@@ -1,112 +1,71 @@
 package com.leo.pillpathbackend.entity;
-
+import com.leo.pillpathbackend.entity.enums.UserType;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "user_type", discriminatorType = DiscriminatorType.STRING)
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Inheritance(strategy = InheritanceType.JOINED)
-@DiscriminatorColumn(name = "user_type", discriminatorType = DiscriminatorType.STRING)
-public class User {
-
+public abstract class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "user_id")
-    private Long userId;
+    private Long id;
 
-    @Column(name = "user_type", insertable = false, updatable = false)
-    private String userType;
+    @Column(unique = true, nullable = false)
+    private String username;
 
-    @NotBlank(message = "Email is required")
-    @Email(message = "Email should be valid")
-    @Column(name = "email", unique = true, nullable = false, length = 100)
+    @Column(unique = true, nullable = false)
     private String email;
 
-    @NotBlank(message = "Password is required")
-    @Size(min = 8, message = "Password must be at least 8 characters")
-    @Column(name = "password", nullable = false)
+    @Column(nullable = false)
     private String password;
 
-    @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^[0-9+\\-\\s()]+$", message = "Invalid phone number format")
-    @Column(name = "phone", nullable = false, length = 20)
-    private String phone;
+    @Column(name = "full_name")
+    private String fullName;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private UserStatus status = UserStatus.ACTIVE;
+    @Column(name = "phone_number")
+    private String phoneNumber;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private UserRole role;
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
 
-    @Column(name = "email_verified", nullable = false)
+    private String address;
+
+    @Column(name = "profile_picture_url")
+    private String profilePictureUrl;
+
+    @Column(name = "is_active")
+    private Boolean isActive = true;
+
+    @Column(name = "email_verified")
     private Boolean emailVerified = false;
 
-    @Column(name = "phone_verified", nullable = false)
+    @Column(name = "phone_verified")
     private Boolean phoneVerified = false;
 
-    @Column(name = "last_login")
-    private LocalDateTime lastLogin;
+    @CreationTimestamp
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 
-    @Column(name = "failed_login_attempts")
-    private Integer failedLoginAttempts = 0;
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
-    @Column(name = "account_locked_until")
-    private LocalDateTime accountLockedUntil;
-
-    @Column(name = "created_by")
-    private String createdBy;
-
-    @Column(name = "updated_by")
-    private String updatedBy;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
-    @Column(name = "deleted_by")
-    private String deletedBy;
-
-    @Column(name = "profile_image_url")
-    private String profileImageUrl;
-
-    @Column(name = "preferences", columnDefinition = "JSON")
-    private String preferences;
-
-    @Column(name = "terms_accepted_at")
-    private LocalDateTime termsAcceptedAt;
-
-    @Column(name = "terms_version")
-    private String termsVersion;
-
-//    public boolean isAccountLocked() {
-//        return accountLockedUntil != null && accountLockedUntil.isAfter(LocalDateTime.now());
-//    }
-//
-//    public boolean isDeleted() {
-//        return deletedAt != null;
-//    }
-
-    public enum UserStatus {
-        ACTIVE,
-        INACTIVE,
-        SUSPENDED,
-        PENDING_VERIFICATION,
-        BLOCKED
-    }
-
-    public enum UserRole {
-        CUSTOMER,
-        PHARMACY,
-        ADMIN,
-        SUPER_ADMIN
-    }
+    // Abstract method to get user type
+    public abstract UserType getUserType();
 }
+

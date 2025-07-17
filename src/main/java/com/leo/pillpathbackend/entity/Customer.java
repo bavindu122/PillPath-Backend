@@ -1,81 +1,65 @@
-//package com.leo.pillpathbackend.entity;
-//
-//import jakarta.persistence.*;
-//import jakarta.validation.constraints.*;
-//import lombok.Data;
-//import lombok.EqualsAndHashCode;
-//import lombok.NoArgsConstructor;
-//import lombok.AllArgsConstructor;
-//
-//import java.time.LocalDate;
-//import java.time.LocalDateTime;
-//
-//@Entity
-//@Table(name = "customers")
-//@Data
-//@EqualsAndHashCode(callSuper = true)
-//@NoArgsConstructor
-//@AllArgsConstructor
-//@DiscriminatorValue("CUSTOMER")
-//@PrimaryKeyJoinColumn(name = "user_id")
-//public class Customer extends User {
-//
-//    @NotBlank(message = "First name is required")
-//    @Size(max = 50, message = "First name cannot exceed 50 characters")
-//    @Column(name = "first_name", nullable = false, length = 50)
-//    private String firstName;
-//
-//    @NotBlank(message = "Last name is required")
-//    @Size(max = 50, message = "Last name cannot exceed 50 characters")
-//    @Column(name = "last_name", nullable = false, length = 50)
-//    private String lastName;
-//
-//    @NotNull(message = "Date of birth is required")
-//    @Past(message = "Date of birth must be in the past")
-//    @Column(name = "date_of_birth", nullable = false)
-//    private LocalDate dateOfBirth;
-//
-//    // Basic profile information
-//    @Enumerated(EnumType.STRING)
-//    @Column(name = "gender")
-//    private Gender gender;
-//
-//    // Address information (basic)
-//    @Column(name = "address", columnDefinition = "TEXT")
-//    private String address;
-//
-//    @Column(name = "city", length = 50)
-//    private String city;
-//
-//    // Customer activity tracking
-//    @Column(name = "total_orders", nullable = false)
-//    private Integer totalOrders = 0;
-//
-//    @Column(name = "last_order_date")
-//    private LocalDateTime lastOrderDate;
-//
-//    // Preferences
-//    @Column(name = "notification_enabled", nullable = false)
-//    private Boolean notificationEnabled = true;
-//
-//    // Utility methods
-//    public String getFullName() {
-//        return firstName + " " + lastName;
-//    }
-//
-//    public int getAge() {
-//        return LocalDate.now().getYear() - dateOfBirth.getYear();
-//    }
-//
-//    public boolean isAdult() {
-//        return getAge() >= 18;
-//    }
-//
-//    // Enums
-//    public enum Gender {
-//        MALE,
-//        FEMALE,
-//        OTHER,
-//        PREFER_NOT_TO_SAY
-//    }
-//}
+package com.leo.pillpathbackend.entity;
+
+import com.leo.pillpathbackend.entity.enums.UserType;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@DiscriminatorValue("CUSTOMER")
+@Setter
+@Getter
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@AllArgsConstructor
+public class Customer extends User {
+
+    @Column(name = "insurance_provider")
+    private String insuranceProvider;
+
+    @Column(name = "insurance_id")
+    private String insuranceId;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "allergies", columnDefinition = "jsonb")
+    private List<String> allergies = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "medical_conditions", columnDefinition = "jsonb")
+    private List<String> medicalConditions = new ArrayList<>();
+
+    @Column(name = "emergency_contact_name")
+    private String emergencyContactName;
+
+    @Column(name = "emergency_contact_phone")
+    private String emergencyContactPhone;
+
+    @Column(name = "preferred_pharmacy_id")
+    private Long preferredPharmacyId;
+
+
+
+    // Relationships - Temporarily commented out until related entities are created
+    /*
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Prescription> prescriptions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Order> orders = new ArrayList<>();
+
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<FamilyProfile> familyProfiles = new ArrayList<>();
+
+    @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private LoyaltyAccount loyaltyAccount;
+    */
+
+    @Override
+    public UserType getUserType() {
+        return UserType.CUSTOMER;
+    }
+}

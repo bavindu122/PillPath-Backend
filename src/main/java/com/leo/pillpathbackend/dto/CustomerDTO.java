@@ -1,17 +1,16 @@
 package com.leo.pillpathbackend.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserDTO {
+public class CustomerDTO {
     private Long id;
     private String username;
     private String email;
@@ -25,4 +24,13 @@ public class UserDTO {
     private Boolean emailVerified;
     private Boolean phoneVerified;
     private String userType;
+
+    // Customer specific fields
+    private String insuranceProvider;
+    private String insuranceId;
+    private List<String> allergies = new ArrayList<>();
+    private List<String> medicalConditions = new ArrayList<>();
+    private String emergencyContactName;
+    private String emergencyContactPhone;
+    private Long preferredPharmacyId;
 }
