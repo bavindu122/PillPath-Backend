@@ -1,8 +1,10 @@
 package com.leo.pillpathbackend.controller;
 
 import com.leo.pillpathbackend.dto.CustomerDTO;
+import com.leo.pillpathbackend.dto.CustomerLoginResponse;
 import com.leo.pillpathbackend.dto.CustomerRegistrationRequest;
 import com.leo.pillpathbackend.dto.CustomerRegistrationResponse;
+import com.leo.pillpathbackend.dto.CustomerLoginRequest;
 import com.leo.pillpathbackend.service.CustomerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,6 +37,16 @@ public class CustomerController {
     public ResponseEntity<Boolean> checkEmailAvailability(@PathVariable String email) {
         boolean exists = customerService.existsByEmail(email);
         return ResponseEntity.ok(!exists); // Return true if available (not exists)
+    }
+    @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<CustomerLoginResponse> loginCustomer(@RequestBody CustomerLoginRequest request) {
+        CustomerLoginResponse response = customerService.loginCustomer(request);
+
+        if (response.isSuccess()) {
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
     }
 
     // ... rest of your existing methods remain the same

@@ -5,19 +5,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDate;
-
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class CustomerRegistrationRequest {
-    private String firstName;
-    private String lastName;
+public class CustomerLoginRequest {
     private String email;
-    private String phone;
     private String password;
-
-    private LocalDate dateOfBirth;
-    private boolean termsAccepted;
 }

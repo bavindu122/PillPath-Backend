@@ -1,14 +1,14 @@
 package com.leo.pillpathbackend.service.impl;
 
-import com.leo.pillpathbackend.dto.CustomerDTO;
-import com.leo.pillpathbackend.dto.CustomerRegistrationRequest;
-import com.leo.pillpathbackend.dto.CustomerRegistrationResponse;
+import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.entity.Customer;
 import com.leo.pillpathbackend.repository.CustomerRepository;
 import com.leo.pillpathbackend.service.CustomerService;
 import com.leo.pillpathbackend.util.Mapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.Optional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,17 +19,13 @@ public class CustomerServiceImpl implements CustomerService {
 
     private final CustomerRepository customerRepository;
     private final Mapper mapper;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public CustomerRegistrationResponse registerCustomer(CustomerRegistrationRequest request) {
         // Validate input
         if (!isValidRegistrationRequest(request)) {
             return createErrorResponse("Invalid registration data");
-        }
-
-        // Check if passwords match
-        if (!request.getPassword().equals(request.getConfirmPassword())) {
-            return createErrorResponse("Passwords do not match");
         }
 
         // Check if email already exists
@@ -60,6 +56,52 @@ public class CustomerServiceImpl implements CustomerService {
                 request.getEmail() != null && !request.getEmail().trim().isEmpty() &&
                 request.getPassword() != null && !request.getPassword().trim().isEmpty() &&
                 request.getPhone() != null && !request.getPhone().trim().isEmpty();
+    }
+
+    @Override
+    public CustomerLoginResponse loginCustomer(CustomerLoginRequest request) {
+        try {
+            // Validate input
+            if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
+                return createLoginErrorResponse("Email is required");
+            }
+
+            if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+                return createLoginErrorResponse("Password is required");
+            }
+
+            // Find customer by email
+            Optional<Customer> customerOpt = customerRepository.findByEmail(request.getEmail().trim().toLowerCase());
+
+            if (customerOpt.isEmpty()) {
+                return createLoginErrorResponse("Invalid email or password");
+            }
+
+            Customer customer = customerOpt.get();
+
+            // Check if customer is active
+            if (!customer.getIsActive()) {
+                return createLoginErrorResponse("Account is deactivated");
+            }
+
+            // Verify password
+            if (!passwordEncoder.matches(request.getPassword(), customer.getPassword())) {
+                return createLoginErrorResponse("Invalid email or password");
+            }
+
+            // Create successful response
+            return mapper.convertToLoginResponse(customer);
+
+        } catch (Exception e) {
+            return createLoginErrorResponse("Login failed: " + e.getMessage());
+        }
+    }
+
+    private CustomerLoginResponse createLoginErrorResponse(String message) {
+        CustomerLoginResponse response = new CustomerLoginResponse();
+        response.setSuccess(false);
+        response.setMessage(message);
+        return response;
     }
 
     private CustomerRegistrationResponse createErrorResponse(String message) {

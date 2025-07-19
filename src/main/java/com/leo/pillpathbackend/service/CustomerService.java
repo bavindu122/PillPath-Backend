@@ -1,13 +1,13 @@
 package com.leo.pillpathbackend.service;
 
-import com.leo.pillpathbackend.dto.CustomerDTO;
-import com.leo.pillpathbackend.dto.CustomerRegistrationRequest;
-import com.leo.pillpathbackend.dto.CustomerRegistrationResponse;
+import com.leo.pillpathbackend.dto.*;
 
 import java.util.List;
 
 public interface CustomerService {
     CustomerRegistrationResponse registerCustomer(CustomerRegistrationRequest request);
+    CustomerLoginResponse loginCustomer(CustomerLoginRequest request);
+
     CustomerDTO saveCustomer(CustomerDTO customerDTO);
     CustomerDTO getCustomerById(Long id);
     CustomerDTO updateCustomer(CustomerDTO customerDTO);

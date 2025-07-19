@@ -1,13 +1,9 @@
 package com.leo.pillpathbackend.util;
 
+import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.entity.User;
-import com.leo.pillpathbackend.dto.UserDTO;
-import com.leo.pillpathbackend.dto.CustomerRegistrationRequest;
-import com.leo.pillpathbackend.dto.CustomerRegistrationResponse;
 import com.leo.pillpathbackend.entity.Review;
-import com.leo.pillpathbackend.dto.ReviewDTO;
 import com.leo.pillpathbackend.entity.Customer;
-import com.leo.pillpathbackend.dto.CustomerDTO;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -207,6 +203,18 @@ public class Mapper {
         response.setFullName(customer.getFullName());
         response.setSuccess(true);
         response.setMessage("Customer registered successfully");
+        return response;
+    }
+
+    public CustomerLoginResponse convertToLoginResponse(Customer customer) {
+        CustomerLoginResponse response = new CustomerLoginResponse();
+        response.setId(customer.getId());
+        response.setUsername(customer.getUsername());
+        response.setEmail(customer.getEmail());
+        response.setFullName(customer.getFullName());
+        response.setSuccess(true);
+        response.setMessage("Login successful");
+        response.setToken(null); // Set this when you implement JWT
         return response;
     }
 }
