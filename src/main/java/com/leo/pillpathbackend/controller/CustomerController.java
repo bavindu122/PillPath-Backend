@@ -1,11 +1,8 @@
 package com.leo.pillpathbackend.controller;
 
-import com.leo.pillpathbackend.dto.CustomerDTO;
-import com.leo.pillpathbackend.dto.CustomerLoginResponse;
-import com.leo.pillpathbackend.dto.CustomerRegistrationRequest;
-import com.leo.pillpathbackend.dto.CustomerRegistrationResponse;
-import com.leo.pillpathbackend.dto.CustomerLoginRequest;
+import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.service.CustomerService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -13,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -38,6 +36,7 @@ public class CustomerController {
         boolean exists = customerService.existsByEmail(email);
         return ResponseEntity.ok(!exists); // Return true if available (not exists)
     }
+
     @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CustomerLoginResponse> loginCustomer(@RequestBody CustomerLoginRequest request) {
         CustomerLoginResponse response = customerService.loginCustomer(request);
@@ -46,6 +45,52 @@ public class CustomerController {
             return ResponseEntity.ok(response);
         } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+    }
+
+    @GetMapping(value = "/profile/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<CustomerProfileDTO> getCustomerProfile(@PathVariable Long id) {
+        try {
+            CustomerProfileDTO customer = customerService.getCustomerProfileById(id);
+            return ResponseEntity.ok(customer);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    @GetMapping(value = "/profile", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getCurrentCustomerProfile(HttpServletRequest request) {
+        try {
+            // Extract token from Authorization header
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Missing or invalid authorization header"));
+            }
+
+            String token = authHeader.substring(7);
+
+            // Simple token validation for temp tokens
+            if (!token.startsWith("temp-token-")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Invalid token format"));
+            }
+
+            // Extract customer ID from temp token
+            Long customerId = Long.parseLong(token.replace("temp-token-", ""));
+
+            CustomerProfileDTO customer = customerService.getCustomerProfileById(customerId);
+            return ResponseEntity.ok(customer);
+
+        } catch (NumberFormatException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Invalid token"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Customer not found"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to get profile: " + e.getMessage()));
         }
     }
 

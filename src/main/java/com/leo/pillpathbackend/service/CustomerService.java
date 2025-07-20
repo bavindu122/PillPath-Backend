@@ -19,4 +19,7 @@ public interface CustomerService {
     List<CustomerDTO> getCustomersByPharmacy(Long pharmacyId);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
+    CustomerDTO getCustomerProfile(Long customerId);
+    CustomerProfileDTO getCustomerProfileById(Long customerId);
+    CustomerProfileDTO getCustomerProfileByEmail(String email);
 }

@@ -110,6 +110,59 @@ public class CustomerServiceImpl implements CustomerService {
         response.setMessage(message);
         return response;
     }
+    @Override
+    public CustomerDTO getCustomerProfile(Long customerId) {
+        try {
+            Customer customer = customerRepository.findById(customerId)
+                    .orElseThrow(() -> new RuntimeException("Customer not found with id: " + customerId));
+
+            // Check if customer is active
+            if (!customer.getIsActive()) {
+                throw new RuntimeException("Customer account is deactivated");
+            }
+
+            return mapper.convertToCustomerDTO(customer);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load customer profile: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public CustomerProfileDTO getCustomerProfileById(Long customerId) {
+        try {
+            Customer customer = customerRepository.findById(customerId)
+                    .orElseThrow(() -> new RuntimeException("Customer not found with id: " + customerId));
+
+            if (!customer.getIsActive()) {
+                throw new RuntimeException("Customer account is deactivated");
+            }
+
+            return mapper.convertToProfileDTO(customer);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load customer profile: " + e.getMessage());
+        }
+    }
+
+
+    @Override
+    public CustomerProfileDTO getCustomerProfileByEmail(String email) {
+        try {
+            Customer customer = customerRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Customer not found with email: " + email));
+
+            if (!customer.getIsActive()) {
+                throw new RuntimeException("Customer account is deactivated");
+            }
+
+            return mapper.convertToProfileDTO(customer);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load customer profile: " + e.getMessage());
+        }
+    }
+
 
     @Override
     public boolean existsByUsername(String username) {

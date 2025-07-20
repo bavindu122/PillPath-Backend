@@ -57,8 +57,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers("/api/v1/customers/register").permitAll()
-                        .requestMatchers("/api/v1/customers/login").permitAll() // Add this line
+                        .requestMatchers("/api/v1/customers/login").permitAll()
                         .requestMatchers("/api/v1/customers/check-email/**").permitAll()
+                        .requestMatchers("/api/v1/customers/profile/**").permitAll() // Add this line for now
                         .anyRequest().authenticated()
                 );
 

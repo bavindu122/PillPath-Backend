@@ -214,7 +214,30 @@ public class Mapper {
         response.setFullName(customer.getFullName());
         response.setSuccess(true);
         response.setMessage("Login successful");
-        response.setToken(null); // Set this when you implement JWT
+        response.setToken("temp-token-" + customer.getId());
+        response.setUser(convertToProfileDTO(customer)); // Safe profile data
         return response;
+    }
+
+    public CustomerProfileDTO convertToProfileDTO(Customer customer) {
+        CustomerProfileDTO dto = new CustomerProfileDTO();
+        dto.setId(customer.getId());
+        dto.setUsername(customer.getUsername());
+        dto.setEmail(customer.getEmail());
+        dto.setFullName(customer.getFullName());
+        dto.setPhoneNumber(customer.getPhoneNumber());
+        dto.setDateOfBirth(customer.getDateOfBirth());
+        dto.setAddress(customer.getAddress());
+        dto.setProfilePictureUrl(customer.getProfilePictureUrl());
+        dto.setEmailVerified(customer.getEmailVerified());
+        dto.setPhoneVerified(customer.getPhoneVerified());
+        dto.setInsuranceProvider(customer.getInsuranceProvider());
+        dto.setInsuranceId(customer.getInsuranceId());
+        dto.setAllergies(customer.getAllergies());
+        dto.setMedicalConditions(customer.getMedicalConditions());
+        dto.setEmergencyContactName(customer.getEmergencyContactName());
+        dto.setEmergencyContactPhone(customer.getEmergencyContactPhone());
+        dto.setPreferredPharmacyId(customer.getPreferredPharmacyId());
+        return dto;
     }
 }
