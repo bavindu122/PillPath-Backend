@@ -1,14 +1,19 @@
 package com.leo.pillpathbackend.controller;
 
+import com.leo.pillpathbackend.entity.Customer;
+import com.leo.pillpathbackend.repository.CustomerRepository;
 import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.service.CustomerService;
+import com.leo.pillpathbackend.service.CloudinaryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +24,9 @@ import java.util.Map;
 public class CustomerController {
 
     private final CustomerService customerService;
+    private final CloudinaryService cloudinaryService;
+    private final CustomerRepository customerRepository;
+
 
     @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CustomerRegistrationResponse> registerCustomer(@RequestBody CustomerRegistrationRequest request) {
@@ -94,7 +102,120 @@ public class CustomerController {
         }
     }
 
-    // ... rest of your existing methods remain the same
+    @PutMapping("/profile")
+    public ResponseEntity<Map<String, Object>> updateProfile(
+            @RequestBody CustomerProfileDTO profileDTO,
+            HttpServletRequest request) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Extract and validate token
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                response.put("success", false);
+                response.put("message", "Missing authorization header");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            String token = authHeader.substring(7);
+            if (!token.startsWith("temp-token-")) {
+                response.put("success", false);
+                response.put("message", "Invalid token format");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            Long customerId = Long.parseLong(token.replace("temp-token-", ""));
+
+            // Update profile
+            CustomerProfileDTO updatedProfile = customerService.updateCustomerProfile(customerId, profileDTO);
+
+            response.put("success", true);
+            response.put("message", "Profile updated successfully");
+            response.put("customer", updatedProfile);
+
+            return ResponseEntity.ok(response);
+
+        } catch (NumberFormatException e) {
+            response.put("success", false);
+            response.put("message", "Invalid token");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        } catch (RuntimeException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to update profile: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+    @PostMapping("/profile/upload-picture")
+    public ResponseEntity<Map<String, Object>> uploadProfilePicture(
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest request) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Extract token from Authorization header
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                response.put("success", false);
+                response.put("message", "Missing authorization header");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            String token = authHeader.substring(7);
+
+            // Simple token validation for temp tokens
+            if (!token.startsWith("temp-token-")) {
+                response.put("success", false);
+                response.put("message", "Invalid token format");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            // Extract customer ID from temp token
+            Long customerId = Long.parseLong(token.replace("temp-token-", ""));
+            Customer customer = customerRepository.findById(customerId)
+                    .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+            // Delete old profile picture if exists
+            if (customer.getProfilePictureUrl() != null) {
+                String oldPublicId = cloudinaryService.extractPublicIdFromUrl(customer.getProfilePictureUrl());
+                if (oldPublicId != null) {
+                    cloudinaryService.deleteImage(oldPublicId);
+                }
+            }
+
+            // Upload new image
+            Map<String, Object> uploadResult = cloudinaryService.uploadProfilePicture(file, customer.getId());
+            String newImageUrl = uploadResult.get("secure_url").toString();
+
+            // Update customer profile
+            customerService.updateProfilePicture(customer.getId(), newImageUrl);
+
+            response.put("success", true);
+            response.put("imageUrl", newImageUrl);
+            response.put("message", "Profile picture updated successfully");
+
+            return ResponseEntity.ok(response);
+
+        } catch (NumberFormatException e) {
+            response.put("success", false);
+            response.put("message", "Invalid token");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to upload image: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CustomerDTO> saveCustomer(@RequestBody CustomerDTO customerDTO) {
         CustomerDTO response = customerService.saveCustomer(customerDTO);

@@ -162,7 +162,43 @@ public class CustomerServiceImpl implements CustomerService {
             throw new RuntimeException("Failed to load customer profile: " + e.getMessage());
         }
     }
+    @Override
+    public Customer findByEmail(String email) {
+        return customerRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Customer not found with email: " + email));
+    }
 
+    @Override
+    public void updateProfilePicture(Long customerId, String imageUrl) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        customer.setProfilePictureUrl(imageUrl);
+        customer.setUpdatedAt(LocalDateTime.now());
+        customerRepository.save(customer);
+    }
+    @Override
+    public CustomerProfileDTO updateCustomerProfile(Long customerId, CustomerProfileDTO profileDTO) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        // Update fields from DTO
+        customer.setFullName(profileDTO.getFullName());
+        customer.setPhoneNumber(profileDTO.getPhoneNumber());
+        customer.setDateOfBirth(profileDTO.getDateOfBirth());
+        customer.setAddress(profileDTO.getAddress());
+        customer.setInsuranceProvider(profileDTO.getInsuranceProvider());
+        customer.setInsuranceId(profileDTO.getInsuranceId());
+        customer.setAllergies(profileDTO.getAllergies());
+        customer.setMedicalConditions(profileDTO.getMedicalConditions());
+        customer.setEmergencyContactName(profileDTO.getEmergencyContactName());
+        customer.setEmergencyContactPhone(profileDTO.getEmergencyContactPhone());
+        customer.setPreferredPharmacyId(profileDTO.getPreferredPharmacyId());
+        customer.setUpdatedAt(LocalDateTime.now());
+
+        Customer updatedCustomer = customerRepository.save(customer);
+        return mapper.convertToProfileDTO(updatedCustomer);
+    }
 
     @Override
     public boolean existsByUsername(String username) {
