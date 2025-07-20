@@ -5,6 +5,7 @@ import com.leo.pillpathbackend.repository.CustomerRepository;
 import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.service.CustomerService;
 import com.leo.pillpathbackend.service.CloudinaryService;
+import com.leo.pillpathbackend.util.AuthenticationHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -26,7 +27,7 @@ public class CustomerController {
     private final CustomerService customerService;
     private final CloudinaryService cloudinaryService;
     private final CustomerRepository customerRepository;
-
+    private final AuthenticationHelper authenticationHelper;
 
     @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CustomerRegistrationResponse> registerCustomer(@RequestBody CustomerRegistrationRequest request) {
@@ -69,30 +70,13 @@ public class CustomerController {
     @GetMapping(value = "/profile", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getCurrentCustomerProfile(HttpServletRequest request) {
         try {
-            // Extract token from Authorization header
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Missing or invalid authorization header"));
-            }
-
-            String token = authHeader.substring(7);
-
-            // Simple token validation for temp tokens
-            if (!token.startsWith("temp-token-")) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Invalid token format"));
-            }
-
-            // Extract customer ID from temp token
-            Long customerId = Long.parseLong(token.replace("temp-token-", ""));
-
+            Long customerId = authenticationHelper.extractCustomerIdFromRequest(request);
             CustomerProfileDTO customer = customerService.getCustomerProfileById(customerId);
             return ResponseEntity.ok(customer);
 
-        } catch (NumberFormatException e) {
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Invalid token"));
+                    .body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("error", "Customer not found"));
@@ -110,24 +94,7 @@ public class CustomerController {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // Extract and validate token
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                response.put("success", false);
-                response.put("message", "Missing authorization header");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            }
-
-            String token = authHeader.substring(7);
-            if (!token.startsWith("temp-token-")) {
-                response.put("success", false);
-                response.put("message", "Invalid token format");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            }
-
-            Long customerId = Long.parseLong(token.replace("temp-token-", ""));
-
-            // Update profile
+            Long customerId = authenticationHelper.extractCustomerIdFromRequest(request);
             CustomerProfileDTO updatedProfile = customerService.updateCustomerProfile(customerId, profileDTO);
 
             response.put("success", true);
@@ -136,9 +103,9 @@ public class CustomerController {
 
             return ResponseEntity.ok(response);
 
-        } catch (NumberFormatException e) {
+        } catch (IllegalArgumentException e) {
             response.put("success", false);
-            response.put("message", "Invalid token");
+            response.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         } catch (RuntimeException e) {
             response.put("success", false);
@@ -150,6 +117,7 @@ public class CustomerController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
+
     @PostMapping("/profile/upload-picture")
     public ResponseEntity<Map<String, Object>> uploadProfilePicture(
             @RequestParam("file") MultipartFile file,
@@ -158,25 +126,7 @@ public class CustomerController {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // Extract token from Authorization header
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                response.put("success", false);
-                response.put("message", "Missing authorization header");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            }
-
-            String token = authHeader.substring(7);
-
-            // Simple token validation for temp tokens
-            if (!token.startsWith("temp-token-")) {
-                response.put("success", false);
-                response.put("message", "Invalid token format");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            }
-
-            // Extract customer ID from temp token
-            Long customerId = Long.parseLong(token.replace("temp-token-", ""));
+            Long customerId = authenticationHelper.extractCustomerIdFromRequest(request);
             Customer customer = customerRepository.findById(customerId)
                     .orElseThrow(() -> new RuntimeException("Customer not found"));
 
@@ -201,14 +151,14 @@ public class CustomerController {
 
             return ResponseEntity.ok(response);
 
-        } catch (NumberFormatException e) {
-            response.put("success", false);
-            response.put("message", "Invalid token");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         } catch (IllegalArgumentException e) {
             response.put("success", false);
             response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        } catch (RuntimeException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "Failed to upload image: " + e.getMessage());

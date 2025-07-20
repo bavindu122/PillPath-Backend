@@ -1,6 +1,8 @@
 package com.leo.pillpathbackend.util;
 
 import com.leo.pillpathbackend.dto.*;
+import com.leo.pillpathbackend.entity.PharmacyAdmin;
+import com.leo.pillpathbackend.entity.Pharmacy;
 import com.leo.pillpathbackend.entity.User;
 import com.leo.pillpathbackend.entity.Review;
 import com.leo.pillpathbackend.entity.Customer;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.modelmapper.*;
 import lombok.RequiredArgsConstructor;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -92,20 +95,18 @@ public class Mapper {
         }
     }
 
+    //Customer specific methods
     public Customer convertToCustomerEntity(CustomerDTO customerDTO) {
         return modelMapper.map(customerDTO, Customer.class);
     }
-
     public CustomerDTO convertToCustomerDTO(Customer customer) {
         return modelMapper.map(customer, CustomerDTO.class);
     }
-
     public List<CustomerDTO> convertToCustomerDTOList(List<Customer> customers) {
         return customers.stream()
                 .map(this::convertToCustomerDTO)
                 .toList();
     }
-
     public void updateCustomerFromDTO(Customer customer, CustomerDTO dto) {
         if (dto.getUsername() != null) {
             customer.setUsername(dto.getUsername());
@@ -163,9 +164,7 @@ public class Mapper {
             customer.setPreferredPharmacyId(dto.getPreferredPharmacyId());
         }
     }
-
     private final PasswordEncoder passwordEncoder;
-
     public Customer convertRegistrationRequestToEntity(CustomerRegistrationRequest request) {
         Customer customer = new Customer();
 
@@ -189,12 +188,10 @@ public class Mapper {
 
         return customer;
     }
-
     private String generateUsername(String firstName, String lastName) {
         String baseUsername = (firstName + lastName).toLowerCase().replaceAll("[^a-zA-Z0-9]", "");
         return baseUsername + System.currentTimeMillis() % 10000;
     }
-
     public CustomerRegistrationResponse convertToRegistrationResponse(Customer customer) {
         CustomerRegistrationResponse response = new CustomerRegistrationResponse();
         response.setId(customer.getId());
@@ -205,7 +202,6 @@ public class Mapper {
         response.setMessage("Customer registered successfully");
         return response;
     }
-
     public CustomerLoginResponse convertToLoginResponse(Customer customer) {
         CustomerLoginResponse response = new CustomerLoginResponse();
         response.setId(customer.getId());
@@ -218,7 +214,6 @@ public class Mapper {
         response.setUser(convertToProfileDTO(customer)); // Safe profile data
         return response;
     }
-
     public CustomerProfileDTO convertToProfileDTO(Customer customer) {
         CustomerProfileDTO dto = new CustomerProfileDTO();
         dto.setId(customer.getId());
@@ -238,6 +233,109 @@ public class Mapper {
         dto.setEmergencyContactName(customer.getEmergencyContactName());
         dto.setEmergencyContactPhone(customer.getEmergencyContactPhone());
         dto.setPreferredPharmacyId(customer.getPreferredPharmacyId());
+        return dto;
+    }
+
+    //Pharmacy && PharmacyAdmin specific methods
+    // Convert registration request to Pharmacy entity
+    public Pharmacy convertToPharmacyEntity(PharmacyRegistrationRequest request) {
+        Pharmacy pharmacy = new Pharmacy();
+        pharmacy.setName(request.getName());
+        pharmacy.setAddress(request.getAddress());
+        pharmacy.setPhoneNumber(request.getPhoneNumber());
+        pharmacy.setEmail(request.getEmail());
+        pharmacy.setLicenseNumber(request.getLicenseNumber());
+        pharmacy.setLicenseExpiryDate(request.getLicenseExpiryDate());
+        pharmacy.setOperatingHours(request.getOperatingHours());
+        pharmacy.setServices(request.getServices());
+        pharmacy.setDeliveryAvailable(request.getDeliveryAvailable());
+        pharmacy.setDeliveryRadius(request.getDeliveryRadius());
+        pharmacy.setIsVerified(false); // Require admin verification
+        pharmacy.setIsActive(true);
+
+        return pharmacy;
+    }
+
+    // Convert registration request to PharmacyAdmin entity
+    public PharmacyAdmin convertToPharmacyAdminEntity(PharmacyRegistrationRequest request, Pharmacy pharmacy) {
+        PharmacyAdmin admin = new PharmacyAdmin();
+
+        // Generate username from first and last name
+        String username = generateUsername(request.getAdminFirstName(), request.getAdminLastName());
+        admin.setUsername(username);
+
+        admin.setEmail(request.getAdminEmail());
+        admin.setPassword(passwordEncoder.encode(request.getAdminPassword()));
+        admin.setFullName(request.getAdminFirstName() + " " + request.getAdminLastName());
+        admin.setPhoneNumber(request.getAdminPhoneNumber());
+
+        // Set PharmacyAdmin specific fields
+        admin.setPharmacy(pharmacy);
+        admin.setPosition(request.getAdminPosition());
+        admin.setLicenseNumber(request.getAdminLicenseNumber());
+        admin.setHireDate(LocalDate.now());
+        admin.setIsPrimaryAdmin(true); // First admin is primary
+        admin.setPermissions(List.of("FULL_ACCESS")); // Default permissions
+
+        // Set default User values
+        admin.setIsActive(true);
+        admin.setEmailVerified(false);
+        admin.setPhoneVerified(false);
+
+        return admin;
+    }
+
+    // Convert to registration response
+    public PharmacyRegistrationResponse convertToPharmacyRegistrationResponse(Pharmacy pharmacy, PharmacyAdmin admin) {
+        PharmacyRegistrationResponse response = new PharmacyRegistrationResponse();
+        response.setPharmacyId(pharmacy.getId());
+        response.setAdminId(admin.getId());
+        response.setPharmacyName(pharmacy.getName());
+        response.setAdminUsername(admin.getUsername());
+        response.setAdminEmail(admin.getEmail());
+        response.setSuccess(true);
+        response.setMessage("Pharmacy registration submitted successfully. Pending approval.");
+        return response;
+    }
+
+    // Convert to login response
+    public PharmacyAdminLoginResponse convertToPharmacyAdminLoginResponse(PharmacyAdmin admin) {
+        PharmacyAdminLoginResponse response = new PharmacyAdminLoginResponse();
+        response.setAdminId(admin.getId());
+        response.setPharmacyId(admin.getPharmacy().getId());
+        response.setUsername(admin.getUsername());
+        response.setEmail(admin.getEmail());
+        response.setFullName(admin.getFullName());
+        response.setSuccess(true);
+        response.setMessage("Login successful");
+        response.setToken("temp-token-pharmacy-" + admin.getId());
+        response.setUser(convertToPharmacyAdminProfileDTO(admin));
+        return response;
+    }
+
+    // Convert to profile DTO
+    public PharmacyAdminProfileDTO convertToPharmacyAdminProfileDTO(PharmacyAdmin admin) {
+        PharmacyAdminProfileDTO dto = new PharmacyAdminProfileDTO();
+        dto.setId(admin.getId());
+        dto.setUsername(admin.getUsername());
+        dto.setEmail(admin.getEmail());
+        dto.setFullName(admin.getFullName());
+        dto.setPhoneNumber(admin.getPhoneNumber());
+        dto.setDateOfBirth(admin.getDateOfBirth());
+        dto.setAddress(admin.getAddress());
+        dto.setProfilePictureUrl(admin.getProfilePictureUrl());
+        dto.setEmailVerified(admin.getEmailVerified());
+        dto.setPhoneVerified(admin.getPhoneVerified());
+
+        // PharmacyAdmin specific fields
+        dto.setPharmacyId(admin.getPharmacy().getId());
+        dto.setPharmacyName(admin.getPharmacy().getName());
+        dto.setPosition(admin.getPosition());
+        dto.setLicenseNumber(admin.getLicenseNumber());
+        dto.setHireDate(admin.getHireDate());
+        dto.setIsPrimaryAdmin(admin.getIsPrimaryAdmin());
+        dto.setPermissions(admin.getPermissions());
+
         return dto;
     }
 }
