@@ -7,5 +7,6 @@ import java.util.Map;
 public interface CloudinaryService {
     Map<String, Object> uploadProfilePicture(MultipartFile file, Long userId) throws IOException;
     void deleteImage(String publicId) throws IOException;
+    @Deprecated
     String extractPublicIdFromUrl(String imageUrl);
 }

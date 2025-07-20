@@ -168,15 +168,12 @@ public class CustomerServiceImpl implements CustomerService {
                 .orElseThrow(() -> new RuntimeException("Customer not found with email: " + email));
     }
 
+    @Deprecated
     @Override
     public void updateProfilePicture(Long customerId, String imageUrl) {
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
-
-        customer.setProfilePictureUrl(imageUrl);
-        customer.setUpdatedAt(LocalDateTime.now());
-        customerRepository.save(customer);
+        updateProfilePicture(customerId, imageUrl, null);
     }
+
     @Override
     public CustomerProfileDTO updateCustomerProfile(Long customerId, CustomerProfileDTO profileDTO) {
         Customer customer = customerRepository.findById(customerId)
@@ -198,6 +195,24 @@ public class CustomerServiceImpl implements CustomerService {
 
         Customer updatedCustomer = customerRepository.save(customer);
         return mapper.convertToProfileDTO(updatedCustomer);
+    }
+
+    @Override
+    public void updateProfilePicture(Long customerId, String imageUrl, String publicId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        customer.setProfilePictureUrl(imageUrl);
+        customer.setProfilePicturePublicId(publicId);
+        customer.setUpdatedAt(LocalDateTime.now());
+        customerRepository.save(customer);
+    }
+
+    @Override
+    public String getProfilePicturePublicId(Long customerId) {
+        return customerRepository.findById(customerId)
+                .map(Customer::getProfilePicturePublicId)
+                .orElse(null);
     }
 
     @Override

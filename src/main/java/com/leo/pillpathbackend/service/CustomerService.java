@@ -26,5 +26,7 @@ public interface CustomerService {
     Customer findByEmail(String email);
     void updateProfilePicture(Long customerId, String imageUrl);
     CustomerProfileDTO updateCustomerProfile(Long customerId, CustomerProfileDTO profileDTO);
+    void updateProfilePicture(Long customerId, String imageUrl, String publicId);
+    String getProfilePicturePublicId(Long customerId);
 
 }

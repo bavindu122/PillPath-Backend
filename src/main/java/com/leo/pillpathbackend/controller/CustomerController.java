@@ -30,15 +30,15 @@ public class CustomerController {
     private final AuthenticationHelper authenticationHelper;
 
     @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<CustomerRegistrationResponse> registerCustomer(@RequestBody CustomerRegistrationRequest request) {
-        CustomerRegistrationResponse response = customerService.registerCustomer(request);
+        public ResponseEntity<CustomerRegistrationResponse> registerCustomer(@RequestBody CustomerRegistrationRequest request) {
+            CustomerRegistrationResponse response = customerService.registerCustomer(request);
 
-        if (response.isSuccess()) {
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            if (response.isSuccess()) {
+                return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
         }
-    }
 
     @GetMapping(value = "/check-email/{email}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Boolean> checkEmailAvailability(@PathVariable String email) {
@@ -130,20 +130,19 @@ public class CustomerController {
             Customer customer = customerRepository.findById(customerId)
                     .orElseThrow(() -> new RuntimeException("Customer not found"));
 
-            // Delete old profile picture if exists
-            if (customer.getProfilePictureUrl() != null) {
-                String oldPublicId = cloudinaryService.extractPublicIdFromUrl(customer.getProfilePictureUrl());
-                if (oldPublicId != null) {
-                    cloudinaryService.deleteImage(oldPublicId);
-                }
+            // Delete old profile picture using stored publicId
+            String oldPublicId = customer.getProfilePicturePublicId();
+            if (oldPublicId != null && !oldPublicId.isEmpty()) {
+                cloudinaryService.deleteImage(oldPublicId);
             }
 
             // Upload new image
             Map<String, Object> uploadResult = cloudinaryService.uploadProfilePicture(file, customer.getId());
             String newImageUrl = uploadResult.get("secure_url").toString();
+            String newPublicId = uploadResult.get("public_id").toString();
 
-            // Update customer profile
-            customerService.updateProfilePicture(customer.getId(), newImageUrl);
+            // Update customer profile with both URL and publicId
+            customerService.updateProfilePicture(customer.getId(), newImageUrl, newPublicId);
 
             response.put("success", true);
             response.put("imageUrl", newImageUrl);

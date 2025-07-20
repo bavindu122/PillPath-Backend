@@ -84,14 +84,14 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         }
     }
 
+    @Deprecated
     @Override
     public String extractPublicIdFromUrl(String imageUrl) {
+        // Keep for legacy/compatibility, but avoid using in new code
         if (imageUrl == null || imageUrl.isEmpty()) {
             return null;
         }
 
-        // Extract public_id from Cloudinary URL
-        // URL format: https://res.cloudinary.com/cloud-name/image/upload/v123456789/public_id.jpg
         try {
             String[] parts = imageUrl.split("/");
             String filename = parts[parts.length - 1];
