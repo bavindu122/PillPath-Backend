@@ -61,8 +61,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/customers/check-email/**").permitAll()
                         .requestMatchers("/api/v1/customers/profile/**").permitAll()
                         .requestMatchers("/api/v1/pharmacies/register").permitAll()
-                        .requestMatchers("/users/admin/login").permitAll()  // Fixed URL
+                        .requestMatchers("/api/v1/users/admin/login").permitAll()  // Fixed URL
                         .requestMatchers("/api/v1/users/change-password").permitAll()
+                        .requestMatchers("/api/v1/admin/dashboard").hasRole("ADMIN")  // Example admin endpoint
                         .anyRequest().authenticated()
                 );
 
