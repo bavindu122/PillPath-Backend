@@ -1,6 +1,7 @@
 package com.leo.pillpathbackend.service;
 
 import com.leo.pillpathbackend.dto.*;
+import com.leo.pillpathbackend.entity.Customer;
 
 import java.util.List;
 
@@ -19,4 +20,13 @@ public interface CustomerService {
     List<CustomerDTO> getCustomersByPharmacy(Long pharmacyId);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
+    CustomerDTO getCustomerProfile(Long customerId);
+    CustomerProfileDTO getCustomerProfileById(Long customerId);
+    CustomerProfileDTO getCustomerProfileByEmail(String email);
+    Customer findByEmail(String email);
+    void updateProfilePicture(Long customerId, String imageUrl);
+    CustomerProfileDTO updateCustomerProfile(Long customerId, CustomerProfileDTO profileDTO);
+    void updateProfilePicture(Long customerId, String imageUrl, String publicId);
+    String getProfilePicturePublicId(Long customerId);
+
 }

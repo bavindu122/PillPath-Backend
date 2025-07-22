@@ -17,4 +17,5 @@ public class CustomerLoginResponse {
     private String message;
     private boolean success;
     private String token; // For future JWT implementation
+    private CustomerProfileDTO user;// Add this for frontend compatibilityA
 }

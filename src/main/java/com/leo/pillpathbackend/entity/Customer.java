@@ -41,6 +41,9 @@ public class Customer extends User {
     @Column(name = "preferred_pharmacy_id")
     private Long preferredPharmacyId;
 
+    @Column(name = "profile_picture_public_id")
+    private String profilePicturePublicId;
+
 
 
     // Relationships - Temporarily commented out until related entities are created
