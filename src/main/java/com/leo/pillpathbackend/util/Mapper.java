@@ -210,7 +210,7 @@ public class Mapper {
         response.setFullName(customer.getFullName());
         response.setSuccess(true);
         response.setMessage("Login successful");
-        response.setToken("temp-token-" + customer.getId());
+        response.setToken("temp-token-customer-" + customer.getId()); // Fixed: added "customer-"
         response.setUser(convertToProfileDTO(customer)); // Safe profile data
         return response;
     }
@@ -299,8 +299,11 @@ public class Mapper {
     }
 
     // Convert to login response
+    // Add these methods to your Mapper class
+
     public PharmacyAdminLoginResponse convertToPharmacyAdminLoginResponse(PharmacyAdmin admin) {
         PharmacyAdminLoginResponse response = new PharmacyAdminLoginResponse();
+
         response.setAdminId(admin.getId());
         response.setPharmacyId(admin.getPharmacy().getId());
         response.setUsername(admin.getUsername());
@@ -308,14 +311,19 @@ public class Mapper {
         response.setFullName(admin.getFullName());
         response.setSuccess(true);
         response.setMessage("Login successful");
-        response.setToken("temp-token-pharmacy-" + admin.getId());
-        response.setUser(convertToPharmacyAdminProfileDTO(admin));
+        // Note: You should implement JWT token generation here
+        response.setToken("jwt_token_here"); // TODO: Implement JWT
+
+        // Set user profile
+        PharmacyAdminProfileDTO userProfile = convertToPharmacyAdminProfileDTO(admin);
+        response.setUser(userProfile);
+
         return response;
     }
 
-    // Convert to profile DTO
     public PharmacyAdminProfileDTO convertToPharmacyAdminProfileDTO(PharmacyAdmin admin) {
         PharmacyAdminProfileDTO dto = new PharmacyAdminProfileDTO();
+
         dto.setId(admin.getId());
         dto.setUsername(admin.getUsername());
         dto.setEmail(admin.getEmail());
@@ -338,4 +346,86 @@ public class Mapper {
 
         return dto;
     }
+    // Add these methods to your existing Mapper class
+
+    public PharmacyDTO convertToPharmacyDTO(Pharmacy pharmacy) {
+        PharmacyDTO dto = modelMapper.map(pharmacy, PharmacyDTO.class);
+
+        // Set derived status field
+        if (pharmacy.getIsActive() && pharmacy.getIsVerified()) {
+            dto.setStatus("Active");
+        } else if (!pharmacy.getIsVerified() && pharmacy.getIsActive()) {
+            dto.setStatus("Pending");
+        } else if (!pharmacy.getIsActive() && pharmacy.getIsVerified()) {
+            dto.setStatus("Suspended");
+        } else {
+            dto.setStatus("Rejected");
+        }
+
+        return dto;
+    }
+
+    public void updatePharmacyFromDTO(Pharmacy pharmacy, PharmacyDTO dto) {
+        if (dto.getName() != null) {
+            pharmacy.setName(dto.getName());
+        }
+        if (dto.getAddress() != null) {
+            pharmacy.setAddress(dto.getAddress());
+        }
+        if (dto.getPhoneNumber() != null) {
+            pharmacy.setPhoneNumber(dto.getPhoneNumber());
+        }
+        if (dto.getEmail() != null) {
+            pharmacy.setEmail(dto.getEmail());
+        }
+        if (dto.getLogoUrl() != null) {
+            pharmacy.setLogoUrl(dto.getLogoUrl());
+        }
+        if (dto.getLogoPublicId() != null) {
+            pharmacy.setLogoPublicId(dto.getLogoPublicId());
+        }
+        if (dto.getBannerUrl() != null) {
+            pharmacy.setBannerUrl(dto.getBannerUrl());
+        }
+        if (dto.getBannerPublicId() != null) {
+            pharmacy.setBannerPublicId(dto.getBannerPublicId());
+        }
+        if (dto.getOperatingHours() != null) {
+            pharmacy.setOperatingHours(dto.getOperatingHours());
+        }
+        if (dto.getServices() != null) {
+            pharmacy.setServices(dto.getServices());
+        }
+        if (dto.getDeliveryAvailable() != null) {
+            pharmacy.setDeliveryAvailable(dto.getDeliveryAvailable());
+        }
+        if (dto.getDeliveryRadius() != null) {
+            pharmacy.setDeliveryRadius(dto.getDeliveryRadius());
+        }
+    }
+//    public PharmacistProfileDTO convertToPharmacistProfileDTO(Pharmacist pharmacist) {
+//        PharmacistProfileDTO dto = new PharmacistProfileDTO();
+//
+//        dto.setId(pharmacist.getId());
+//        dto.setEmail(pharmacist.getEmail());
+//        dto.setFullName(pharmacist.getFullName());
+//        dto.setPhoneNumber(pharmacist.getPhoneNumber());
+//        dto.setDateOfBirth(pharmacist.getDateOfBirth());
+//        dto.setProfilePictureUrl(pharmacist.getProfilePictureUrl());
+//
+//        // Pharmacist specific fields
+//        dto.setPharmacyId(pharmacist.getPharmacy().getId());
+//        dto.setPharmacyName(pharmacist.getPharmacy().getName());
+//        dto.setLicenseNumber(pharmacist.getLicenseNumber());
+//        dto.setLicenseExpiryDate(pharmacist.getLicenseExpiryDate());
+//        dto.setSpecialization(pharmacist.getSpecialization());
+//        dto.setYearsOfExperience(pharmacist.getYearsOfExperience());
+//        dto.setHireDate(pharmacist.getHireDate());
+//        dto.setShiftSchedule(pharmacist.getShiftSchedule());
+//        dto.setCertifications(pharmacist.getCertifications());
+//        dto.setIsVerified(pharmacist.getIsVerified());
+//        dto.setIsActive(pharmacist.getIsActive());
+//
+//        return dto;
+//    }
 }

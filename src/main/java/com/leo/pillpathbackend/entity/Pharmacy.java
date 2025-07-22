@@ -7,7 +7,6 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -49,6 +48,19 @@ public class Pharmacy {
     @Column(name = "license_expiry_date")
     private LocalDate licenseExpiryDate;
 
+    // Cloudinary image fields
+    @Column(name = "logo_url")
+    private String logoUrl;
+
+    @Column(name = "logo_public_id")
+    private String logoPublicId;
+
+    @Column(name = "banner_url")
+    private String bannerUrl;
+
+    @Column(name = "banner_public_id")
+    private String bannerPublicId;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "operating_hours", columnDefinition = "jsonb")
     private Map<String, String> operatingHours;
@@ -89,9 +101,6 @@ public class Pharmacy {
 
     @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Pharmacist> pharmacists = new ArrayList<>();
-//
-//    @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-//    private List<Inventory> inventory = new ArrayList<>();
 
     @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Order> orders = new ArrayList<>();

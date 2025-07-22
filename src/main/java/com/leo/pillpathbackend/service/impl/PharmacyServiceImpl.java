@@ -1,9 +1,6 @@
 package com.leo.pillpathbackend.service.impl;
 
-import com.leo.pillpathbackend.dto.PharmacyRegistrationRequest;
-import com.leo.pillpathbackend.dto.PharmacyRegistrationResponse;
-import com.leo.pillpathbackend.dto.PharmacyAdminLoginResponse;
-import com.leo.pillpathbackend.dto.PharmacyAdminProfileDTO;
+import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.entity.Pharmacy;
 import com.leo.pillpathbackend.entity.PharmacyAdmin;
 import com.leo.pillpathbackend.repository.PharmacyRepository;
@@ -11,6 +8,8 @@ import com.leo.pillpathbackend.repository.PharmacyAdminRepository;
 import com.leo.pillpathbackend.service.PharmacyService;
 import com.leo.pillpathbackend.util.Mapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,30 +56,30 @@ public class PharmacyServiceImpl implements PharmacyService {
         return mapper.convertToPharmacyRegistrationResponse(pharmacy, admin);
     }
 
-    @Override
-    public PharmacyAdminLoginResponse loginPharmacyAdmin(String email, String password) {
-        PharmacyAdmin admin = pharmacyAdminRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
-
-        if (!passwordEncoder.matches(password, admin.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
-        }
-
-        if (!admin.getIsActive()) {
-            throw new RuntimeException("Account is inactive");
-        }
-
-        Pharmacy pharmacy = admin.getPharmacy();
-        if (!pharmacy.getIsActive()) {
-            throw new RuntimeException("Pharmacy account is inactive");
-        }
-
-        if (!pharmacy.getIsVerified()) {
-            throw new RuntimeException("Pharmacy is pending verification");
-        }
-
-        return mapper.convertToPharmacyAdminLoginResponse(admin);
-    }
+//    @Override
+//    public PharmacyAdminLoginResponse loginPharmacyAdmin(String email, String password) {
+//        PharmacyAdmin admin = pharmacyAdminRepository.findByEmail(email)
+//                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+//
+//        if (!passwordEncoder.matches(password, admin.getPassword())) {
+//            throw new RuntimeException("Invalid credentials");
+//        }
+//
+//        if (!admin.getIsActive()) {
+//            throw new RuntimeException("Account is inactive");
+//        }
+//
+//        Pharmacy pharmacy = admin.getPharmacy();
+//        if (!pharmacy.getIsActive()) {
+//            throw new RuntimeException("Pharmacy account is inactive");
+//        }
+//
+//        if (!pharmacy.getIsVerified()) {
+//            throw new RuntimeException("Pharmacy is pending verification");
+//        }
+//
+//        return mapper.convertToPharmacyAdminLoginResponse(admin);
+//    }
 
     @Override
     public PharmacyAdminProfileDTO getPharmacyAdminProfileById(Long id) {
@@ -132,5 +131,45 @@ public class PharmacyServiceImpl implements PharmacyService {
 
         pharmacyRepository.save(pharmacy);
         return approved;
+    }
+
+    @Override
+    public Page<PharmacyDTO> getAllPharmacies(String searchTerm, String status, Pageable pageable) {
+        return null;
+    }
+
+    @Override
+    public PharmacyStatsDTO getPharmacyStats() {
+        return null;
+    }
+
+    @Override
+    public PharmacyDTO getPharmacyById(Long id) {
+        return null;
+    }
+
+    @Override
+    public PharmacyDTO approvePharmacy(Long pharmacyId) {
+        return null;
+    }
+
+    @Override
+    public PharmacyDTO rejectPharmacy(Long pharmacyId, String reason) {
+        return null;
+    }
+
+    @Override
+    public PharmacyDTO suspendPharmacy(Long pharmacyId, String reason) {
+        return null;
+    }
+
+    @Override
+    public PharmacyDTO activatePharmacy(Long pharmacyId) {
+        return null;
+    }
+
+    @Override
+    public PharmacyDTO updatePharmacyDetails(Long pharmacyId, PharmacyDTO pharmacyDTO) {
+        return null;
     }
 }

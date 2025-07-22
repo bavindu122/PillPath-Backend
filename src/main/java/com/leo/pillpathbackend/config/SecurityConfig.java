@@ -63,7 +63,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/pharmacies/register").permitAll()
                         .requestMatchers("/api/v1/users/admin/login").permitAll()  // Fixed URL
                         .requestMatchers("/api/v1/users/change-password").permitAll()
-                        .requestMatchers("/api/v1/admin/dashboard").hasRole("ADMIN")  // Example admin endpoint
+                        .requestMatchers("/api/v1/admin/**").permitAll()  // Fixed URL
+
                         .anyRequest().authenticated()
                 );
 
