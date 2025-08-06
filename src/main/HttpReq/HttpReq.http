@@ -10,23 +10,16 @@ GET https://examples.http-client.intellij.net/get
 ### GET request to Get a pharmacy by ID
 GET http://localhost:8080/api/v1/admin/pharmacies?search=&status=All&page=0&size=12&sortBy=createdAt&sortDir=desc
 
-### Post request to login as a pharmacy administrator
-POST http://localhost:8080/api/v1/pharmacies/login
+### Unified Login - Customer
+POST http://localhost:8080/api/v1/users/login
 Content-Type: application/json
 
 {
-    "email": "nirmi@gmail.com",
-    "password": "12345678"
-}
-
-### Post request to login as a user
-POST http://localhost:8080/api/v1/auth/login
-Content-Type: application/json
-
-{
-  "email": "bavindu122@gmail.com",
+  "email": "nirmi@gmail.com",
   "password": "12345678"
 }
+
+
 
 ### Put request to update a user Profile
 GET http://localhost:8080/api/v1/customers/profile

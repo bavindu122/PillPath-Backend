@@ -1,9 +1,9 @@
 package com.leo.pillpathbackend.service.impl;
 
-import com.leo.pillpathbackend.dto.AdminLoginRequest;
-import com.leo.pillpathbackend.dto.AdminLoginResponse;
-import com.leo.pillpathbackend.dto.UserDTO;
+import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.entity.Admin;
+import com.leo.pillpathbackend.entity.Customer;
+import com.leo.pillpathbackend.entity.PharmacyAdmin;
 import com.leo.pillpathbackend.entity.User;
 import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.UserService;
@@ -22,6 +22,79 @@ public class UserServiceImpl implements UserService {
     private final Mapper mapper;
     private final PasswordEncoder passwordEncoder;
 
+    @Override
+    public UnifiedLoginResponse unifiedLogin(UnifiedLoginRequest request) {
+        // Validate input
+        if (request.getEmail() == null || request.getEmail().trim().isEmpty() ||
+                request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+            return UnifiedLoginResponse.builder()
+                    .success(false)
+                    .message("Email and password are required")
+                    .build();
+        }
+
+        String email = request.getEmail().trim().toLowerCase();
+
+        // Check in User repository first to identify user type
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            return UnifiedLoginResponse.builder()
+                    .success(false)
+                    .message("Invalid email or password")
+                    .build();
+        }
+
+        User user = userOpt.get();
+
+        // Verify user is active
+        if (!user.getIsActive()) {
+            return UnifiedLoginResponse.builder()
+                    .success(false)
+                    .message("Account is deactivated")
+                    .build();
+        }
+
+        // Verify password
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            return UnifiedLoginResponse.builder()
+                    .success(false)
+                    .message("Invalid email or password")
+                    .build();
+        }
+
+        // Determine user type and create appropriate response
+        if (user instanceof Customer) {
+            Customer customer = (Customer) user;
+            CustomerProfileDTO profileDTO = mapper.convertToProfileDTO(customer);
+            return UnifiedLoginResponse.builder()
+                    .success(true)
+                    .message("Login successful")
+                    .token("customer-token-" + customer.getId())
+                    .userType("CUSTOMER")
+                    .userId(customer.getId())
+                    .userProfile(profileDTO)
+                    .build();
+        }
+        else if (user instanceof PharmacyAdmin) {
+            PharmacyAdmin admin = (PharmacyAdmin) user;
+            PharmacyAdminProfileDTO profileDTO = mapper.convertToPharmacyAdminProfileDTO(admin);
+            return UnifiedLoginResponse.builder()
+                    .success(true)
+                    .message("Login successful")
+                    .token("pharmacy-admin-token-" + admin.getId())
+                    .userType("PHARMACY_ADMIN")
+                    .userId(admin.getId())
+                    .userProfile(profileDTO)
+                    .build();
+        }
+        // Add other user types as needed (Pharmacist, etc.)
+
+        // Fallback for unhandled user types
+        return UnifiedLoginResponse.builder()
+                .success(false)
+                .message("Unsupported user type")
+                .build();
+    }
     @Override
     public UserDTO createUser(UserDTO userDTO) {
         throw new UnsupportedOperationException("Cannot create abstract User. Use specific user type services.");

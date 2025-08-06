@@ -1,8 +1,6 @@
 package com.leo.pillpathbackend.controller;
 
-import com.leo.pillpathbackend.dto.AdminLoginRequest;
-import com.leo.pillpathbackend.dto.AdminLoginResponse;
-import com.leo.pillpathbackend.dto.ChangePasswordRequest;
+import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -42,6 +40,16 @@ public class UserController {
                             .success(false)
                             .message("Login failed: " + e.getMessage())
                             .build());
+        }
+    }
+    @PostMapping("/login")
+    public ResponseEntity<UnifiedLoginResponse> login(@RequestBody UnifiedLoginRequest request) {
+        UnifiedLoginResponse response = userService.unifiedLogin(request);
+
+        if (response.isSuccess()) {
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
     }
 }
