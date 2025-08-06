@@ -19,6 +19,12 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
     boolean existsByEmail(String email);
     boolean existsByLicenseNumber(String licenseNumber);
 
+    // Count methods for stats
+    Long countByIsActiveTrueAndIsVerifiedTrue();
+    Long countByIsActiveTrueAndIsVerifiedFalse();
+    Long countByIsActiveFalseAndIsVerifiedTrue();
+    Long countByIsActiveFalseAndIsVerifiedFalse();
+
     // Admin management queries
     @Query("SELECT COUNT(p) FROM Pharmacy p WHERE p.isActive = true AND p.isVerified = true")
     Long countActivePharmacies();
@@ -33,12 +39,13 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
     Long countSuspendedPharmacies();
 
     // Search and filter queries
-    // Add these methods to PharmacyRepository
+    // Add these methods to PharmacyRepository.java
+
+
     @Query("SELECT p FROM Pharmacy p WHERE " +
             "(:searchTerm = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
             "LOWER(p.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-            "LOWER(p.address) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-            "LOWER(p.licenseNumber) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND " +
+            "LOWER(p.address) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND " +
             "(:status IS NULL OR " +
             "(:status = 'Active' AND p.isActive = true AND p.isVerified = true) OR " +
             "(:status = 'Pending' AND p.isActive = true AND p.isVerified = false) OR " +
@@ -47,8 +54,6 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
     Page<Pharmacy> findPharmaciesWithFilters(@Param("searchTerm") String searchTerm,
                                              @Param("status") String status,
                                              Pageable pageable);
-
     @Query("SELECT p FROM Pharmacy p ORDER BY p.createdAt DESC")
     List<Pharmacy> findTop10ByOrderByCreatedAtDesc();
-
 }

@@ -24,6 +24,7 @@ public class AdminController {
         }
     }
 
+
     // Future admin endpoints:
     // @GetMapping("/users")
     // @PostMapping("/users/{id}/deactivate")

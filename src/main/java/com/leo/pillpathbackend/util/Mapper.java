@@ -378,18 +378,6 @@ public class Mapper {
         if (dto.getEmail() != null) {
             pharmacy.setEmail(dto.getEmail());
         }
-        if (dto.getLogoUrl() != null) {
-            pharmacy.setLogoUrl(dto.getLogoUrl());
-        }
-        if (dto.getLogoPublicId() != null) {
-            pharmacy.setLogoPublicId(dto.getLogoPublicId());
-        }
-        if (dto.getBannerUrl() != null) {
-            pharmacy.setBannerUrl(dto.getBannerUrl());
-        }
-        if (dto.getBannerPublicId() != null) {
-            pharmacy.setBannerPublicId(dto.getBannerPublicId());
-        }
         if (dto.getOperatingHours() != null) {
             pharmacy.setOperatingHours(dto.getOperatingHours());
         }

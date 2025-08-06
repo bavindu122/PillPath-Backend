@@ -25,6 +25,7 @@ public class PharmacyServiceImpl implements PharmacyService {
     private final Mapper mapper;
     private final PasswordEncoder passwordEncoder;
 
+
     @Override
     @Transactional
     public PharmacyRegistrationResponse registerPharmacy(PharmacyRegistrationRequest request) {
@@ -135,41 +136,146 @@ public class PharmacyServiceImpl implements PharmacyService {
 
     @Override
     public Page<PharmacyDTO> getAllPharmacies(String searchTerm, String status, Pageable pageable) {
-        return null;
+        // Handle "All" status filter
+        if ("All".equals(status)) {
+            status = null;
+        }
+
+        // Validate status
+        if (status != null && !status.isEmpty() && !status.matches("Active|Pending|Suspended|Rejected")) {
+            throw new IllegalArgumentException("Invalid status filter");
+        }
+
+        // Search and filter pharmacies
+        return pharmacyRepository.findPharmaciesWithFilters(
+                searchTerm == null ? "" : searchTerm,
+                status,
+                pageable
+        ).map(mapper::convertToPharmacyDTO);
     }
 
-    @Override
-    public PharmacyStatsDTO getPharmacyStats() {
-        return null;
-    }
 
-    @Override
+@Override
+public PharmacyStatsDTO getPharmacyStats() {
+    Long activePharmacies = pharmacyRepository.countByIsActiveTrueAndIsVerifiedTrue();
+    Long pendingApproval = pharmacyRepository.countByIsActiveTrueAndIsVerifiedFalse();
+    Long suspendedPharmacies = pharmacyRepository.countByIsActiveFalseAndIsVerifiedTrue();
+    Long rejectedPharmacies = pharmacyRepository.countByIsActiveFalseAndIsVerifiedFalse();
+
+    return PharmacyStatsDTO.builder()
+            .activePharmacies(activePharmacies)
+            .pendingApproval(pendingApproval)
+            .suspendedPharmacies(suspendedPharmacies)
+            .rejectedPharmacies(rejectedPharmacies)
+            .build();
+}
+
+
+@Override
     public PharmacyDTO getPharmacyById(Long id) {
-        return null;
-    }
+        Pharmacy pharmacy = pharmacyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found with ID: " + id));
 
+        return mapper.convertToPharmacyDTO(pharmacy);
+    }
     @Override
+    @Transactional
     public PharmacyDTO approvePharmacy(Long pharmacyId) {
-        return null;
-    }
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found with ID: " + pharmacyId));
 
+        if (pharmacy.getIsVerified()) {
+            throw new RuntimeException("Pharmacy is already verified");
+        }
+
+        pharmacy.setIsVerified(true);
+        pharmacy.setIsActive(true);
+       // Clear any previous rejection reason
+
+        pharmacy = pharmacyRepository.save(pharmacy);
+        return mapper.convertToPharmacyDTO(pharmacy);
+    }
     @Override
+    @Transactional
     public PharmacyDTO rejectPharmacy(Long pharmacyId, String reason) {
-        return null;
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found with ID: " + pharmacyId));
+
+        if (pharmacy.getIsVerified()) {
+            throw new RuntimeException("Cannot reject an already verified pharmacy");
+        }
+
+        pharmacy.setIsVerified(false);
+        pharmacy.setIsActive(false);
+
+
+        pharmacy = pharmacyRepository.save(pharmacy);
+        return mapper.convertToPharmacyDTO(pharmacy);
     }
 
     @Override
+    @Transactional
     public PharmacyDTO suspendPharmacy(Long pharmacyId, String reason) {
-        return null;
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found with ID: " + pharmacyId));
+
+        if (!pharmacy.getIsVerified()) {
+            throw new RuntimeException("Cannot suspend an unverified pharmacy");
+        }
+
+        if (!pharmacy.getIsActive()) {
+            throw new RuntimeException("Pharmacy is already suspended");
+        }
+
+        pharmacy.setIsActive(false);
+        pharmacy = pharmacyRepository.save(pharmacy);
+        return mapper.convertToPharmacyDTO(pharmacy);
     }
 
     @Override
+    @Transactional
     public PharmacyDTO activatePharmacy(Long pharmacyId) {
-        return null;
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found with ID: " + pharmacyId));
+
+        if (!pharmacy.getIsVerified()) {
+            throw new RuntimeException("Cannot activate an unverified pharmacy");
+        }
+
+        if (pharmacy.getIsActive()) {
+            throw new RuntimeException("Pharmacy is already active");
+        }
+
+        pharmacy.setIsActive(true);// Clear suspension reason
+
+        pharmacy = pharmacyRepository.save(pharmacy);
+        return mapper.convertToPharmacyDTO(pharmacy);
     }
 
     @Override
+    @Transactional
     public PharmacyDTO updatePharmacyDetails(Long pharmacyId, PharmacyDTO pharmacyDTO) {
-        return null;
+        Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy not found with ID: " + pharmacyId));
+
+        // Check for email uniqueness if being updated
+        if (pharmacyDTO.getEmail() != null && !pharmacyDTO.getEmail().equals(pharmacy.getEmail())) {
+            if (pharmacyRepository.existsByEmail(pharmacyDTO.getEmail())) {
+                throw new RuntimeException("Pharmacy with this email already exists");
+            }
+        }
+
+        // Check for license number uniqueness if being updated
+        if (pharmacyDTO.getLicenseNumber() != null && !pharmacyDTO.getLicenseNumber().equals(pharmacy.getLicenseNumber())) {
+            if (pharmacyRepository.existsByLicenseNumber(pharmacyDTO.getLicenseNumber())) {
+                throw new RuntimeException("Pharmacy with this license number already exists");
+            }
+        }
+
+        // Update pharmacy details using mapper
+        mapper.updatePharmacyFromDTO(pharmacy, pharmacyDTO);
+
+        pharmacy = pharmacyRepository.save(pharmacy);
+        return mapper.convertToPharmacyDTO(pharmacy);
     }
 }
