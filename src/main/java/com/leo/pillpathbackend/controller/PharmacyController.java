@@ -38,23 +38,6 @@ public class PharmacyController {
         }
     }
 
-//    @PostMapping("/login")
-//    public ResponseEntity<?> loginPharmacyAdmin(@RequestBody Map<String, String> credentials) {
-//        try {
-//            String email = credentials.get("email");
-//            String password = credentials.get("password");
-//
-//            if (email == null || password == null) {
-//                return ResponseEntity.badRequest().body(
-//                        Map.of("success", false, "message", "Email and password are required"));
-//            }
-//
-//            return ResponseEntity.ok(pharmacyService.loginPharmacyAdmin(email, password));
-//        } catch (Exception e) {
-//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-//                    .body(Map.of("success", false, "message", e.getMessage()));
-//        }
-//    }
 
     @GetMapping(value = "/admin/profile", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getPharmacyAdminProfile(HttpServletRequest request) {
