@@ -78,9 +78,16 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     }
 
     @Override
-    public void deleteImage(String publicId) throws IOException {
-        if (publicId != null && !publicId.isEmpty()) {
-            cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+    public void deleteImage(String publicId) {
+        try {
+            Map<String, Object> params = Map.of(
+                    "invalidate", false,
+                    "resource_type", "image"
+            );
+            cloudinary.uploader().destroy(publicId, params);
+        } catch (Exception e) {
+            // Log the error but don't fail the upload
+            System.err.println("Failed to delete old image: " + e.getMessage());
         }
     }
 

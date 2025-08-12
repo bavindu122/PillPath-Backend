@@ -19,34 +19,34 @@ public class AuthenticationHelper {
     }
 
     /**
-     * Helper method to extract customer ID from customer temp token.
+     * Helper method to extract customer ID from customer token.
      * Returns the customer ID or throws IllegalArgumentException if invalid.
      */
     public Long extractCustomerIdFromToken(String token) {
-        if (token == null || !token.startsWith("temp-token-")) {
-            throw new IllegalArgumentException("Invalid token format");
+        if (token == null || !token.startsWith("customer-token-")) {
+            throw new IllegalArgumentException("Invalid customer token format");
         }
 
         try {
-            return Long.parseLong(token.replace("temp-token-", ""));
+            return Long.parseLong(token.replace("customer-token-", ""));
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid token format");
+            throw new IllegalArgumentException("Invalid customer token format");
         }
     }
 
     /**
-     * Helper method to extract pharmacy admin ID from pharmacy admin temp token.
+     * Helper method to extract pharmacy admin ID from pharmacy admin token.
      * Returns the admin ID or throws IllegalArgumentException if invalid.
      */
     public Long extractPharmacyAdminIdFromToken(String token) {
-        if (token == null || !token.startsWith("temp-token-pharmacy-")) {
-            throw new IllegalArgumentException("Invalid token format");
+        if (token == null || !token.startsWith("pharmacy-admin-token-")) {
+            throw new IllegalArgumentException("Invalid pharmacy admin token format");
         }
 
         try {
-            return Long.parseLong(token.replace("temp-token-pharmacy-", ""));
+            return Long.parseLong(token.replace("pharmacy-admin-token-", ""));
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid token format");
+            throw new IllegalArgumentException("Invalid pharmacy admin token format");
         }
     }
 
