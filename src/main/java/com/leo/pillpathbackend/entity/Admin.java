@@ -4,6 +4,8 @@ import com.leo.pillpathbackend.entity.enums.AdminLevel;
 import com.leo.pillpathbackend.entity.enums.UserType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -31,6 +33,7 @@ public class Admin extends User {
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "permissions", columnDefinition = "jsonb")
     private List<String> permissions = new ArrayList<>();
 
