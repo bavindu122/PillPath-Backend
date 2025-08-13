@@ -1,0 +1,8 @@
+package com.leo.pillpathbackend.service;
+
+import com.leo.pillpathbackend.dto.AddMemberDTO;
+import com.leo.pillpathbackend.entity.FamilyMember;
+
+public interface FamilyMemberService {
+    FamilyMember addMember(AddMemberDTO dto);
+}
