@@ -13,7 +13,7 @@ import java.nio.file.Paths;
 public class PillpathBackendApplication {
 
     public static void main(String[] args) {
-        // Load .env file for local development
+        // Load .env file for local development BEFORE SpringApplication.run
         try {
             loadEnvFile();
         } catch (Exception e) {
