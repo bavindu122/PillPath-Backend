@@ -63,42 +63,33 @@ Content-Type: image/jpeg
 < C:\Users\ASUS\Downloads\raini.jpg
 ------WebKitFormBoundary7MA4YWxkTrZu0gW--
 
-### Get all pharmacies for map
-GET http://localhost:8080/api/v1/admin/pharmacies/map
+### Get all staff members for a pharmacy (no search)
+GET http://localhost:8080/api/pharmacy-admin/pharmacies/2/staff
+Authorization: Bearer pharmacy-admin-token-3
+Content-Type: application/json
 
-### Get all pharmacies (regardless of status)
-GET http://localhost:8080/api/v1/admin/pharmacies?search=&status=All&page=0&size=12&sortBy=createdAt&sortDir=desc
+###
 
-### Register pharmacy with location
-POST http://localhost:8080/api/v1/pharmacies/register
+### Get staff members for a pharmacy with search filter
+GET http://localhost:8080/api/pharmacy-admin/pharmacies/1/staff?search=John
+Authorization: Bearer pharmacy-admin-token-3
+Content-Type: application/json
+
+### Create a new staff member (pharmacist)
+POST http://localhost:8080/api/v1/pharmacy-admin/staff
+Authorization: Bearer pharmacy-admin-token-3
 Content-Type: application/json
 
 {
-  "name": "Lavinia Health Care",
-  "address": "123 Galle Road, Mount Lavinia, Sri Lanka",
-  "phoneNumber": "+94112567890",
-  "email": "info@laviniahealth.lk",
-  "licenseNumber": "PH2025002",
-  "licenseExpiryDate": "2026-11-30",
-  "operatingHours": {
-    "monday": "07:00-23:00",
-    "tuesday": "07:00-23:00",
-    "wednesday": "07:00-23:00",
-    "thursday": "07:00-23:00",
-    "friday": "07:00-23:00",
-    "saturday": "07:00-23:00",
-    "sunday": "08:00-22:00"
-  },
-  "services": ["24/7 Emergency", "Prescription Medicines", "Baby Care", "Diabetes Care"],
-  "deliveryAvailable": true,
-  "deliveryRadius": 20,
-  "latitude": 6.8344,
-  "longitude": 79.8634,
-  "adminFirstName": "Nimali",
-  "adminLastName": "Silva",
-  "adminEmail": "nimali.silva@laviniahealth.lk",
-  "adminPassword": "Admin@456",
-  "adminPhoneNumber": "+94776543210",
-  "adminPosition": "Pharmacy Manager",
-  "adminLicenseNumber": "RPH2024002"
+  "fullName": "John Doe",
+
+  "email": "pa2@gmail.com",
+  "phoneNumber": "+94-77-987-6543",
+  "position": "Pharmacist",
+  "licenseNumber": "PH-2024-002",
+  "hireDate": "2024-01-15",
+  "salary": 75000.00,
+  "isActive": true,
+  "password": "12345678",
+  "pharmacyId": "1"
 }
