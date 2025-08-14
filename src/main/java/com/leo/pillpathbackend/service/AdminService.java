@@ -11,6 +11,7 @@ public interface AdminService {
     Announcement addAnnouncement(AddAnnouncementRequest request);
     List<Announcement> getAllAnnouncementsLatestFirst();
     Announcement updateAnnouncement(Long id, AddAnnouncementRequest request);
+    Announcement toggleAnnouncementStatus(Long id);
 
 
     // Future admin methods can go here:

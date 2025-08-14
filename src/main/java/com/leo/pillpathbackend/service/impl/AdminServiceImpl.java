@@ -171,4 +171,16 @@ public class AdminServiceImpl implements AdminService {
         // publishedDate and other fields remain unchanged
         return announcementRepository.save(announcement);
     }
+
+    @Override
+    public Announcement toggleAnnouncementStatus(Long id) {
+        Announcement announcement = announcementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Announcement not found with id: " + id));
+
+        // Toggle the active status
+        announcement.setActive(!announcement.isActive());
+
+        // updatedAt will be automatically set by @PreUpdate
+        return announcementRepository.save(announcement);
+    }
 }

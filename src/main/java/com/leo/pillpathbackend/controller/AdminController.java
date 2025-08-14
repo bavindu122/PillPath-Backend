@@ -60,6 +60,16 @@ public class AdminController {
         }
     }
 
+    @PatchMapping("/announcements/{id}/toggle-status")
+    public ResponseEntity<Announcement> toggleAnnouncementStatus(@PathVariable Long id) {
+        try {
+            Announcement updatedAnnouncement = adminService.toggleAnnouncementStatus(id);
+            return ResponseEntity.ok(updatedAnnouncement);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
 
 
 
