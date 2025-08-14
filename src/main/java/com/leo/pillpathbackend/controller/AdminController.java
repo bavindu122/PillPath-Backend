@@ -24,6 +24,7 @@ public class AdminController {
 
     private final AdminService adminService;
 
+
     @GetMapping("/dashboard")
     public ResponseEntity<AdminDashboardResponseDTO> getDashboardData() {
         try {
@@ -69,6 +70,18 @@ public class AdminController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @DeleteMapping("/announcements/{id}")
+    public ResponseEntity<Void> deleteAnnouncement(@PathVariable Long id) {
+        try {
+            adminService.deleteAnnouncement(id);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+
 
 
 

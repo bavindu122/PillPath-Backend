@@ -183,4 +183,12 @@ public class AdminServiceImpl implements AdminService {
         // updatedAt will be automatically set by @PreUpdate
         return announcementRepository.save(announcement);
     }
+
+    @Override
+    public void deleteAnnouncement(Long id) {
+        Announcement announcement = announcementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Announcement not found with id: " + id));
+
+        announcementRepository.delete(announcement);
+    }
 }
