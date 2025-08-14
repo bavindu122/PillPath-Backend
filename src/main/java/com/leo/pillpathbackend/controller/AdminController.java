@@ -47,6 +47,19 @@ public class AdminController {
         return ResponseEntity.ok(announcements);
     }
 
+    @PutMapping("/announcements/{id}")
+    public ResponseEntity<Announcement> updateAnnouncement(
+            @PathVariable Long id,
+            @Valid @RequestBody AddAnnouncementRequest request) {
+
+        try {
+            Announcement updatedAnnouncement = adminService.updateAnnouncement(id, request);
+            return ResponseEntity.ok(updatedAnnouncement);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
 
 
 

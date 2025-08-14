@@ -10,6 +10,7 @@ public interface AdminService {
     AdminDashboardResponseDTO getDashboardData();
     Announcement addAnnouncement(AddAnnouncementRequest request);
     List<Announcement> getAllAnnouncementsLatestFirst();
+    Announcement updateAnnouncement(Long id, AddAnnouncementRequest request);
 
 
     // Future admin methods can go here:

@@ -151,4 +151,24 @@ public class AdminServiceImpl implements AdminService {
     public List<Announcement> getAllAnnouncementsLatestFirst() {
         return announcementRepository.findAllByOrderByCreatedAtDesc();
     }
+
+    @Override
+    public Announcement updateAnnouncement(Long id, AddAnnouncementRequest request) {
+        Announcement announcement = announcementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Announcement not found with id: " + id));
+
+        // Update only provided fields (partial update)
+        if (request.getTitle() != null && !request.getTitle().trim().isEmpty()) {
+            announcement.setTitle(request.getTitle());
+        }
+        if (request.getContent() != null && !request.getContent().trim().isEmpty()) {
+            announcement.setContent(request.getContent());
+        }
+        if (request.getExpiryDate() != null) {
+            announcement.setExpiryDate(request.getExpiryDate());
+        }
+
+        // publishedDate and other fields remain unchanged
+        return announcementRepository.save(announcement);
+    }
 }
