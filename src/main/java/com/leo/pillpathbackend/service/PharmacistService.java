@@ -1,7 +1,7 @@
 package com.leo.pillpathbackend.service;
 
-import com.leo.pillpathbackend.dto.PharmacistCreateRequest;
-import com.leo.pillpathbackend.dto.PharmacistUpdateRequest;
+import com.leo.pillpathbackend.dto.PharmacistCreateRequestDTO;
+import com.leo.pillpathbackend.dto.PharmacistUpdateRequestDTO;
 import com.leo.pillpathbackend.dto.PharmacistResponseDTO;
 
 import java.util.List;
@@ -11,12 +11,12 @@ public interface PharmacistService {
     /**
      * Create a new pharmacist
      */
-    PharmacistResponseDTO createPharmacist(PharmacistCreateRequest request);
+    PharmacistResponseDTO createPharmacist(PharmacistCreateRequestDTO request);
 
     /**
      * Update an existing pharmacist
      */
-    PharmacistResponseDTO updatePharmacist(Long pharmacistId, PharmacistUpdateRequest request);
+    PharmacistResponseDTO updatePharmacist(Long pharmacistId, PharmacistUpdateRequestDTO request);
     
     /**
      * Get pharmacist by ID
@@ -52,4 +52,6 @@ public interface PharmacistService {
      * Verify if pharmacist belongs to a pharmacy
      */
     boolean isPharmacistInPharmacy(Long pharmacistId, Long pharmacyId);
+
+    List<PharmacistResponseDTO> getPharmacistsByPharmacy(Long pharmacyId);
 }

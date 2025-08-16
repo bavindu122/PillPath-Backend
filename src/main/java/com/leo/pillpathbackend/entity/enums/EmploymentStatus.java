@@ -7,7 +7,8 @@ public enum EmploymentStatus {
     ACTIVE("Active"),
     INACTIVE("Inactive"),
     SUSPENDED("Suspended"),
-    TERMINATED("Terminated");
+    TERMINATED("Terminated"),
+    ON_LEAVE("On Leave");
 
     private final String displayName;
 

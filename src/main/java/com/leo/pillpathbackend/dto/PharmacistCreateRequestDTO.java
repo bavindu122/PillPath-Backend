@@ -1,5 +1,6 @@
 package com.leo.pillpathbackend.dto;
 
+import com.leo.pillpathbackend.entity.enums.EmploymentStatus;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -17,7 +18,7 @@ import java.util.ArrayList;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PharmacistCreateRequest {
+public class PharmacistCreateRequestDTO {
     @NotBlank(message = "Full name is required")
     private String fullName;
 
@@ -53,4 +54,11 @@ public class PharmacistCreateRequest {
 
     @NotNull(message = "Pharmacy ID is required")
     private Long pharmacyId;
+
+    // New fields added
+    private Boolean isActive = true;
+
+    private Boolean isVerified = false;
+
+    private EmploymentStatus employmentStatus = EmploymentStatus.ACTIVE;
 }

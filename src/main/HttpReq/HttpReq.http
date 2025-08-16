@@ -82,8 +82,7 @@ Content-Type: application/json
 
 {
   "fullName": "John Doe",
-
-  "email": "pa2@gmail.com",
+  "email": "pa3@gmail.com",
   "phoneNumber": "+94-77-987-6543",
   "position": "Pharmacist",
   "licenseNumber": "PH-2024-002",
