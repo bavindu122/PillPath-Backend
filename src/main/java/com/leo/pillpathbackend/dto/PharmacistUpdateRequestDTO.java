@@ -16,7 +16,7 @@ import java.util.ArrayList;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PharmacistUpdateRequest {
+public class PharmacistUpdateRequestDTO {
     @NotBlank(message = "Full name is required")
     private String fullName;
 

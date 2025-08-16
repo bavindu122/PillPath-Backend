@@ -8,19 +8,18 @@ import lombok.AllArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class PharmacistResponseDTO {
     private Long id;
-    private String email;
     private String fullName;
+    private String email;
     private String phoneNumber;
     private LocalDate dateOfBirth;
     private String profilePictureUrl;
-    
-    // Pharmacist specific fields
     private Long pharmacyId;
     private String pharmacyName;
     private String licenseNumber;
@@ -28,11 +27,11 @@ public class PharmacistResponseDTO {
     private String specialization;
     private Integer yearsOfExperience;
     private LocalDate hireDate;
-    private String shiftSchedule;
-    private List<String> certifications;
-    private Boolean isVerified;
     private Boolean isActive;
+    private Boolean isVerified;
     private EmploymentStatus employmentStatus;
+    private String shiftSchedule;
+    private List<String> certifications = new ArrayList<>();
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
