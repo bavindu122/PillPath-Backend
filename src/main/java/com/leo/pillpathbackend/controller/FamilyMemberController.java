@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 import java.util.Map;
 
 
@@ -37,6 +38,35 @@ public class FamilyMemberController {
             ));
         }
     }
+
+    @DeleteMapping("/family-members/{memberId}")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    public ResponseEntity<?> deleteFamilyMember(@PathVariable Long memberId) {
+        try {
+            familyMemberService.deleteMember(memberId);
+            return ResponseEntity.ok(Map.of("message", "Family member deleted successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage(),
+                    "type", e.getClass().getSimpleName()
+            ));
+        }
+    }
+
+    @GetMapping("/family-members")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    public ResponseEntity<?> getFamilyMembers() {
+        try {
+            List<FamilyMember> familyMembers = familyMemberService.getCurrentUserFamilyMembers();
+            return ResponseEntity.ok(familyMembers);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage(),
+                    "type", e.getClass().getSimpleName()
+            ));
+        }
+    }
+
     @GetMapping("/debug-auth")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<?> debugAuth() {

@@ -41,7 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/users/login").permitAll()
                         .requestMatchers("/api/v1/customers/register").permitAll()
                         .requestMatchers("/api/v1/customers/check-email/**").permitAll()
-                        .requestMatchers("/api/members/family-members").authenticated()
+                        .requestMatchers("/api/members/**").authenticated()
                         .anyRequest().authenticated()
                 );
 

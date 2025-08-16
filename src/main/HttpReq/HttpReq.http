@@ -53,7 +53,7 @@ Content-Type: application/json
 
 ### add a family member to the user profile
 POST http://localhost:8080/api/members/family-members
-Authorization: Bearer customer-token-2
+Authorization: Bearer customer-token-5
 Content-Type: application/json
 
 {
@@ -63,6 +63,16 @@ Content-Type: application/json
   "medicalConditions": ["Asthma"]
 }
 
+### Delete a family member by ID
+DELETE http://localhost:8080/api/members/family-members/18
+Authorization: Bearer customer-token-5
+Content-Type: application/json
+
 ### Get all family members of a user
 GET http://localhost:8080/api/members/debug-auth
 Authorization: Bearer customer-token-2
+
+
+### Get all family members for debugging
+GET http://localhost:8080/api/members/family-members
+Authorization: Bearer customer-token-1

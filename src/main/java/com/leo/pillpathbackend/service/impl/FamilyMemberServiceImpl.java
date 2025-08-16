@@ -9,6 +9,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class FamilyMemberServiceImpl implements FamilyMemberService {
 
@@ -43,5 +45,35 @@ public class FamilyMemberServiceImpl implements FamilyMemberService {
         member.setUserId(customerId);
 
         return familyMemberRepository.save(member);
+    }
+
+    @Override
+    public void deleteMember(Long memberId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Long currentUserId = (Long) auth.getPrincipal();
+
+        // Find the family member
+        FamilyMember member = familyMemberRepository.findById(memberId)
+                .orElseThrow(() -> new RuntimeException("Family member not found"));
+        
+        // Check if the current user owns this family member
+        if (!member.getUserId().equals(currentUserId)) {
+            throw new RuntimeException("Unauthorized: You can only delete your own family members");
+        }
+
+        // Delete the family member
+        familyMemberRepository.deleteById(memberId);
+    }
+
+    @Override
+    public List<FamilyMember> getFamilyMembersByUserId(Long userId) {
+        return familyMemberRepository.findByUserId(userId);
+    }
+
+    @Override
+    public List<FamilyMember> getCurrentUserFamilyMembers() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Long currentUserId = (Long) auth.getPrincipal();
+        return familyMemberRepository.findByUserId(currentUserId);
     }
 }
