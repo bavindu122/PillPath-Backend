@@ -7,6 +7,11 @@ import lombok.AllArgsConstructor;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Past;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.ArrayList;
 
 @Data
 @NoArgsConstructor
@@ -21,6 +26,13 @@ public class PharmacistUpdateRequest {
 
     private String phoneNumber;
 
+    @Past(message = "Date of birth must be in the past")
+    private LocalDate dateOfBirth;
+
+    private String profilePictureUrl;
+
+    private LocalDate licenseExpiryDate;
+
     private String specialization;
 
     @Min(value = 0, message = "Years of experience cannot be negative")
@@ -28,7 +40,5 @@ public class PharmacistUpdateRequest {
 
     private String shiftSchedule;
 
-    private String profilePictureUrl;
-
-    private Boolean isActive;
+    private List<String> certifications = new ArrayList<>();
 }
