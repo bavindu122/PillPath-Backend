@@ -102,3 +102,7 @@ Content-Type: application/json
   "adminPosition": "Pharmacy Manager",
   "adminLicenseNumber": "RPH2024002"
 }
+
+
+### Get pharmacies within 10km radius of user location
+GET http://localhost:8080/api/v1/admin/pharmacies/map?userLat=6.9271&userLng=79.8612&radiusKm=10
