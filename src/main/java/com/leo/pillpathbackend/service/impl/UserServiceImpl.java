@@ -8,10 +8,13 @@ import com.leo.pillpathbackend.entity.User;
 import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.UserService;
 import com.leo.pillpathbackend.util.Mapper;
+import com.leo.pillpathbackend.util.JwtService;
+import com.leo.pillpathbackend.util.TokenBlacklistService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
 import java.util.Optional;
 
 @Service
@@ -21,6 +24,8 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final Mapper mapper;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     public UnifiedLoginResponse unifiedLogin(UnifiedLoginRequest request) {
@@ -63,25 +68,24 @@ public class UserServiceImpl implements UserService {
         }
 
         // Determine user type and create appropriate response
-        if (user instanceof Customer) {
-            Customer customer = (Customer) user;
+        if (user instanceof Customer customer) {
             CustomerProfileDTO profileDTO = mapper.convertToProfileDTO(customer);
+            String token = jwtService.generateToken(customer.getId(), "CUSTOMER");
             return UnifiedLoginResponse.builder()
                     .success(true)
                     .message("Login successful")
-                    .token("customer-token-" + customer.getId())
+                    .token(token)
                     .userType("CUSTOMER")
                     .userId(customer.getId())
                     .userProfile(profileDTO)
                     .build();
-        }
-        else if (user instanceof PharmacyAdmin) {
-            PharmacyAdmin admin = (PharmacyAdmin) user;
+        } else if (user instanceof PharmacyAdmin admin) {
             PharmacyAdminProfileDTO profileDTO = mapper.convertToPharmacyAdminProfileDTO(admin);
+            String token = jwtService.generateToken(admin.getId(), "PHARMACY_ADMIN");
             return UnifiedLoginResponse.builder()
                     .success(true)
                     .message("Login successful")
-                    .token("pharmacy-admin-token-" + admin.getId())
+                    .token(token)
                     .userType("PHARMACY_ADMIN")
                     .userId(admin.getId())
                     .userProfile(profileDTO)
@@ -186,12 +190,28 @@ public class UserServiceImpl implements UserService {
         }
 
         Admin admin = (Admin) user;
+        String token = jwtService.generateToken(admin.getId(), "ADMIN");
 
         return AdminLoginResponse.builder()
                 .success(true)
                 .message("Login successful")
                 .adminId(admin.getId())
                 .adminLevel(admin.getAdminLevel().name())
+                .token(token)
                 .build();
+    }
+
+    public void logout(String token) {
+        if (token != null && !token.trim().isEmpty()) {
+            Date exp = null;
+            try {
+                exp = jwtService.getExpiration(token);
+            } catch (Exception ignored) { }
+            if (exp != null) {
+                tokenBlacklistService.blacklist(token, exp);
+            } else {
+                tokenBlacklistService.blacklist(token);
+            }
+        }
     }
 }

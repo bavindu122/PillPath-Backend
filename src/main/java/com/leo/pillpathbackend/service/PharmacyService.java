@@ -23,4 +23,6 @@ public interface PharmacyService {
     PharmacyDTO suspendPharmacy(Long pharmacyId, String reason);
     PharmacyDTO activatePharmacy(Long pharmacyId);
     PharmacyDTO updatePharmacyDetails(Long pharmacyId, PharmacyDTO pharmacyDTO);
+    PharmacyDTO getPharmacyProfileByAdminId(Long adminId);
+    PharmacyDTO updatePharmacyProfile(Long adminId, PharmacyDTO pharmacyDTO);
 }

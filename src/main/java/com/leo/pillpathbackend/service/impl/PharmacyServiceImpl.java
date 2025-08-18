@@ -313,4 +313,49 @@ public PharmacyStatsDTO getPharmacyStats() {
         dto.setIsVerified(pharmacy.getIsVerified());
         return dto;
     }
+
+    @Override
+    public PharmacyDTO getPharmacyProfileByAdminId(Long adminId) {
+        PharmacyAdmin admin = pharmacyAdminRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy admin not found"));
+
+        Pharmacy pharmacy = admin.getPharmacy();
+        if (pharmacy == null) {
+            throw new RuntimeException("No pharmacy associated with this admin");
+        }
+
+        return mapper.convertToPharmacyDTO(pharmacy);
+    }
+
+    @Override
+    @Transactional
+    public PharmacyDTO updatePharmacyProfile(Long adminId, PharmacyDTO pharmacyDTO) {
+        PharmacyAdmin admin = pharmacyAdminRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy admin not found"));
+
+        Pharmacy pharmacy = admin.getPharmacy();
+        if (pharmacy == null) {
+            throw new RuntimeException("No pharmacy associated with this admin");
+        }
+
+        // Check for email uniqueness if being updated
+        if (pharmacyDTO.getEmail() != null && !pharmacyDTO.getEmail().equals(pharmacy.getEmail())) {
+            if (pharmacyRepository.existsByEmail(pharmacyDTO.getEmail())) {
+                throw new RuntimeException("Pharmacy with this email already exists");
+            }
+        }
+
+        // Check for license number uniqueness if being updated
+        if (pharmacyDTO.getLicenseNumber() != null && !pharmacyDTO.getLicenseNumber().equals(pharmacy.getLicenseNumber())) {
+            if (pharmacyRepository.existsByLicenseNumber(pharmacyDTO.getLicenseNumber())) {
+                throw new RuntimeException("Pharmacy with this license number already exists");
+            }
+        }
+
+        // Update pharmacy details using mapper
+        mapper.updatePharmacyFromDTO(pharmacy, pharmacyDTO);
+
+        pharmacy = pharmacyRepository.save(pharmacy);
+        return mapper.convertToPharmacyDTO(pharmacy);
+    }
 }

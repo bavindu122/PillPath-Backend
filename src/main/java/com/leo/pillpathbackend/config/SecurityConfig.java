@@ -56,7 +56,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
-                        .requestMatchers("/api/v1/users/login").permitAll()  // Unified login
+                        .requestMatchers("/api/v1/users/**").permitAll()  // Unified login
                         .requestMatchers("/api/v1/users/admin/login").permitAll()  // Admin login
                         .requestMatchers("/api/v1/users/change-password").permitAll()
                         .requestMatchers("/api/v1/customers/register").permitAll()
@@ -66,6 +66,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/pharmacies/register").permitAll()
                         .requestMatchers("/api/v1/pharmacy-admins/register").permitAll()
                         .requestMatchers("/api/v1/admin/**").permitAll()
+                        .requestMatchers("/api/v1/pharmacies/**").permitAll()
                         .anyRequest().authenticated()
                 );
 

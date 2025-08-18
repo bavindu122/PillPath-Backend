@@ -103,6 +103,58 @@ Content-Type: application/json
   "adminLicenseNumber": "RPH2024002"
 }
 
+### Get pharmacy profile (accessed by pharmacy admin)
+GET http://localhost:8080/api/v1/pharmacies/admin/profile
+Authorization: Bearer pharmacy-admin-token-36
 
-### Get pharmacies within 10km radius of user location
-GET http://localhost:8080/api/v1/admin/pharmacies/map?userLat=6.9271&userLng=79.8612&radiusKm=10
+### Update pharmacy profile (accessed by pharmacy admin)
+PUT http://localhost:8080/api/v1/pharmacies/admin/profile
+Authorization: Bearer temp-token-pharmacy-36
+Content-Type: application/json
+
+{
+  "name": "Updated Pharmacy Name",
+  "address": "Updated Address"
+}
+
+
+### Get pharmacy profile (accessed by pharmacy admin)
+GET http://localhost:8080/api/v1/pharmacies/pharmacy-profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhd…JTiJ9.7GE1LDRb-UOVuQItqFg1HknwBZngV-3a-Dghwzj8HZA
+
+### Update pharmacy profile
+PUT http://localhost:8080/api/v1/pharmacies/pharmacy-profile
+Authorization: Bearer pharmacy-admin-token-36
+Content-Type: application/json
+
+{
+  "name": "Borella Medi care",
+  "address": "borella, Colombo, Sri Lanka"
+}
+
+### Login as Pharmacy Admin
+POST http://localhost:8080/api/v1/users/login
+Content-Type: application/json
+
+{
+  "email": "nirmi4@gmail.com",
+  "password": "12345678"
+}
+
+### Get pharmacy profile (accessed by pharmacy admin)
+GET http://localhost:8080/api/v1/pharmacies/admin/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NTU0NTM5MCwiZXhwIjoxNzU1NjMxNzkwLCJzdWIiOiIzNiIsInVpZCI6MzYsInJvbGUiOiJQSEFSTUFDWV9BRE1JTiJ9.q7fsWQkIM-3YHGZ6cFEgOS-LTuVm0TidzVfeUHnqeco
+
+### Get pharmacy profile (accessed by pharmacy admin)
+GET http://localhost:8080/api/v1/pharmacies/pharmacy-profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NTU0NTM5MCwiZXhwIjoxNzU1NjMxNzkwLCJzdWIiOiIzNiIsInVpZCI6MzYsInJvbGUiOiJQSEFSTUFDWV9BRE1JTiJ9.q7fsWQkIM-3YHGZ6cFEgOS-LTuVm0TidzVfeUHnqeco
+
+### Update pharmacy profile (accessed by pharmacy admin)
+PUT http://localhost:8080/api/v1/pharmacies/pharmacy-profile
+Authorization:  Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NTU0NTM5MCwiZXhwIjoxNzU1NjMxNzkwLCJzdWIiOiIzNiIsInVpZCI6MzYsInJvbGUiOiJQSEFSTUFDWV9BRE1JTiJ9.q7fsWQkIM-3YHGZ6cFEgOS-LTuVm0TidzVfeUHnqeco
+Content-Type: application/json
+
+{
+  "name": "Updated Pharmacy Name",
+  "address": "Updated Address"
+}
