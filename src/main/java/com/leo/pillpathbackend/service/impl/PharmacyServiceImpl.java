@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -277,5 +279,38 @@ public PharmacyStatsDTO getPharmacyStats() {
 
         pharmacy = pharmacyRepository.save(pharmacy);
         return mapper.convertToPharmacyDTO(pharmacy);
+    }
+    @Override
+    public List<PharmacyMapDTO> getPharmaciesForMap(Double userLat, Double userLng, Double radiusKm) {
+        List<Pharmacy> pharmacies;
+
+        if (userLat != null && userLng != null) {
+            // Get pharmacies within radius (you'll need to implement this query)
+            pharmacies = pharmacyRepository.findActivePharmaciesWithinRadius(userLat, userLng, radiusKm);
+        } else {
+            // Get all active pharmacies with location data
+            pharmacies = pharmacyRepository.findByIsActiveTrueAndIsVerifiedTrueAndLatitudeIsNotNullAndLongitudeIsNotNull();
+        }
+
+        return pharmacies.stream()
+                .map(this::mapToPharmacyMapDTO)
+                .collect(Collectors.toList());
+    }
+
+    private PharmacyMapDTO mapToPharmacyMapDTO(Pharmacy pharmacy) {
+        PharmacyMapDTO dto = new PharmacyMapDTO();
+        dto.setId(pharmacy.getId());
+        dto.setName(pharmacy.getName());
+        dto.setAddress(pharmacy.getAddress());
+        dto.setLatitude(pharmacy.getLatitude());
+        dto.setLongitude(pharmacy.getLongitude());
+        dto.setAverageRating(pharmacy.getAverageRating());
+        dto.setPhoneNumber(pharmacy.getPhoneNumber());
+        dto.setDeliveryAvailable(pharmacy.getDeliveryAvailable());
+        dto.setLogoUrl(pharmacy.getLogoUrl());
+        dto.setOperatingHours(pharmacy.getOperatingHours());
+        dto.setIsActive(pharmacy.getIsActive());
+        dto.setIsVerified(pharmacy.getIsVerified());
+        return dto;
     }
 }

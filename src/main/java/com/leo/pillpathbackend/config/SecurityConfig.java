@@ -64,10 +64,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/customers/check-email/**").permitAll()
                         .requestMatchers("/api/v1/customers/profile/**").permitAll()
                         .requestMatchers("/api/v1/pharmacies/register").permitAll()
-                        .requestMatchers("/api/v1/pharmacies/**").permitAll()
                         .requestMatchers("/api/v1/pharmacy-admins/register").permitAll()
-                        .requestMatchers("/api/v1/pharmacy-admin/**").permitAll()
-                        .requestMatchers("/api/pharmacy-admin/**").permitAll() // Add this line
                         .requestMatchers("/api/v1/admin/**").permitAll()
                         .anyRequest().authenticated()
                 );
