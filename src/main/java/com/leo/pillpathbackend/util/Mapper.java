@@ -250,6 +250,7 @@ public class Mapper {
         pharmacy.setServices(request.getServices());
         pharmacy.setDeliveryAvailable(request.getDeliveryAvailable());
         pharmacy.setDeliveryRadius(request.getDeliveryRadius());
+        pharmacy.setIsVerified(false);
 
         // Add location mapping
         pharmacy.setLatitude(request.getLatitude());
