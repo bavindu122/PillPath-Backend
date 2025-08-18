@@ -15,8 +15,8 @@ POST http://localhost:8080/api/v1/users/login
 Content-Type: application/json
 
 {
-  "email": "nirmi@gmail.com",
-  "password": "12345678"
+  "email": "senuja@gmail.com",
+  "password": "sanuthma"
 }
 
 
@@ -76,3 +76,30 @@ Authorization: Bearer customer-token-2
 ### Get all family members for debugging
 GET http://localhost:8080/api/members/family-members
 Authorization: Bearer customer-token-1
+
+
+### Update customer profile
+PUT http://localhost:8080/api/v1/customers/profile
+Authorization: Bearer customer-token-3
+Content-Type: application/json
+
+{
+  "username": "newusername",
+  "fullName": "New Name",
+  "email": "new@email.com",
+  "phoneNumber": "1234567890",
+  "dateOfBirth": "1990-01-01",
+  "address": "123 Main St",
+  "profilePictureUrl": "https://example.com/image.jpg",
+  "allergies": [
+    "Peanuts",
+    "Shellfish"
+  ],
+  "medicalConditions": [
+    "Asthma"
+  ],
+  "emergencyContactName": "Jane Doe",
+  "emergencyContactPhone": "0987654321",
+  "insuranceProvider": "ProviderX",
+  "insuranceId": "INS-123456"
+}
