@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -257,6 +259,84 @@ public PharmacyStatsDTO getPharmacyStats() {
     public PharmacyDTO updatePharmacyDetails(Long pharmacyId, PharmacyDTO pharmacyDTO) {
         Pharmacy pharmacy = pharmacyRepository.findById(pharmacyId)
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found with ID: " + pharmacyId));
+
+        // Check for email uniqueness if being updated
+        if (pharmacyDTO.getEmail() != null && !pharmacyDTO.getEmail().equals(pharmacy.getEmail())) {
+            if (pharmacyRepository.existsByEmail(pharmacyDTO.getEmail())) {
+                throw new RuntimeException("Pharmacy with this email already exists");
+            }
+        }
+
+        // Check for license number uniqueness if being updated
+        if (pharmacyDTO.getLicenseNumber() != null && !pharmacyDTO.getLicenseNumber().equals(pharmacy.getLicenseNumber())) {
+            if (pharmacyRepository.existsByLicenseNumber(pharmacyDTO.getLicenseNumber())) {
+                throw new RuntimeException("Pharmacy with this license number already exists");
+            }
+        }
+
+        // Update pharmacy details using mapper
+        mapper.updatePharmacyFromDTO(pharmacy, pharmacyDTO);
+
+        pharmacy = pharmacyRepository.save(pharmacy);
+        return mapper.convertToPharmacyDTO(pharmacy);
+    }
+    @Override
+    public List<PharmacyMapDTO> getPharmaciesForMap(Double userLat, Double userLng, Double radiusKm) {
+        List<Pharmacy> pharmacies;
+
+        if (userLat != null && userLng != null) {
+            // Get pharmacies within radius (you'll need to implement this query)
+            pharmacies = pharmacyRepository.findActivePharmaciesWithinRadius(userLat, userLng, radiusKm);
+        } else {
+            // Get all active pharmacies with location data
+            pharmacies = pharmacyRepository.findByIsActiveTrueAndIsVerifiedTrueAndLatitudeIsNotNullAndLongitudeIsNotNull();
+        }
+
+        return pharmacies.stream()
+                .map(this::mapToPharmacyMapDTO)
+                .collect(Collectors.toList());
+    }
+
+    private PharmacyMapDTO mapToPharmacyMapDTO(Pharmacy pharmacy) {
+        PharmacyMapDTO dto = new PharmacyMapDTO();
+        dto.setId(pharmacy.getId());
+        dto.setName(pharmacy.getName());
+        dto.setAddress(pharmacy.getAddress());
+        dto.setLatitude(pharmacy.getLatitude());
+        dto.setLongitude(pharmacy.getLongitude());
+        dto.setAverageRating(pharmacy.getAverageRating());
+        dto.setPhoneNumber(pharmacy.getPhoneNumber());
+        dto.setDeliveryAvailable(pharmacy.getDeliveryAvailable());
+        dto.setLogoUrl(pharmacy.getLogoUrl());
+        dto.setOperatingHours(pharmacy.getOperatingHours());
+        dto.setIsActive(pharmacy.getIsActive());
+        dto.setIsVerified(pharmacy.getIsVerified());
+        return dto;
+    }
+
+    @Override
+    public PharmacyDTO getPharmacyProfileByAdminId(Long adminId) {
+        PharmacyAdmin admin = pharmacyAdminRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy admin not found"));
+
+        Pharmacy pharmacy = admin.getPharmacy();
+        if (pharmacy == null) {
+            throw new RuntimeException("No pharmacy associated with this admin");
+        }
+
+        return mapper.convertToPharmacyDTO(pharmacy);
+    }
+
+    @Override
+    @Transactional
+    public PharmacyDTO updatePharmacyProfile(Long adminId, PharmacyDTO pharmacyDTO) {
+        PharmacyAdmin admin = pharmacyAdminRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Pharmacy admin not found"));
+
+        Pharmacy pharmacy = admin.getPharmacy();
+        if (pharmacy == null) {
+            throw new RuntimeException("No pharmacy associated with this admin");
+        }
 
         // Check for email uniqueness if being updated
         if (pharmacyDTO.getEmail() != null && !pharmacyDTO.getEmail().equals(pharmacy.getEmail())) {

@@ -5,13 +5,14 @@ import com.leo.pillpathbackend.entity.Customer;
 import com.leo.pillpathbackend.repository.CustomerRepository;
 import com.leo.pillpathbackend.service.CustomerService;
 import com.leo.pillpathbackend.util.Mapper;
+import com.leo.pillpathbackend.util.JwtService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import java.util.Optional;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +21,7 @@ public class CustomerServiceImpl implements CustomerService {
     private final CustomerRepository customerRepository;
     private final Mapper mapper;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     @Override
     public CustomerRegistrationResponse registerCustomer(CustomerRegistrationRequest request) {
@@ -89,8 +91,10 @@ public class CustomerServiceImpl implements CustomerService {
                 return createLoginErrorResponse("Invalid email or password");
             }
 
-            // Create successful response
-            return mapper.convertToLoginResponse(customer);
+            // Build response and attach JWT
+            CustomerLoginResponse resp = mapper.convertToLoginResponse(customer);
+            resp.setToken(jwtService.generateToken(customer.getId(), "CUSTOMER"));
+            return resp;
 
         } catch (Exception e) {
             return createLoginErrorResponse("Login failed: " + e.getMessage());
@@ -110,6 +114,7 @@ public class CustomerServiceImpl implements CustomerService {
         response.setMessage(message);
         return response;
     }
+
     @Override
     public CustomerDTO getCustomerProfile(Long customerId) {
         try {
@@ -293,3 +298,4 @@ public class CustomerServiceImpl implements CustomerService {
         return mapper.convertToCustomerDTOList(customers);
     }
 }
+
