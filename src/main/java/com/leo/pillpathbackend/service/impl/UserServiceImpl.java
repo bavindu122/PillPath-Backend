@@ -1,10 +1,7 @@
 package com.leo.pillpathbackend.service.impl;
 
 import com.leo.pillpathbackend.dto.*;
-import com.leo.pillpathbackend.entity.Admin;
-import com.leo.pillpathbackend.entity.Customer;
-import com.leo.pillpathbackend.entity.PharmacyAdmin;
-import com.leo.pillpathbackend.entity.User;
+import com.leo.pillpathbackend.entity.*;
 import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.UserService;
 import com.leo.pillpathbackend.util.Mapper;
@@ -88,6 +85,17 @@ public class UserServiceImpl implements UserService {
                     .token(token)
                     .userType("PHARMACY_ADMIN")
                     .userId(admin.getId())
+                    .userProfile(profileDTO)
+                    .build();
+        }else if (user instanceof PharmacistUser pharmacistUser) {
+            PharmacistProfileDTO profileDTO = mapper.convertToPharmacistProfileDTO(pharmacistUser);
+            String token = jwtService.generateToken(pharmacistUser.getId(), "PHARMACIST");
+            return UnifiedLoginResponse.builder()
+                    .success(true)
+                    .message("Login successful")
+                    .token(token)
+                    .userType("PHARMACIST")
+                    .userId(pharmacistUser.getId())
                     .userProfile(profileDTO)
                     .build();
         }
