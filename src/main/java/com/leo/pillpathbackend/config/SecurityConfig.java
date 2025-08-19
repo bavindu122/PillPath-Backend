@@ -56,7 +56,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
-                        .requestMatchers("/api/v1/users/login").permitAll()  // Unified login
+                        .requestMatchers("/api/v1/users/**").permitAll()  // Unified login
                         .requestMatchers("/api/v1/users/admin/login").permitAll()  // Admin login
                         .requestMatchers("/api/v1/users/change-password").permitAll()
                         .requestMatchers("/api/v1/customers/register").permitAll()

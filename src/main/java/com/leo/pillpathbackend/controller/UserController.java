@@ -2,10 +2,14 @@ package com.leo.pillpathbackend.controller;
 
 import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/users")  // Changed from "/users" to "/api/v1/users"
@@ -50,6 +54,31 @@ public class UserController {
             return ResponseEntity.ok(response);
         } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+    }
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, Object>> logout(HttpServletRequest request) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                response.put("success", false);
+                response.put("message", "No token provided");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            String token = authHeader.substring(7);
+            userService.logout(token);
+
+            response.put("success", true);
+            response.put("message", "Logged out successfully");
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Logout failed: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 }

@@ -145,13 +145,5 @@ public class PharmacyManagementController {
             return ResponseEntity.badRequest().body(response);
         }
     }
-    @GetMapping("/map")
-    public ResponseEntity<List<PharmacyMapDTO>> getPharmaciesForMap(
-            @RequestParam(required = false) Double userLat,
-            @RequestParam(required = false) Double userLng,
-            @RequestParam(defaultValue = "10") Double radiusKm) {
 
-        List<PharmacyMapDTO> pharmacies = pharmacyService.getPharmaciesForMap(userLat, userLng, radiusKm);
-        return ResponseEntity.ok(pharmacies);
-    }
 }

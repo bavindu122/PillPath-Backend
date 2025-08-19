@@ -210,7 +210,8 @@ public class Mapper {
         response.setFullName(customer.getFullName());
         response.setSuccess(true);
         response.setMessage("Login successful");
-        response.setToken("temp-token-customer-" + customer.getId()); // Fixed: added "customer-"
+        // Token will be set by the Service layer using JwtService
+        // response.setToken(...);
         response.setUser(convertToProfileDTO(customer)); // Safe profile data
         return response;
     }
@@ -371,30 +372,54 @@ public class Mapper {
         return dto;
     }
 
-    public void updatePharmacyFromDTO(Pharmacy pharmacy, PharmacyDTO dto) {
-        if (dto.getName() != null) {
-            pharmacy.setName(dto.getName());
+    public void updatePharmacyFromDTO(Pharmacy pharmacy, PharmacyDTO pharmacyDTO) {
+        if (pharmacyDTO.getName() != null) {
+            pharmacy.setName(pharmacyDTO.getName());
         }
-        if (dto.getAddress() != null) {
-            pharmacy.setAddress(dto.getAddress());
+        if (pharmacyDTO.getAddress() != null) {
+            pharmacy.setAddress(pharmacyDTO.getAddress());
         }
-        if (dto.getPhoneNumber() != null) {
-            pharmacy.setPhoneNumber(dto.getPhoneNumber());
+        if (pharmacyDTO.getLatitude() != null) {
+            pharmacy.setLatitude(pharmacyDTO.getLatitude());
         }
-        if (dto.getEmail() != null) {
-            pharmacy.setEmail(dto.getEmail());
+        if (pharmacyDTO.getLongitude() != null) {
+            pharmacy.setLongitude(pharmacyDTO.getLongitude());
         }
-        if (dto.getOperatingHours() != null) {
-            pharmacy.setOperatingHours(dto.getOperatingHours());
+        if (pharmacyDTO.getPhoneNumber() != null) {
+            pharmacy.setPhoneNumber(pharmacyDTO.getPhoneNumber());
         }
-        if (dto.getServices() != null) {
-            pharmacy.setServices(dto.getServices());
+        if (pharmacyDTO.getEmail() != null) {
+            pharmacy.setEmail(pharmacyDTO.getEmail());
         }
-        if (dto.getDeliveryAvailable() != null) {
-            pharmacy.setDeliveryAvailable(dto.getDeliveryAvailable());
+        if (pharmacyDTO.getLicenseNumber() != null) {
+            pharmacy.setLicenseNumber(pharmacyDTO.getLicenseNumber());
         }
-        if (dto.getDeliveryRadius() != null) {
-            pharmacy.setDeliveryRadius(dto.getDeliveryRadius());
+        if (pharmacyDTO.getLicenseExpiryDate() != null) {
+            pharmacy.setLicenseExpiryDate(pharmacyDTO.getLicenseExpiryDate());
+        }
+        if (pharmacyDTO.getLogoUrl() != null) {
+            pharmacy.setLogoUrl(pharmacyDTO.getLogoUrl());
+        }
+        if (pharmacyDTO.getLogoPublicId() != null) {
+            pharmacy.setLogoPublicId(pharmacyDTO.getLogoPublicId());
+        }
+        if (pharmacyDTO.getBannerUrl() != null) {
+            pharmacy.setBannerUrl(pharmacyDTO.getBannerUrl());
+        }
+        if (pharmacyDTO.getBannerPublicId() != null) {
+            pharmacy.setBannerPublicId(pharmacyDTO.getBannerPublicId());
+        }
+        if (pharmacyDTO.getOperatingHours() != null) {
+            pharmacy.setOperatingHours(pharmacyDTO.getOperatingHours());
+        }
+        if (pharmacyDTO.getServices() != null) {
+            pharmacy.setServices(pharmacyDTO.getServices());
+        }
+        if (pharmacyDTO.getDeliveryAvailable() != null) {
+            pharmacy.setDeliveryAvailable(pharmacyDTO.getDeliveryAvailable());
+        }
+        if (pharmacyDTO.getDeliveryRadius() != null) {
+            pharmacy.setDeliveryRadius(pharmacyDTO.getDeliveryRadius());
         }
     }
 //    public PharmacistProfileDTO convertToPharmacistProfileDTO(Pharmacist pharmacist) {

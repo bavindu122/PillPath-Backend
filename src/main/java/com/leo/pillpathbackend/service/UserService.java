@@ -10,8 +10,8 @@ public interface UserService {
     UserDTO getUserByUsername(String username);
     UserDTO getUserByEmail(String email);
     boolean validateUser(String username, String password);
-    public void changePassword(String username, String currentPassword, String newPassword) ;
-    public AdminLoginResponse loginAdmin(AdminLoginRequest request);
-    // Add this method to UserService.java
+    void changePassword(String username, String currentPassword, String newPassword);
+    AdminLoginResponse loginAdmin(AdminLoginRequest request);
     UnifiedLoginResponse unifiedLogin(UnifiedLoginRequest request);
+    void logout(String token);
 }
