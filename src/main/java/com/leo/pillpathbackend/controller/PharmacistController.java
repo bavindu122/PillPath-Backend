@@ -4,6 +4,7 @@ import com.leo.pillpathbackend.dto.PharmacistCreateRequestDTO;
 import com.leo.pillpathbackend.dto.PharmacistUpdateRequestDTO;
 import com.leo.pillpathbackend.dto.PharmacistResponseDTO;
 import com.leo.pillpathbackend.service.PharmacistService;
+import com.leo.pillpathbackend.service.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -24,6 +26,7 @@ import java.util.Map;
 public class PharmacistController {
 
     private final PharmacistService pharmacistService;
+    private final CloudinaryService cloudinaryService;
 
     @PostMapping("/staff")
     @PreAuthorize("hasRole('PHARMACY_ADMIN')")
@@ -42,6 +45,140 @@ public class PharmacistController {
             log.error("Unexpected error creating staff member: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Internal server error"));
+        }
+    }
+
+    // NEW: General profile picture upload endpoint
+    @PostMapping("/upload-profile-picture")
+    @PreAuthorize("hasRole('PHARMACY_ADMIN')")
+    public ResponseEntity<?> uploadProfilePicture(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "userId", required = false) Long userId) {
+
+        try {
+            log.info("Uploading profile picture for userId: {}", userId);
+
+            // Validate file
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "No file provided"));
+            }
+
+            // Validate file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Only image files are allowed"));
+            }
+
+            // Validate file size (5MB max)
+            long maxSize = 5 * 1024 * 1024; // 5MB
+            if (file.getSize() > maxSize) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "File size must be less than 5MB"));
+            }
+
+            // Upload to Cloudinary
+            Map<String, Object> uploadResult = cloudinaryService.uploadProfilePicture(file, userId);
+
+            log.info("Profile picture uploaded successfully: {}", uploadResult.get("secure_url"));
+
+            return ResponseEntity.ok(uploadResult);
+
+        } catch (Exception e) {
+            log.error("Error uploading profile picture: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to upload image: " + e.getMessage()));
+        }
+    }
+
+    // NEW: General profile picture delete endpoint
+    @DeleteMapping("/delete-profile-picture")
+    @PreAuthorize("hasRole('PHARMACY_ADMIN')")
+    public ResponseEntity<?> deleteProfilePicture(@RequestParam("publicId") String publicId) {
+        try {
+            log.info("Deleting profile picture with publicId: {}", publicId);
+
+            cloudinaryService.deleteImage(publicId);
+
+            return ResponseEntity.ok(Map.of("message", "Profile picture deleted successfully"));
+
+        } catch (Exception e) {
+            log.error("Error deleting profile picture: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to delete image: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/staff/{staffId}/profile-picture")
+    @PreAuthorize("hasRole('PHARMACY_ADMIN')")
+    public ResponseEntity<?> uploadStaffProfilePicture(
+            @PathVariable Long staffId,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            log.info("POST request to upload profile picture for staff ID: {}", staffId);
+
+            if (file.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "File is required"));
+            }
+
+            // Validate file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "File must be an image"));
+            }
+
+            // Validate file size (5MB limit)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "File size must be less than 5MB"));
+            }
+
+            // Upload to Cloudinary
+            Map<String, Object> uploadResult = cloudinaryService.uploadProfilePicture(file, staffId);
+            String imageUrl = (String) uploadResult.get("secure_url");
+
+            // Update pharmacist with new profile picture URL
+            PharmacistResponseDTO updatedPharmacist = pharmacistService.updateProfilePicture(staffId, imageUrl);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Profile picture updated successfully",
+                    "imageUrl", imageUrl,
+                    "pharmacist", updatedPharmacist
+            ));
+        } catch (RuntimeException e) {
+            log.error("Error uploading profile picture for staff ID {}: {}", staffId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error uploading profile picture for staff ID {}: ", staffId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to upload profile picture"));
+        }
+    }
+
+    @DeleteMapping("/staff/{staffId}/profile-picture")
+    @PreAuthorize("hasRole('PHARMACY_ADMIN')")
+    public ResponseEntity<?> deleteStaffProfilePicture(@PathVariable Long staffId) {
+        try {
+            log.info("DELETE request to remove profile picture for staff ID: {}", staffId);
+
+            PharmacistResponseDTO updatedPharmacist = pharmacistService.removeProfilePicture(staffId);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Profile picture removed successfully",
+                    "pharmacist", updatedPharmacist
+            ));
+        } catch (RuntimeException e) {
+            log.error("Error removing profile picture for staff ID {}: {}", staffId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error removing profile picture for staff ID {}: ", staffId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to remove profile picture"));
         }
     }
 

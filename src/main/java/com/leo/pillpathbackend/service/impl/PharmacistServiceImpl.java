@@ -11,6 +11,7 @@ import com.leo.pillpathbackend.repository.PharmacistRepository;
 import com.leo.pillpathbackend.repository.PharmacyRepository;
 import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.PharmacistService;
+import com.leo.pillpathbackend.service.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,6 +32,7 @@ public class PharmacistServiceImpl implements PharmacistService {
     private final PharmacyRepository pharmacyRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CloudinaryService cloudinaryService;
 
     @Override
     @Transactional
@@ -335,5 +337,79 @@ public class PharmacistServiceImpl implements PharmacistService {
         response.setUpdatedAt(pharmacist.getUpdatedAt());
         
         return response;
+    }
+
+    @Override
+    @Transactional
+    public PharmacistResponseDTO updateProfilePicture(Long pharmacistId, String imageUrl) {
+        log.info("Updating profile picture for pharmacist ID: {}", pharmacistId);
+
+        Pharmacist pharmacist = pharmacistRepository.findById(pharmacistId)
+                .orElseThrow(() -> new RuntimeException("Pharmacist not found with ID: " + pharmacistId));
+
+        // Delete old profile picture from Cloudinary if exists
+        String oldProfilePictureUrl = pharmacist.getProfilePictureUrl();
+        if (oldProfilePictureUrl != null && !oldProfilePictureUrl.isEmpty()) {
+            try {
+                String publicId = cloudinaryService.extractPublicIdFromUrl(oldProfilePictureUrl);
+                if (publicId != null) {
+                    cloudinaryService.deleteImage(publicId);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to delete old profile picture: {}", e.getMessage());
+                // Don't fail the operation if old image deletion fails
+            }
+        }
+
+        // Update both direct field and user field
+        pharmacist.setProfilePictureUrl(imageUrl);
+
+        PharmacistUser user = pharmacist.getPharmacistUser();
+        if (user != null) {
+            user.setProfilePictureUrl(imageUrl);
+            userRepository.save(user);
+        }
+
+        Pharmacist savedPharmacist = pharmacistRepository.save(pharmacist);
+        log.info("Updated profile picture for pharmacist ID: {}", pharmacistId);
+
+        return convertToResponse(savedPharmacist);
+    }
+
+    @Override
+    @Transactional
+    public PharmacistResponseDTO removeProfilePicture(Long pharmacistId) {
+        log.info("Removing profile picture for pharmacist ID: {}", pharmacistId);
+
+        Pharmacist pharmacist = pharmacistRepository.findById(pharmacistId)
+                .orElseThrow(() -> new RuntimeException("Pharmacist not found with ID: " + pharmacistId));
+
+        // Delete profile picture from Cloudinary if exists
+        String profilePictureUrl = pharmacist.getProfilePictureUrl();
+        if (profilePictureUrl != null && !profilePictureUrl.isEmpty()) {
+            try {
+                String publicId = cloudinaryService.extractPublicIdFromUrl(profilePictureUrl);
+                if (publicId != null) {
+                    cloudinaryService.deleteImage(publicId);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to delete profile picture from Cloudinary: {}", e.getMessage());
+                // Don't fail the operation if image deletion fails
+            }
+        }
+
+        // Remove profile picture URLs
+        pharmacist.setProfilePictureUrl(null);
+
+        PharmacistUser user = pharmacist.getPharmacistUser();
+        if (user != null) {
+            user.setProfilePictureUrl(null);
+            userRepository.save(user);
+        }
+
+        Pharmacist savedPharmacist = pharmacistRepository.save(pharmacist);
+        log.info("Removed profile picture for pharmacist ID: {}", pharmacistId);
+
+        return convertToResponse(savedPharmacist);
     }
 }
