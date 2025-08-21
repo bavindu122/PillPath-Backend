@@ -3,7 +3,7 @@ package com.leo.pillpathbackend.controller;
 import com.leo.pillpathbackend.dto.PharmacistCreateRequestDTO;
 import com.leo.pillpathbackend.dto.PharmacistUpdateRequestDTO;
 import com.leo.pillpathbackend.dto.PharmacistResponseDTO;
-import com.leo.pillpathbackend.service.impl.PharmacistServiceImpl;
+import com.leo.pillpathbackend.service.PharmacistService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
