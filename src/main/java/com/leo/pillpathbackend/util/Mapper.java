@@ -1,11 +1,7 @@
 package com.leo.pillpathbackend.util;
 
 import com.leo.pillpathbackend.dto.*;
-import com.leo.pillpathbackend.entity.PharmacyAdmin;
-import com.leo.pillpathbackend.entity.Pharmacy;
-import com.leo.pillpathbackend.entity.User;
-import com.leo.pillpathbackend.entity.Review;
-import com.leo.pillpathbackend.entity.Customer;
+import com.leo.pillpathbackend.entity.*;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -14,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -251,6 +248,7 @@ public class Mapper {
         pharmacy.setServices(request.getServices());
         pharmacy.setDeliveryAvailable(request.getDeliveryAvailable());
         pharmacy.setDeliveryRadius(request.getDeliveryRadius());
+        pharmacy.setIsVerified(false);
 
         // Add location mapping
         pharmacy.setLatitude(request.getLatitude());
@@ -421,29 +419,38 @@ public class Mapper {
             pharmacy.setDeliveryRadius(pharmacyDTO.getDeliveryRadius());
         }
     }
-//    public PharmacistProfileDTO convertToPharmacistProfileDTO(Pharmacist pharmacist) {
-//        PharmacistProfileDTO dto = new PharmacistProfileDTO();
-//
-//        dto.setId(pharmacist.getId());
-//        dto.setEmail(pharmacist.getEmail());
-//        dto.setFullName(pharmacist.getFullName());
-//        dto.setPhoneNumber(pharmacist.getPhoneNumber());
-//        dto.setDateOfBirth(pharmacist.getDateOfBirth());
-//        dto.setProfilePictureUrl(pharmacist.getProfilePictureUrl());
-//
-//        // Pharmacist specific fields
-//        dto.setPharmacyId(pharmacist.getPharmacy().getId());
-//        dto.setPharmacyName(pharmacist.getPharmacy().getName());
-//        dto.setLicenseNumber(pharmacist.getLicenseNumber());
-//        dto.setLicenseExpiryDate(pharmacist.getLicenseExpiryDate());
-//        dto.setSpecialization(pharmacist.getSpecialization());
-//        dto.setYearsOfExperience(pharmacist.getYearsOfExperience());
-//        dto.setHireDate(pharmacist.getHireDate());
-//        dto.setShiftSchedule(pharmacist.getShiftSchedule());
-//        dto.setCertifications(pharmacist.getCertifications());
-//        dto.setIsVerified(pharmacist.getIsVerified());
-//        dto.setIsActive(pharmacist.getIsActive());
-//
-//        return dto;
-//    }
+
+    public PharmacistProfileDTO convertToPharmacistProfileDTO(PharmacistUser pharmacist) {
+        if (pharmacist == null) {
+            return null;
+        }
+        PharmacistProfileDTO dto = new PharmacistProfileDTO();
+        dto.setId(pharmacist.getId());
+        //dto.setUsername(pharmacist.getUsername());
+        dto.setEmail(pharmacist.getEmail());
+        dto.setFullName(pharmacist.getFullName());
+        dto.setPhoneNumber(pharmacist.getPhoneNumber());
+        dto.setDateOfBirth(pharmacist.getDateOfBirth());
+        //dto.setAddress(pharmacist.getAddress());
+        dto.setProfilePictureUrl(pharmacist.getProfilePictureUrl());
+
+        // Pharmacist specific fields
+        if (pharmacist.getPharmacy() != null) {
+            dto.setPharmacyId(pharmacist.getPharmacy().getId());
+            dto.setPharmacyName(pharmacist.getPharmacy().getName());
+        }
+        dto.setLicenseNumber(pharmacist.getLicenseNumber());
+        dto.setLicenseExpiryDate(pharmacist.getLicenseExpiryDate());
+        dto.setSpecialization(pharmacist.getSpecialization());
+        dto.setYearsOfExperience(pharmacist.getYearsOfExperience());
+        dto.setHireDate(pharmacist.getHireDate());
+        dto.setShiftSchedule(pharmacist.getShiftSchedule());
+        dto.setCertifications(Collections.singletonList(pharmacist.getCertifications()));
+        dto.setIsVerified(pharmacist.getIsVerified());
+        dto.setIsActive(pharmacist.getIsActive());
+
+        // dto.setEmailVerified(pharmacist.getEmailVerified());
+        // dto.setPhoneVerified(pharmacist.getPhoneVerified());
+        return dto;
+    }
 }
