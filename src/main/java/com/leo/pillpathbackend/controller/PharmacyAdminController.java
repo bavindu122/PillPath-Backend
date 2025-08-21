@@ -21,7 +21,7 @@ import java.util.Map;
 @CrossOrigin(origins = "*")
 public class PharmacyAdminController {
 
-    private final PharmacistServiceImpl pharmacistService;
+    private final PharmacistService pharmacistService;
 
     /**
      * Get all staff members for a pharmacy
