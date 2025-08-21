@@ -118,43 +118,17 @@ Content-Type: application/json
 }
 
 
-### Get pharmacy profile (accessed by pharmacy admin)
-GET http://localhost:8080/api/v1/pharmacies/pharmacy-profile
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhd…JTiJ9.7GE1LDRb-UOVuQItqFg1HknwBZngV-3a-Dghwzj8HZA
+### Upload pharmacy banner (<=8MB) - correct multipart usage
+POST http://localhost:8080/api/v1/pharmacies/pharmacy-profile/upload-banner
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NTc2MjkzNSwiZXhwIjoxNzU1ODQ5MzM1LCJzdWIiOiIzNiIsInVpZCI6MzYsInJvbGUiOiJQSEFSTUFDWV9BRE1JTiJ9.WKOjc_6CivadgLDQCT8cf77xZ-p8vjIpI0tNIK_cMP4
+Content-Type: multipart/form-data
 
-### Update pharmacy profile
-PUT http://localhost:8080/api/v1/pharmacies/pharmacy-profile
-Authorization: Bearer pharmacy-admin-token-36
-Content-Type: application/json
+file=@C:\Users\ASUS\Downloads\pharmacy_banner.jpg;type=image/jpeg
 
-{
-  "name": "Borella Medi care",
-  "address": "borella, Colombo, Sri Lanka"
-}
 
-### Login as Pharmacy Admin
-POST http://localhost:8080/api/v1/users/login
-Content-Type: application/json
+### Upload pharmacy logo (<=5MB) - correct multipart usage
+POST http://localhost:8080/api/v1/pharmacies/pharmacy-profile/upload-logo
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data
 
-{
-  "email": "nirmi4@gmail.com",
-  "password": "12345678"
-}
-
-### Get pharmacy profile (accessed by pharmacy admin)
-GET http://localhost:8080/api/v1/pharmacies/admin/profile
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NTU0NTM5MCwiZXhwIjoxNzU1NjMxNzkwLCJzdWIiOiIzNiIsInVpZCI6MzYsInJvbGUiOiJQSEFSTUFDWV9BRE1JTiJ9.q7fsWQkIM-3YHGZ6cFEgOS-LTuVm0TidzVfeUHnqeco
-
-### Get pharmacy profile (accessed by pharmacy admin)
-GET http://localhost:8080/api/v1/pharmacies/pharmacy-profile
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NTU0NTM5MCwiZXhwIjoxNzU1NjMxNzkwLCJzdWIiOiIzNiIsInVpZCI6MzYsInJvbGUiOiJQSEFSTUFDWV9BRE1JTiJ9.q7fsWQkIM-3YHGZ6cFEgOS-LTuVm0TidzVfeUHnqeco
-
-### Update pharmacy profile (accessed by pharmacy admin)
-PUT http://localhost:8080/api/v1/pharmacies/pharmacy-profile
-Authorization:  Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NTU0NTM5MCwiZXhwIjoxNzU1NjMxNzkwLCJzdWIiOiIzNiIsInVpZCI6MzYsInJvbGUiOiJQSEFSTUFDWV9BRE1JTiJ9.q7fsWQkIM-3YHGZ6cFEgOS-LTuVm0TidzVfeUHnqeco
-Content-Type: application/json
-
-{
-  "name": "Updated Pharmacy Name",
-  "address": "Updated Address"
-}
+file=@C:\Users\ASUS\Downloads\pharmacy-logo.jpg;type=image/jpeg

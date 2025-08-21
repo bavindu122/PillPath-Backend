@@ -1,6 +1,11 @@
 package com.leo.pillpathbackend.controller;
 
-import com.leo.pillpathbackend.dto.*;
+import com.leo.pillpathbackend.dto.PharmacyDTO;
+import com.leo.pillpathbackend.dto.PharmacyRegistrationRequest;
+import com.leo.pillpathbackend.dto.PharmacyRegistrationResponse;
+import com.leo.pillpathbackend.dto.PharmacyAdminProfileDTO;
+import com.leo.pillpathbackend.dto.PharmacyMapDTO;
+import com.leo.pillpathbackend.service.CloudinaryService;
 import com.leo.pillpathbackend.service.PharmacyService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
 import java.util.List;
@@ -22,6 +28,8 @@ public class PharmacyController {
 
     private final PharmacyService pharmacyService;
     private final AuthenticationHelper authenticationHelper;
+    private final CloudinaryService cloudinaryService;
+
 
     @PostMapping("/register")
     public ResponseEntity<PharmacyRegistrationResponse> registerPharmacy(
@@ -172,6 +180,103 @@ public class PharmacyController {
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "Failed to update pharmacy profile: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+    // New: upload or change pharmacy logo
+    @PostMapping(value = "/pharmacy-profile/upload-logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> uploadPharmacyLogo(
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest request) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Long adminId = authenticationHelper.extractPharmacyAdminIdFromRequest(request);
+
+            // Load current pharmacy to get old publicId
+            PharmacyDTO current = pharmacyService.getPharmacyProfileByAdminId(adminId);
+            String oldPublicId = current.getLogoPublicId();
+            if (oldPublicId != null && !oldPublicId.isEmpty()) {
+                cloudinaryService.deleteImage(oldPublicId);
+            }
+
+            // Upload new logo
+            Map<String, Object> upload = cloudinaryService.uploadPharmacyLogo(file, current.getId());
+            String newUrl = upload.get("secure_url").toString();
+            String newPublicId = upload.get("public_id").toString();
+
+            // Persist new logo details
+            PharmacyDTO patch = new PharmacyDTO();
+            patch.setLogoUrl(newUrl);
+            patch.setLogoPublicId(newPublicId);
+            PharmacyDTO updated = pharmacyService.updatePharmacyProfile(adminId, patch);
+
+            response.put("success", true);
+            response.put("imageUrl", newUrl);
+            response.put("message", "Logo updated successfully");
+            response.put("pharmacy", updated);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        } catch (RuntimeException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to upload logo: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    // New: upload or change pharmacy banner
+    @PostMapping(value = "/pharmacy-profile/upload-banner", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> uploadPharmacyBanner(
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest request) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Long adminId = authenticationHelper.extractPharmacyAdminIdFromRequest(request);
+
+            // Load current pharmacy to get old publicId
+            PharmacyDTO current = pharmacyService.getPharmacyProfileByAdminId(adminId);
+            String oldPublicId = current.getBannerPublicId();
+            if (oldPublicId != null && !oldPublicId.isEmpty()) {
+                cloudinaryService.deleteImage(oldPublicId);
+            }
+
+            // Upload new banner
+            Map<String, Object> upload = cloudinaryService.uploadPharmacyBanner(file, current.getId());
+            String newUrl = upload.get("secure_url").toString();
+            String newPublicId = upload.get("public_id").toString();
+
+            // Persist new banner details
+            PharmacyDTO patch = new PharmacyDTO();
+            patch.setBannerUrl(newUrl);
+            patch.setBannerPublicId(newPublicId);
+            PharmacyDTO updated = pharmacyService.updatePharmacyProfile(adminId, patch);
+
+            response.put("success", true);
+            response.put("imageUrl", newUrl);
+            response.put("message", "Banner updated successfully");
+            response.put("pharmacy", updated);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        } catch (RuntimeException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to upload banner: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }

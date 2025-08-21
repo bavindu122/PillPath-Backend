@@ -59,6 +59,30 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         return uploadImageWithValidation(file, publicId, transformation, 5 * 1024 * 1024);
     }
 
+    //pharmacy
+    //pharmacy logo upload (square)
+    @Override
+    public Map<String, Object> uploadPharmacyLogo(MultipartFile file, Long pharmacyId) throws IOException {
+        String publicId = "pillpath/pharmacies/logos/" + pharmacyId + "-" + UUID.randomUUID();
+        Transformation transformation = new Transformation()
+                .width(512).height(512).crop("fill").gravity("auto")
+                .quality("auto").fetchFormat("auto");
+
+        return uploadImageWithValidation(file, publicId, transformation, 5 * 1024 * 1024);
+    }
+
+    // New: pharmacy banner upload (wide)
+    @Override
+    public Map<String, Object> uploadPharmacyBanner(MultipartFile file, Long pharmacyId) throws IOException {
+        String publicId = "pillpath/pharmacies/banners/" + pharmacyId + "-" + UUID.randomUUID();
+        Transformation transformation = new Transformation()
+                .width(1600).height(500).crop("fill").gravity("auto")
+                .quality("auto").fetchFormat("auto");
+
+        return uploadImageWithValidation(file, publicId, transformation, 8 * 1024 * 1024);
+    }
+
+
     @Override
     public void deleteImage(String publicId) {
         try {
