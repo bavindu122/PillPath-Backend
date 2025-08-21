@@ -8,6 +8,8 @@ import com.leo.pillpathbackend.util.Mapper;
 import com.leo.pillpathbackend.util.JwtService;
 import com.leo.pillpathbackend.util.TokenBlacklistService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +20,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
+    private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
+
     private final UserRepository userRepository;
     private final Mapper mapper;
     private final PasswordEncoder passwordEncoder;
@@ -26,7 +30,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UnifiedLoginResponse unifiedLogin(UnifiedLoginRequest request) {
-        // Validate input
         if (request.getEmail() == null || request.getEmail().trim().isEmpty() ||
                 request.getPassword() == null || request.getPassword().trim().isEmpty()) {
             return UnifiedLoginResponse.builder()
@@ -37,7 +40,6 @@ public class UserServiceImpl implements UserService {
 
         String email = request.getEmail().trim().toLowerCase();
 
-        // Check in User repository first to identify user type
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
             return UnifiedLoginResponse.builder()
@@ -48,7 +50,6 @@ public class UserServiceImpl implements UserService {
 
         User user = userOpt.get();
 
-        // Verify user is active
         if (!user.getIsActive()) {
             return UnifiedLoginResponse.builder()
                     .success(false)
@@ -56,7 +57,6 @@ public class UserServiceImpl implements UserService {
                     .build();
         }
 
-        // Verify password
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             return UnifiedLoginResponse.builder()
                     .success(false)
@@ -64,7 +64,6 @@ public class UserServiceImpl implements UserService {
                     .build();
         }
 
-        // Determine user type and create appropriate response
         if (user instanceof Customer customer) {
             CustomerProfileDTO profileDTO = mapper.convertToProfileDTO(customer);
             String token = jwtService.generateToken(customer.getId(), "CUSTOMER");
@@ -99,14 +98,13 @@ public class UserServiceImpl implements UserService {
                     .userProfile(profileDTO)
                     .build();
         }
-        // Add other user types as needed (Pharmacist, etc.)
 
-        // Fallback for unhandled user types
         return UnifiedLoginResponse.builder()
                 .success(false)
                 .message("Unsupported user type")
                 .build();
     }
+
     @Override
     public UserDTO createUser(UserDTO userDTO) {
         throw new UnsupportedOperationException("Cannot create abstract User. Use specific user type services.");
@@ -214,7 +212,9 @@ public class UserServiceImpl implements UserService {
             Date exp = null;
             try {
                 exp = jwtService.getExpiration(token);
-            } catch (Exception ignored) { }
+            } catch (Exception e) {
+                logger.warn("Failed to get token expiration during logout", e);
+            }
             if (exp != null) {
                 tokenBlacklistService.blacklist(token, exp);
             } else {
