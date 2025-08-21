@@ -1,9 +1,6 @@
 HELP.md
 target/
-# .mvn/wrapper/maven-wrapper.jar  <-- Removed this line
-
-!**/src/main/**/target/
-!**/src/test/**/target/
+out/
 
 ### STS ###
 .apt_generated
@@ -15,7 +12,7 @@ target/
 .sts4-cache
 
 ### IntelliJ IDEA ###
-.idea
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -32,5 +29,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+src/main/resources/application.properties
+src/main/resources/application-*.properties
 .env
 *.env

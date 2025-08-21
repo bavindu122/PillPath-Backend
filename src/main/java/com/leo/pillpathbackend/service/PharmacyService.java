@@ -4,6 +4,8 @@ import com.leo.pillpathbackend.dto.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
+
 public interface PharmacyService {
     // Existing methods
     PharmacyRegistrationResponse registerPharmacy(PharmacyRegistrationRequest request);
@@ -11,7 +13,7 @@ public interface PharmacyService {
     PharmacyAdminProfileDTO getPharmacyAdminProfileById(Long id);
     PharmacyAdminProfileDTO updatePharmacyAdminProfile(Long id, PharmacyAdminProfileDTO profileDTO);
     boolean verifyPharmacy(Long pharmacyId, boolean approved);
-
+    List<PharmacyMapDTO> getPharmaciesForMap(Double userLat, Double userLng, Double radiusKm);
     // New admin management methods
     Page<PharmacyDTO> getAllPharmacies(String searchTerm, String status, Pageable pageable);
     PharmacyStatsDTO getPharmacyStats();
@@ -21,4 +23,6 @@ public interface PharmacyService {
     PharmacyDTO suspendPharmacy(Long pharmacyId, String reason);
     PharmacyDTO activatePharmacy(Long pharmacyId);
     PharmacyDTO updatePharmacyDetails(Long pharmacyId, PharmacyDTO pharmacyDTO);
+    PharmacyDTO getPharmacyProfileByAdminId(Long adminId);
+    PharmacyDTO updatePharmacyProfile(Long adminId, PharmacyDTO pharmacyDTO);
 }
