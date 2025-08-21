@@ -206,7 +206,9 @@ public class UserServiceImpl implements UserService {
             Date exp = null;
             try {
                 exp = jwtService.getExpiration(token);
-            } catch (Exception ignored) { }
+            } catch (Exception e) {
+                logger.warn("Failed to get token expiration during logout", e);
+            }
             if (exp != null) {
                 tokenBlacklistService.blacklist(token, exp);
             } else {
