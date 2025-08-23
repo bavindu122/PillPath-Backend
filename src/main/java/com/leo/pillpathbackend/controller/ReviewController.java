@@ -41,7 +41,7 @@ public class ReviewController {
 
     @DeleteMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ReviewDTO> deleteReview(@RequestBody ReviewDTO reviewDTO) {
-        reviewService.deleteReview(reviewDTO.getId());
+        reviewService.deleteReview(Math.toIntExact(reviewDTO.getId()));
         return ResponseEntity.status(HttpStatus.NO_CONTENT).body(reviewDTO);
     }
 
