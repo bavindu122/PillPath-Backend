@@ -34,7 +34,7 @@ public class JwtService {
             byte[] padded = new byte[32];
             System.arraycopy(bytes, 0, padded, 0, Math.min(bytes.length, 32));
             for (int i = bytes.length; i < 32; i++) padded[i] = (byte) i;
-            bytes = padded;
+            throw new IllegalArgumentException("JWT secret must be at least 32 bytes (256 bits) for HS256.");
         }
         this.key = Keys.hmacShaKeyFor(bytes);
     }
