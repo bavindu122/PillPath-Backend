@@ -1,10 +1,6 @@
 package com.leo.pillpathbackend.controller;
 
-import com.leo.pillpathbackend.dto.PharmacyDTO;
-import com.leo.pillpathbackend.dto.PharmacyRegistrationRequest;
-import com.leo.pillpathbackend.dto.PharmacyRegistrationResponse;
-import com.leo.pillpathbackend.dto.PharmacyAdminProfileDTO;
-import com.leo.pillpathbackend.dto.PharmacyMapDTO;
+import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.service.CloudinaryService;
 import com.leo.pillpathbackend.service.PharmacyService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
@@ -278,6 +274,45 @@ public class PharmacyController {
             response.put("success", false);
             response.put("message", "Failed to upload banner: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @GetMapping("/{pharmacyId}/profile")
+    public ResponseEntity<?> getPharmacyProfile(@PathVariable Long pharmacyId) {
+        try {
+            System.out.println("Fetching pharmacy profile for ID: " + pharmacyId);
+            PharmacyDTO profile = pharmacyService.getPharmacyProfile(pharmacyId);
+            System.out.println("Profile found: " + profile.getName());
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(profile);
+        } catch (RuntimeException e) {
+            System.err.println("Runtime error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("error", e.getMessage(), "status", 404));
+        } catch (Exception e) {
+            System.err.println("General error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("error", "Failed to get pharmacy profile: " + e.getMessage(), "status", 500));
+        }
+    }
+
+    @GetMapping("/{pharmacyId}/products")
+    public ResponseEntity<?> getPharmacyProducts(@PathVariable Long pharmacyId) {
+        try {
+            System.out.println("Fetching pharmacy products for ID: " + pharmacyId);
+            List<OTCProductDTO> products = pharmacyService.getPharmacyProducts(pharmacyId);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(products);
+        } catch (Exception e) {
+            System.err.println("Error fetching products: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("error", "Failed to get pharmacy products: " + e.getMessage(), "status", 500));
         }
     }
 }
