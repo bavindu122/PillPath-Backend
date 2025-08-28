@@ -6,28 +6,22 @@ import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "prescription_items")
-@Getter
-@Setter
+@Table(name = "prescription_submission_items")
+@Getter @Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class PrescriptionItem {
-
+@NoArgsConstructor @AllArgsConstructor
+public class PrescriptionSubmissionItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Parent
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "prescription_id", nullable = false)
-    private Prescription prescription;
+    @JoinColumn(name = "submission_id", nullable = false)
+    private PrescriptionSubmission submission;
 
-    // Basic medicine info (from pharmacist review)
     private String medicineName;
     private String genericName;
     private String dosage;
-
     private Integer quantity;
 
     @Column(precision = 12, scale = 2)
@@ -41,3 +35,4 @@ public class PrescriptionItem {
     @Column(length = 500)
     private String notes;
 }
+

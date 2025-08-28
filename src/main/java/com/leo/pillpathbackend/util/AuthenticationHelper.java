@@ -60,6 +60,21 @@ public class AuthenticationHelper {
         return jwtService.getUserId(token);
     }
 
+    /** Extract pharmacist ID from JWT; requires role PHARMACIST */
+    public Long extractPharmacistIdFromToken(String token) {
+        if (token == null) {
+            throw new IllegalArgumentException("Missing token");
+        }
+        if (!jwtService.isTokenValid(token)) {
+            throw new IllegalArgumentException("Invalid token");
+        }
+        String role = jwtService.getRole(token);
+        if (role == null || !role.equalsIgnoreCase("PHARMACIST")) {
+            throw new IllegalArgumentException("Invalid role for this resource");
+        }
+        return jwtService.getUserId(token);
+    }
+
     /**
      * Extract customer ID from request header via JWT
      */
@@ -80,5 +95,14 @@ public class AuthenticationHelper {
             throw new IllegalArgumentException("Missing or invalid authorization header");
         }
         return extractPharmacyAdminIdFromToken(token);
+    }
+
+    /** Extract pharmacist ID from request header via JWT */
+    public Long extractPharmacistIdFromRequest(HttpServletRequest request) {
+        String token = extractAndValidateToken(request);
+        if (token == null) {
+            throw new IllegalArgumentException("Missing or invalid authorization header");
+        }
+        return extractPharmacistIdFromToken(token);
     }
 }

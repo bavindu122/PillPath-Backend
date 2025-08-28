@@ -1,0 +1,201 @@
+package com.leo.pillpathbackend.controller;
+
+import com.leo.pillpathbackend.dto.PrescriptionDTO;
+import com.leo.pillpathbackend.dto.PrescriptionItemDTO;
+import com.leo.pillpathbackend.dto.PrescriptionListItemDTO;
+import com.leo.pillpathbackend.dto.request.CreatePrescriptionRequest;
+import com.leo.pillpathbackend.dto.activity.PrescriptionActivityListResponse;
+import com.leo.pillpathbackend.entity.PharmacistUser;
+import com.leo.pillpathbackend.repository.UserRepository;
+import com.leo.pillpathbackend.service.PrescriptionService;
+import com.leo.pillpathbackend.util.AuthenticationHelper;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v1/prescriptions")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "*")
+public class PrescriptionController {
+
+    private final PrescriptionService prescriptionService;
+    private final AuthenticationHelper auth;
+    // Replace admin repo with user repo to resolve pharmacist's pharmacy
+    private final UserRepository userRepository;
+
+    // Customer: upload a prescription image to a chosen pharmacy
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> upload(
+            @RequestPart("file") MultipartFile file,
+            @RequestPart(value = "meta", required = false) CreatePrescriptionRequest meta,
+            // Fallback params if meta is not provided as JSON part
+            @RequestParam(value = "pharmacyIds", required = false) List<Long> pharmacyIds, // multi support
+            @RequestParam(value = "pharmacyId", required = false) Long pharmacyId,
+            @RequestParam(value = "note", required = false) String note,
+            @RequestParam(value = "deliveryPreference", required = false) String deliveryPreference,
+            @RequestParam(value = "deliveryAddress", required = false) String deliveryAddress,
+            @RequestParam(value = "latitude", required = false) BigDecimal latitude,
+            @RequestParam(value = "longitude", required = false) BigDecimal longitude,
+            HttpServletRequest request
+    ) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+
+            if (meta == null) {
+                meta = new CreatePrescriptionRequest();
+                if (pharmacyIds != null && !pharmacyIds.isEmpty()) {
+                    meta.setPharmacyIds(pharmacyIds);
+                } else {
+                    meta.setPharmacyId(pharmacyId);
+                }
+                meta.setNote(note);
+                if (deliveryPreference != null) {
+                    try {
+                        meta.setDeliveryPreference(
+                                com.leo.pillpathbackend.entity.enums.DeliveryPreference.valueOf(deliveryPreference.toUpperCase())
+                        );
+                    } catch (IllegalArgumentException e) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "Invalid deliveryPreference"));
+                    }
+                }
+                meta.setDeliveryAddress(deliveryAddress);
+                meta.setLatitude(latitude);
+                meta.setLongitude(longitude);
+            }
+
+            PrescriptionDTO dto = prescriptionService.uploadPrescription(customerId, file, meta);
+            return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Image upload failed: " + e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Customer: list own prescriptions
+    @GetMapping("/my")
+    public ResponseEntity<?> myPrescriptions(HttpServletRequest request) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+            List<PrescriptionListItemDTO> list = prescriptionService.getCustomerPrescriptions(customerId);
+            return ResponseEntity.ok(list);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Customer: view a specific prescription
+    @GetMapping("/my/{id}")
+    public ResponseEntity<?> myPrescription(@PathVariable Long id, HttpServletRequest request) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+            PrescriptionDTO dto = prescriptionService.getCustomerPrescription(id, customerId);
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Pharmacy staff (PHARMACIST): list prescriptions received by their pharmacy
+    @GetMapping("/pharmacy")
+    public ResponseEntity<?> pharmacyPrescriptions(HttpServletRequest request) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            PharmacistUser pharmacist = (PharmacistUser) userRepository.findById(pharmacistId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
+            if (pharmacist.getPharmacy() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Pharmacist is not assigned to a pharmacy"));
+            }
+            Long pharmacyId = pharmacist.getPharmacy().getId();
+            List<PrescriptionListItemDTO> list = prescriptionService.getPharmacyPrescriptions(pharmacyId);
+            return ResponseEntity.ok(list);
+        } catch (ClassCastException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid user type"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Pharmacy staff (PHARMACIST): view one prescription
+    @GetMapping("/pharmacy/{id}")
+    public ResponseEntity<?> pharmacyPrescription(@PathVariable Long id, HttpServletRequest request) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            PharmacistUser pharmacist = (PharmacistUser) userRepository.findById(pharmacistId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
+            if (pharmacist.getPharmacy() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Pharmacist is not assigned to a pharmacy"));
+            }
+            Long pharmacyId = pharmacist.getPharmacy().getId();
+            PrescriptionDTO dto = prescriptionService.getPharmacyPrescription(id, pharmacyId);
+            return ResponseEntity.ok(dto);
+        } catch (ClassCastException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid user type"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Pharmacy staff (PHARMACIST): replace prescription items (order preview)
+    @PutMapping("/pharmacy/{id}/items")
+    public ResponseEntity<?> replaceItems(
+            @PathVariable Long id,
+            @RequestBody List<PrescriptionItemDTO> items,
+            HttpServletRequest request
+    ) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            PharmacistUser pharmacist = (PharmacistUser) userRepository.findById(pharmacistId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
+            if (pharmacist.getPharmacy() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Pharmacist is not assigned to a pharmacy"));
+            }
+            Long pharmacyId = pharmacist.getPharmacy().getId();
+            PrescriptionDTO dto = prescriptionService.replaceItemsForPharmacy(pharmacyId, id, items);
+            return ResponseEntity.ok(dto);
+        } catch (ClassCastException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid user type"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Customer: list activities
+    @GetMapping("/activities")
+    public ResponseEntity<?> customerActivities(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+            PrescriptionActivityListResponse resp = prescriptionService.getCustomerActivities(customerId, page, size);
+            return ResponseEntity.ok(resp);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+}

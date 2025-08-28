@@ -453,4 +453,76 @@ public class Mapper {
         // dto.setPhoneVerified(pharmacist.getPhoneVerified());
         return dto;
     }
+
+    // Prescription mappings
+    public PrescriptionDTO toPrescriptionDTO(Prescription p) {
+        if (p == null) return null;
+        PrescriptionDTO dto = new PrescriptionDTO();
+        dto.setId(p.getId());
+        dto.setCode(p.getCode());
+        if (p.getCustomer() != null) {
+            dto.setCustomerId(p.getCustomer().getId());
+            dto.setCustomerName(p.getCustomer().getFullName());
+        }
+        if (p.getPharmacy() != null) {
+            dto.setPharmacyId(p.getPharmacy().getId());
+            dto.setPharmacyName(p.getPharmacy().getName());
+        }
+        dto.setStatus(p.getStatus());
+        dto.setImageUrl(p.getImageUrl());
+        dto.setNote(p.getNote());
+        dto.setDeliveryPreference(p.getDeliveryPreference());
+        dto.setDeliveryAddress(p.getDeliveryAddress());
+        dto.setLatitude(p.getLatitude());
+        dto.setLongitude(p.getLongitude());
+        dto.setTotalPrice(p.getTotalPrice());
+        if (p.getItems() != null) {
+            dto.setItems(p.getItems().stream().map(this::toPrescriptionItemDTO).toList());
+        }
+        dto.setCreatedAt(p.getCreatedAt());
+        dto.setUpdatedAt(p.getUpdatedAt());
+        return dto;
+    }
+
+    public PrescriptionListItemDTO toPrescriptionListItemDTO(Prescription p) {
+        if (p == null) return null;
+        return PrescriptionListItemDTO.builder()
+                .id(p.getId())
+                .code(p.getCode())
+                .pharmacyName(p.getPharmacy() != null ? p.getPharmacy().getName() : null)
+                .status(p.getStatus())
+                .createdAt(p.getCreatedAt())
+                .updatedAt(p.getUpdatedAt())
+                .build();
+    }
+
+    public PrescriptionItemDTO toPrescriptionItemDTO(PrescriptionItem item) {
+        if (item == null) return null;
+        return PrescriptionItemDTO.builder()
+                .id(item.getId())
+                .medicineName(item.getMedicineName())
+                .genericName(item.getGenericName())
+                .dosage(item.getDosage())
+                .quantity(item.getQuantity())
+                .unitPrice(item.getUnitPrice())
+                .totalPrice(item.getTotalPrice())
+                .available(item.getAvailable())
+                .notes(item.getNotes())
+                .build();
+    }
+
+    public PrescriptionItem toPrescriptionItemEntity(PrescriptionItemDTO dto) {
+        if (dto == null) return null;
+        return PrescriptionItem.builder()
+                .id(dto.getId())
+                .medicineName(dto.getMedicineName())
+                .genericName(dto.getGenericName())
+                .dosage(dto.getDosage())
+                .quantity(dto.getQuantity())
+                .unitPrice(dto.getUnitPrice())
+                .totalPrice(dto.getTotalPrice())
+                .available(dto.getAvailable())
+                .notes(dto.getNotes())
+                .build();
+    }
 }

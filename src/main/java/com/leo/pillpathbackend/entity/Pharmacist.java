@@ -89,8 +89,6 @@ public class Pharmacist {
     private LocalDateTime updatedAt;
 
     // Relationships
-    @OneToMany(mappedBy = "verifiedBy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Prescription> verifiedPrescriptions = new ArrayList<>();
 
     @OneToMany(mappedBy = "processedBy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Order> processedOrders = new ArrayList<>();

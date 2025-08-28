@@ -82,6 +82,16 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         return uploadImageWithValidation(file, publicId, transformation, 8 * 1024 * 1024);
     }
 
+    @Override
+    public Map<String, Object> uploadPrescriptionImage(MultipartFile file, Long customerId, Long pharmacyId) throws IOException {
+        String publicId = "pillpath/prescriptions/" + pharmacyId + "/" + customerId + "-" + UUID.randomUUID();
+        Transformation transformation = new Transformation()
+                .width(1600).height(1600).crop("limit")
+                .quality("auto").fetchFormat("auto");
+
+        // 8MB limit for prescription images
+        return uploadImageWithValidation(file, publicId, transformation, 8 * 1024 * 1024);
+    }
 
     @Override
     public void deleteImage(String publicId) {
