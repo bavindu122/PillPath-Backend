@@ -17,6 +17,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     Optional<User> findByUsernameAndPassword(String username, String password);
 
+    boolean existsByEmail(String email);
+    boolean existsByUsername(String username);
+
     @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END FROM Admin a WHERE a.adminLevel = :adminLevel")
     boolean existsByAdminLevel(@Param("adminLevel") AdminLevel adminLevel);
 

@@ -24,25 +24,26 @@ public class Pharmacist {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
-    private String email;
+     //Remove these duplicate fields - they exist in PharmacistUser
+     @Column(unique = true, nullable = false)
+     private String email;
 
-    @Column(nullable = false)
-    private String password;
+     @Column(nullable = false)
+     private String password;
 
-    @Column(name = "full_name", nullable = false)
-    private String fullName;
+     @Column(name = "full_name", nullable = false)
+     private String fullName;
 
-    @Column(name = "phone_number")
-    private String phoneNumber;
+     @Column(name = "phone_number")
+     private String phoneNumber;
 
-    @Column(name = "date_of_birth")
-    private LocalDate dateOfBirth;
+     @Column(name = "date_of_birth")
+     private LocalDate dateOfBirth;
 
-    @Column(name = "profile_picture_url")
-    private String profilePictureUrl;
+     @Column(name = "profile_picture_url")
+     private String profilePictureUrl;
 
-    // Pharmacist-specific fields
+     //Pharmacist-specific fields only
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pharmacy_id", nullable = false)
     private Pharmacy pharmacy;
@@ -94,8 +95,32 @@ public class Pharmacist {
     @OneToMany(mappedBy = "processedBy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Order> processedOrders = new ArrayList<>();
 
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "pharmacist_user_id", nullable = false)
+    private PharmacistUser pharmacistUser;
+
     public UserType getUserType() {
         return UserType.PHARMACIST;
     }
-}
 
+    public PharmacistUser getUser() {
+        return pharmacistUser;
+    }
+
+    public void setUser(PharmacistUser pharmacistUser) {
+        this.pharmacistUser = pharmacistUser;
+    }
+
+    // Convenience methods to access user fields
+    public String getEmail() {
+        return pharmacistUser != null ? pharmacistUser.getEmail() : null;
+    }
+
+    public String getFullName() {
+        return pharmacistUser != null ? pharmacistUser.getFullName() : null;
+    }
+
+    public String getPhoneNumber() {
+        return pharmacistUser != null ? pharmacistUser.getPhoneNumber() : null;
+    }
+}

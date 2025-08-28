@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,10 @@ public class PharmacyRegistrationRequest {
     private List<String> services;
     private Boolean deliveryAvailable;
     private Integer deliveryRadius;
+
+    // Add location fields
+    private BigDecimal latitude;
+    private BigDecimal longitude;
 
     // Admin details
     private String adminFirstName;

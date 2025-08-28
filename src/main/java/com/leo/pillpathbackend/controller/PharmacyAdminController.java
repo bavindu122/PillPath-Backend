@@ -1,7 +1,7 @@
 package com.leo.pillpathbackend.controller;
 
-import com.leo.pillpathbackend.dto.PharmacistCreateRequest;
-import com.leo.pillpathbackend.dto.PharmacistUpdateRequest;
+import com.leo.pillpathbackend.dto.PharmacistCreateRequestDTO;
+import com.leo.pillpathbackend.dto.PharmacistUpdateRequestDTO;
 import com.leo.pillpathbackend.dto.PharmacistResponseDTO;
 import com.leo.pillpathbackend.service.PharmacistService;
 import lombok.RequiredArgsConstructor;
@@ -70,7 +70,7 @@ public class PharmacyAdminController {
      * Add a new staff member (pharmacist)
      */
     @PostMapping("/staff")
-    public ResponseEntity<?> addStaffMember(@Valid @RequestBody PharmacistCreateRequest request) {
+    public ResponseEntity<?> addStaffMember(@Valid @RequestBody PharmacistCreateRequestDTO request) {
         try {
             PharmacistResponseDTO newStaff = pharmacistService.createPharmacist(request);
             log.info("Successfully created staff member with ID: {}", newStaff.getId());
@@ -92,7 +92,7 @@ public class PharmacyAdminController {
     @PutMapping("/staff/{staffId}")
     public ResponseEntity<?> updateStaffMember(
             @PathVariable Long staffId,
-            @Valid @RequestBody PharmacistUpdateRequest request) {
+            @Valid @RequestBody PharmacistUpdateRequestDTO request) {
         try {
             PharmacistResponseDTO updatedStaff = pharmacistService.updatePharmacist(staffId, request);
             log.info("Successfully updated staff member with ID: {}", staffId);
