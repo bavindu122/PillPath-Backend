@@ -10,7 +10,6 @@ import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
 import com.leo.pillpathbackend.dto.AddAnnouncementResponse;
 import com.leo.pillpathbackend.entity.Announcement;
 import com.leo.pillpathbackend.service.AdminService;
-import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
 import java.util.List;
