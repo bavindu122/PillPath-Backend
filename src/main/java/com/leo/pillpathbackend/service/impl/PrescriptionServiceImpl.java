@@ -11,6 +11,7 @@ import com.leo.pillpathbackend.repository.CustomerRepository;
 import com.leo.pillpathbackend.repository.PharmacyRepository;
 import com.leo.pillpathbackend.repository.PrescriptionRepository;
 import com.leo.pillpathbackend.repository.PrescriptionSubmissionRepository;
+import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.CloudinaryService;
 import com.leo.pillpathbackend.service.PrescriptionService;
 import com.leo.pillpathbackend.util.Mapper;
@@ -42,6 +43,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final CloudinaryService cloudinaryService;
     private final Mapper mapper;
     private final PrescriptionSubmissionRepository prescriptionSubmissionRepository;
+    private final UserRepository userRepository;
 
     private static final DateTimeFormatter ISO_SECOND_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
@@ -209,6 +211,81 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                         .size(size)
                         .total(items.size())
                         .build())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.leo.pillpathbackend.dto.PharmacistQueueItemDTO> getPharmacistQueue(Long pharmacistId, PrescriptionStatus status) {
+        User pharmacist = userRepository.findById(pharmacistId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
+        if (!(pharmacist instanceof PharmacistUser phUser)) {
+            throw new IllegalArgumentException("User is not a pharmacist");
+        }
+        Pharmacy pharmacy = phUser.getPharmacy();
+        if (pharmacy == null) {
+            throw new IllegalArgumentException("Pharmacist not assigned to a pharmacy");
+        }
+        Long pharmacyId = pharmacy.getId();
+        PrescriptionStatus effectiveStatus = (status == null) ? PrescriptionStatus.PENDING_REVIEW : status;
+        List<PrescriptionSubmission> submissions;
+        if (effectiveStatus == PrescriptionStatus.PENDING_REVIEW) {
+            submissions = prescriptionSubmissionRepository
+                    .findByPharmacyIdAndStatusAndAssignedPharmacistIsNullOrderByCreatedAtAsc(pharmacyId, PrescriptionStatus.PENDING_REVIEW);
+        } else if (effectiveStatus == PrescriptionStatus.IN_PROGRESS) {
+            submissions = prescriptionSubmissionRepository
+                    .findByPharmacyIdAndAssignedPharmacistIdAndStatusOrderByCreatedAtAsc(pharmacyId, pharmacistId, PrescriptionStatus.IN_PROGRESS);
+        } else {
+            // For now only allow the two statuses
+            submissions = List.of();
+        }
+        return submissions.stream().map(this::toQueueDTO).toList();
+    }
+
+    @Override
+    public com.leo.pillpathbackend.dto.PharmacistQueueItemDTO claimSubmission(Long pharmacistId, Long submissionId) {
+        User pharmacist = userRepository.findById(pharmacistId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
+        if (!(pharmacist instanceof PharmacistUser phUser)) {
+            throw new IllegalArgumentException("User is not a pharmacist");
+        }
+        Pharmacy pharmacy = phUser.getPharmacy();
+        if (pharmacy == null) {
+            throw new IllegalArgumentException("Pharmacist not assigned to a pharmacy");
+        }
+        PrescriptionSubmission submission = prescriptionSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new IllegalArgumentException("Submission not found"));
+        if (!submission.getPharmacy().getId().equals(pharmacy.getId())) {
+            throw new IllegalArgumentException("Submission does not belong to pharmacist's pharmacy");
+        }
+        // Attempt atomic claim
+        int updated = prescriptionSubmissionRepository.claim(submissionId, pharmacistId);
+        if (updated == 0) {
+            // Refresh entity to reveal current state
+            submission = prescriptionSubmissionRepository.findById(submissionId)
+                    .orElseThrow(() -> new IllegalArgumentException("Submission not found after claim attempt"));
+            if (submission.getAssignedPharmacist() != null) {
+                throw new IllegalStateException("Already claimed");
+            }
+            throw new IllegalStateException("Cannot claim submission (invalid status) ");
+        }
+        // Reload updated submission
+        submission = prescriptionSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new IllegalArgumentException("Submission not found after update"));
+        return toQueueDTO(submission);
+    }
+
+    private com.leo.pillpathbackend.dto.PharmacistQueueItemDTO toQueueDTO(PrescriptionSubmission s) {
+        Prescription prescription = s.getPrescription();
+        return com.leo.pillpathbackend.dto.PharmacistQueueItemDTO.builder()
+                .submissionId(s.getId())
+                .prescriptionCode(prescription.getCode())
+                .uploadedAt(prescription.getCreatedAt() != null ? prescription.getCreatedAt().format(ISO_SECOND_FORMAT) : null)
+                .status(s.getStatus())
+                .imageUrl(prescription.getImageUrl())
+                .note(prescription.getNote())
+                .claimed(s.getAssignedPharmacist() != null)
+                .assignedPharmacistId(s.getAssignedPharmacist() != null ? s.getAssignedPharmacist().getId() : null)
                 .build();
     }
 

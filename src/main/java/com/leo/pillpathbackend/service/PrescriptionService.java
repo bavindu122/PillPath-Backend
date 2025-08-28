@@ -5,6 +5,8 @@ import com.leo.pillpathbackend.dto.PrescriptionItemDTO;
 import com.leo.pillpathbackend.dto.PrescriptionListItemDTO;
 import com.leo.pillpathbackend.dto.activity.PrescriptionActivityListResponse;
 import com.leo.pillpathbackend.dto.request.CreatePrescriptionRequest;
+import com.leo.pillpathbackend.dto.PharmacistQueueItemDTO;
+import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -24,4 +26,9 @@ public interface PrescriptionService {
     PrescriptionDTO replaceItemsForPharmacy(Long pharmacyId, Long prescriptionId, List<PrescriptionItemDTO> items);
 
     PrescriptionActivityListResponse getCustomerActivities(Long customerId, int page, int size);
+
+    // Pharmacist queue (multi-pharmacy submissions)
+    List<PharmacistQueueItemDTO> getPharmacistQueue(Long pharmacistId, PrescriptionStatus status);
+
+    PharmacistQueueItemDTO claimSubmission(Long pharmacistId, Long submissionId);
 }

@@ -30,7 +30,6 @@ public class PrescriptionController {
 
     private final PrescriptionService prescriptionService;
     private final AuthenticationHelper auth;
-    // Replace admin repo with user repo to resolve pharmacist's pharmacy
     private final UserRepository userRepository;
 
     // Customer: upload a prescription image to a chosen pharmacy
@@ -194,6 +193,41 @@ public class PrescriptionController {
             return ResponseEntity.ok(resp);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/pharmacist/queue")
+    public ResponseEntity<?> pharmacistQueue(@RequestParam(value = "status", required = false) String status,
+                                             HttpServletRequest request) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            com.leo.pillpathbackend.entity.enums.PrescriptionStatus st = null;
+            if (status != null) {
+                try {
+                    st = com.leo.pillpathbackend.entity.enums.PrescriptionStatus.valueOf(status.toUpperCase());
+                } catch (IllegalArgumentException ex) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Invalid status"));
+                }
+            }
+            return ResponseEntity.ok(prescriptionService.getPharmacistQueue(pharmacistId, st));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/pharmacist/{submissionId}/claim")
+    public ResponseEntity<?> claimSubmission(@PathVariable Long submissionId, HttpServletRequest request) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            return ResponseEntity.ok(prescriptionService.claimSubmission(pharmacistId, submissionId));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
