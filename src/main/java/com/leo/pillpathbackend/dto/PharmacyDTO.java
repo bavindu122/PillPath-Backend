@@ -47,4 +47,13 @@ public class PharmacyDTO {
     private String status; // Derived from isActive + isVerified
     private String rejectReason;
     private String suspendReason;
+
+    // Additional fields for profile view
+    private Boolean hasDelivery;
+    private Boolean has24HourService;
+    private Boolean acceptsInsurance;
+    private Boolean hasVaccinations;
+    private String currentStatus;
+    private List<ReviewDTO> recentReviews;
+    private List<OTCProductDTO> popularProducts;
 }

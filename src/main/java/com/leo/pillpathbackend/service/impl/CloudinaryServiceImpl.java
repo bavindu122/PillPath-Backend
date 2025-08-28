@@ -18,63 +18,79 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     @Autowired
     private Cloudinary cloudinary;
 
-    @Override
-    public Map<String, Object> uploadProfilePicture(MultipartFile file, Long userId) throws IOException {
-        // Validate file
+    private Map<String, Object> uploadImageWithValidation(
+            MultipartFile file,
+            String publicId,
+            Transformation transformation,
+            long maxSizeBytes) throws IOException {
+
+        // Common validation
         if (file.isEmpty()) {
             throw new IllegalArgumentException("File is empty");
         }
 
-        // Check file type
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new IllegalArgumentException("File must be an image");
         }
 
-        // Check file size (5MB limit)
-        if (file.getSize() > 5 * 1024 * 1024) {
-            throw new IllegalArgumentException("File size must not exceed 5MB");
+        if (file.getSize() > maxSizeBytes) {
+            throw new IllegalArgumentException("File size exceeds limit");
         }
 
-        // Generate unique filename
+        // Common upload logic
+        return cloudinary.uploader().upload(
+                file.getBytes(),
+                ObjectUtils.asMap(
+                        "public_id", publicId,
+                        "resource_type", "image",
+                        "transformation", transformation
+                )
+        );
+    }
+
+    @Override
+    public Map<String, Object> uploadProfilePicture(MultipartFile file, Long userId) throws IOException {
         String publicId = "pillpath/profile-pics/" + userId + "-" + UUID.randomUUID();
+        Transformation transformation = new Transformation()
+                .width(400).height(400).crop("fill").gravity("face")
+                .quality("auto").fetchFormat("auto");
 
-        System.out.println("=== CLOUDINARY UPLOAD DEBUG ===");
-        System.out.println("File name: " + file.getOriginalFilename());
-        System.out.println("File size: " + file.getSize() + " bytes");
-        System.out.println("Content type: " + contentType);
-        System.out.println("Generated publicId: " + publicId);
-        System.out.println("User ID: " + userId);
+        return uploadImageWithValidation(file, publicId, transformation, 5 * 1024 * 1024);
+    }
 
-        try {
-            // Upload with transformations
-            Map<String, Object> uploadResult = cloudinary.uploader().upload(
-                    file.getBytes(),
-                    ObjectUtils.asMap(
-                            "public_id", publicId,
-                            "resource_type", "image",
-                            "transformation", new Transformation()
-                                    .width(400).height(400).crop("fill").gravity("face")
-                                    .quality("auto").fetchFormat("auto")
-                    )
-            );
+    //pharmacy
+    //pharmacy logo upload (square)
+    @Override
+    public Map<String, Object> uploadPharmacyLogo(MultipartFile file, Long pharmacyId) throws IOException {
+        String publicId = "pillpath/pharmacies/logos/" + pharmacyId + "-" + UUID.randomUUID();
+        Transformation transformation = new Transformation()
+                .width(512).height(512).crop("fill").gravity("auto")
+                .quality("auto").fetchFormat("auto");
 
-            System.out.println("=== UPLOAD SUCCESSFUL ===");
-            System.out.println("Secure URL: " + uploadResult.get("secure_url"));
-            System.out.println("Public ID: " + uploadResult.get("public_id"));
-            System.out.println("Version: " + uploadResult.get("version"));
-            System.out.println("Format: " + uploadResult.get("format"));
-            System.out.println("Resource Type: " + uploadResult.get("resource_type"));
-            System.out.println("Full response: " + uploadResult);
+        return uploadImageWithValidation(file, publicId, transformation, 5 * 1024 * 1024);
+    }
 
-            return uploadResult;
+    // New: pharmacy banner upload (wide)
+    @Override
+    public Map<String, Object> uploadPharmacyBanner(MultipartFile file, Long pharmacyId) throws IOException {
+        String publicId = "pillpath/pharmacies/banners/" + pharmacyId + "-" + UUID.randomUUID();
+        Transformation transformation = new Transformation()
+                .width(1600).height(500).crop("fill").gravity("auto")
+                .quality("auto").fetchFormat("auto");
 
-        } catch (Exception e) {
-            System.err.println("=== UPLOAD FAILED ===");
-            System.err.println("Error message: " + e.getMessage());
-            e.printStackTrace();
-            throw e;
-        }
+        return uploadImageWithValidation(file, publicId, transformation, 8 * 1024 * 1024);
+    }
+
+    @Override
+    public Map<String, Object> uploadPrescriptionImage(MultipartFile file, Long customerId, Long pharmacyId) throws IOException {
+        String publicId = "pillpath/prescriptions/" + pharmacyId + "/" + customerId + "-" + UUID.randomUUID();
+        Transformation transformation = new Transformation()
+                .width(1600).height(1600).crop("limit")
+                .quality("auto").fetchFormat("auto");
+
+        // 8MB limit for prescription images
+        return uploadImageWithValidation(file, publicId, transformation, 8 * 1024 * 1024);
     }
 
     @Override

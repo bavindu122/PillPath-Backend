@@ -15,8 +15,8 @@ POST http://localhost:8080/api/v1/users/login
 Content-Type: application/json
 
 {
-  "email": "senuja@gmail.com",
-  "password": "sanuthma"
+  "email": "bavindu122@gmail.com",
+  "password": "12345678"
 }
 
 
@@ -51,55 +51,164 @@ file="C:\Users\ASUS\Downloads\20250720_2310_image.png"
 GET http://localhost:8080/api/v1/customers
 Content-Type: application/json
 
-### add a family member to the user profile
-POST http://localhost:8080/api/members/family-members
-Authorization: Bearer customer-token-5
+### Upload Profile Picture - Customer
+POST http://localhost:8080/api/v1/customers/profile/upload-picture
+Authorization: Bearer customer-token-8
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="profile-picture.jpg"
+Content-Type: image/jpeg
+
+< C:\Users\ASUS\Downloads\raini.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Get all pharmacies for map
+GET http://localhost:8080/api/v1/admin/pharmacies/map
+
+### Get all pharmacies (regardless of status)
+GET http://localhost:8080/api/v1/admin/pharmacies?search=&status=All&page=0&size=12&sortBy=createdAt&sortDir=desc
+
+### Register pharmacy with location
+POST http://localhost:8080/api/v1/pharmacies/register
 Content-Type: application/json
 
 {
-  "name": "Jane Doe",
-  "relation": "Sister",
-  "age": 28,
-  "medicalConditions": ["Asthma"]
+  "name": "Lavinia Health Care",
+  "address": "123 Galle Road, Mount Lavinia, Sri Lanka",
+  "phoneNumber": "+94112567890",
+  "email": "info@laviniahealth.lk",
+  "licenseNumber": "PH2025002",
+  "licenseExpiryDate": "2026-11-30",
+  "operatingHours": {
+    "monday": "07:00-23:00",
+    "tuesday": "07:00-23:00",
+    "wednesday": "07:00-23:00",
+    "thursday": "07:00-23:00",
+    "friday": "07:00-23:00",
+    "saturday": "07:00-23:00",
+    "sunday": "08:00-22:00"
+  },
+  "services": ["24/7 Emergency", "Prescription Medicines", "Baby Care", "Diabetes Care"],
+  "deliveryAvailable": true,
+  "deliveryRadius": 20,
+  "latitude": 6.8344,
+  "longitude": 79.8634,
+  "adminFirstName": "Nimali",
+  "adminLastName": "Silva",
+  "adminEmail": "nimali.silva@laviniahealth.lk",
+  "adminPassword": "Admin@456",
+  "adminPhoneNumber": "+94776543210",
+  "adminPosition": "Pharmacy Manager",
+  "adminLicenseNumber": "RPH2024002"
 }
 
-### Delete a family member by ID
-DELETE http://localhost:8080/api/members/family-members/18
-Authorization: Bearer customer-token-5
-Content-Type: application/json
+### Get pharmacy profile (accessed by pharmacy admin)
+GET http://localhost:8080/api/v1/pharmacies/admin/profile
+Authorization: Bearer pharmacy-admin-token-36
 
-### Get all family members of a user
-GET http://localhost:8080/api/members/debug-auth
-Authorization: Bearer customer-token-2
-
-
-### Get all family members for debugging
-GET http://localhost:8080/api/members/family-members
-Authorization: Bearer customer-token-1
-
-
-### Update customer profile
-PUT http://localhost:8080/api/v1/customers/profile
-Authorization: Bearer customer-token-3
+### Update pharmacy profile (accessed by pharmacy admin)
+PUT http://localhost:8080/api/v1/pharmacies/admin/profile
+Authorization: Bearer temp-token-pharmacy-36
 Content-Type: application/json
 
 {
-  "username": "newusername",
-  "fullName": "New Name",
-  "email": "new@email.com",
-  "phoneNumber": "1234567890",
-  "dateOfBirth": "1990-01-01",
-  "address": "123 Main St",
-  "profilePictureUrl": "https://example.com/image.jpg",
-  "allergies": [
-    "Peanuts",
-    "Shellfish"
-  ],
-  "medicalConditions": [
-    "Asthma"
-  ],
-  "emergencyContactName": "Jane Doe",
-  "emergencyContactPhone": "0987654321",
-  "insuranceProvider": "ProviderX",
-  "insuranceId": "INS-123456"
+  "name": "Updated Pharmacy Name",
+  "address": "Updated Address"
 }
+
+
+### Upload pharmacy banner (<=8MB) - correct multipart usage
+POST http://localhost:8080/api/v1/pharmacies/pharmacy-profile/upload-banner
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NTc2MjkzNSwiZXhwIjoxNzU1ODQ5MzM1LCJzdWIiOiIzNiIsInVpZCI6MzYsInJvbGUiOiJQSEFSTUFDWV9BRE1JTiJ9.WKOjc_6CivadgLDQCT8cf77xZ-p8vjIpI0tNIK_cMP4
+Content-Type: multipart/form-data
+
+file=@C:\Users\ASUS\Downloads\pharmacy_banner.jpg;type=image/jpeg
+
+
+### Upload pharmacy logo (<=5MB) - correct multipart usage
+POST http://localhost:8080/api/v1/pharmacies/pharmacy-profile/upload-logo
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data
+
+file=@C:\Users\ASUS\Downloads\pharmacy-logo.jpg;type=image/jpeg
+
+@baseUrl = http://localhost:8080
+@customerToken = <customer-jwt>
+@pharmacistToken = <pharmacist-jwt>
+
+### Customer - Upload prescription (multipart) with JSON meta part
+POST http://localhost:8080/api/v1/prescriptions/upload
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NTgwMzQ3MywiZXhwIjoxNzU1ODg5ODczLCJzdWIiOiI4IiwidWlkIjo4LCJyb2xlIjoiQ1VTVE9NRVIifQ.zOV4BWEf4G1e3f1zwRDGw-k2OKSvFnntaVVA_WqZNe0
+Content-Type: multipart/form-data
+
+file=@C:\Users\ASUS\Downloads\pharmacy_logo.jpg;type=image/jpeg
+meta={
+  "pharmacyId": 1,
+  "note": "Please review and prepare.",
+  "deliveryPreference": "PICKUP",
+  "deliveryAddress": "",
+  "latitude": 6.9271,
+  "longitude": 79.8612
+};type=application/json
+
+### Customer - Upload prescription (multipart) with simple fields (no JSON part)
+POST {{baseUrl}}/api/v1/prescriptions/upload
+Authorization: Bearer {{customerToken}}
+Content-Type: multipart/form-data
+
+file=@C:\Users\ASUS\Downloads\prescription2.jpg;type=image/jpeg
+pharmacyId=1
+note=Please review quickly
+deliveryPreference=PICKUP
+latitude=6.9271
+longitude=79.8612
+
+### Customer - List my prescriptions
+GET {{baseUrl}}/api/v1/prescriptions/my
+Authorization: Bearer {{customerToken}}
+
+### Customer - View my prescription by ID
+GET {{baseUrl}}/api/v1/prescriptions/my/1
+Authorization: Bearer {{customerToken}}
+
+### Pharmacist - List prescriptions received by my pharmacy
+GET {{baseUrl}}/api/v1/prescriptions/pharmacy
+Authorization: Bearer {{pharmacistToken}}
+
+### Pharmacist - View a prescription received by my pharmacy
+GET {{baseUrl}}/api/v1/prescriptions/pharmacy/1
+Authorization: Bearer {{pharmacistToken}}
+
+### Pharmacist - Replace prescription items (order preview)
+PUT {{baseUrl}}/api/v1/prescriptions/pharmacy/1/items
+Authorization: Bearer {{pharmacistToken}}
+Content-Type: application/json
+
+[
+  {
+    "medicineName": "Amoxicillin 500mg",
+    "genericName": "Amoxicillin",
+    "dosage": "1 cap x 3/day",
+    "quantity": 10,
+    "unitPrice": 50.00,
+    "available": true,
+    "notes": "Generic ok"
+  },
+  {
+    "medicineName": "Paracetamol 500mg",
+    "genericName": "Acetaminophen",
+    "dosage": "1 tab x 3/day",
+    "quantity": 20,
+    "unitPrice": 5.00,
+    "available": true
+  }
+]
+
+### Customer - List my prescriptions (after pharmacist updated items)
+GET http://localhost:8080/api/v1/prescriptions/my
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NjEzNzQxMCwiZXhwIjoxNzU2MjIzODEwLCJzdWIiOiI4IiwidWlkIjo4LCJyb2xlIjoiQ1VTVE9NRVIifQ.L__sXppcF_GNc1YcV5nuDUZqzQqj52QL6wdcJTk1DTc
+
+### Pharmacist - Update prescription status
+GET http://localhost:8080/api/v1/prescriptions/activities?page=0&size=20
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NjEzNzQxMCwiZXhwIjoxNzU2MjIzODEwLCJzdWIiOiI4IiwidWlkIjo4LCJyb2xlIjoiQ1VTVE9NRVIifQ.L__sXppcF_GNc1YcV5nuDUZqzQqj52QL6wdcJTk1DTc

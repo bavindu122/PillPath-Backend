@@ -1,77 +1,80 @@
 package com.leo.pillpathbackend.entity;
 
+import com.leo.pillpathbackend.entity.enums.DeliveryPreference;
 import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "prescriptions")
-@Data
+@Getter
+@Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class Prescription {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "prescription_number", unique = true)
-    private String prescriptionNumber;
+    // Optional human-friendly code (e.g., RX-YYYYMM-XX)
+    @Column(unique = true)
+    private String code;
+
+    // Assuming you have User and Pharmacy entities
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "customer_id")
+    private User customer;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "pharmacy_id")
+    private Pharmacy pharmacy;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id", nullable = false)
-    private Customer customer;
-
-    @Column(name = "doctor_name")
-    private String doctorName;
-
-    @Column(name = "doctor_license_number")
-    private String doctorLicenseNumber;
-
-    @Column(name = "doctor_phone")
-    private String doctorPhone;
-
-    @Column(name = "issued_date")
-    private LocalDate issuedDate;
-
-    @Column(name = "expiry_date")
-    private LocalDate expiryDate;
-
-    @Column(name = "image_url")
-    private String imageUrl;
+    @JoinColumn(name = "assigned_pharmacist_id")
+    private User assignedPharmacist;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
-    private PrescriptionStatus status = PrescriptionStatus.PENDING;
+    @Column(nullable = false)
+    private PrescriptionStatus status = PrescriptionStatus.PENDING_REVIEW;
 
-    @Column(name = "verification_notes", columnDefinition = "TEXT")
-    private String verificationNotes;
+    // Uploaded image (Cloudinary or similar)
+    private String imageUrl;
+    private String imagePublicId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "verified_by")
-    private Pharmacist verifiedBy;
+    @Column(length = 1000)
+    private String note;
 
-    @Column(name = "verified_at")
-    private LocalDateTime verifiedAt;
+    @Enumerated(EnumType.STRING)
+    private DeliveryPreference deliveryPreference = DeliveryPreference.PICKUP;
+
+    private String deliveryAddress;
+
+    @Column(precision = 10, scale = 8)
+    private BigDecimal latitude;
+
+    @Column(precision = 11, scale = 8)
+    private BigDecimal longitude;
+
+    @OneToMany(mappedBy = "prescription", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<PrescriptionItem> items = new ArrayList<>();
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal totalPrice;
 
     @CreationTimestamp
-    @Column(name = "created_at")
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    // Relationships
-    @OneToMany(mappedBy = "prescription", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<PrescriptionItem> prescriptionItems = new ArrayList<>();
-
-    @OneToMany(mappedBy = "prescription", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Order> orders = new ArrayList<>();
 }

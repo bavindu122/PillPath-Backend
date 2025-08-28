@@ -1,11 +1,7 @@
 package com.leo.pillpathbackend.util;
 
 import com.leo.pillpathbackend.dto.*;
-import com.leo.pillpathbackend.entity.PharmacyAdmin;
-import com.leo.pillpathbackend.entity.Pharmacy;
-import com.leo.pillpathbackend.entity.User;
-import com.leo.pillpathbackend.entity.Review;
-import com.leo.pillpathbackend.entity.Customer;
+import com.leo.pillpathbackend.entity.*;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -14,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -210,7 +207,8 @@ public class Mapper {
         response.setFullName(customer.getFullName());
         response.setSuccess(true);
         response.setMessage("Login successful");
-        response.setToken("temp-token-customer-" + customer.getId()); // Fixed: added "customer-"
+        // Token will be set by the Service layer using JwtService
+        // response.setToken(...);
         response.setUser(convertToProfileDTO(customer)); // Safe profile data
         return response;
     }
@@ -250,7 +248,13 @@ public class Mapper {
         pharmacy.setServices(request.getServices());
         pharmacy.setDeliveryAvailable(request.getDeliveryAvailable());
         pharmacy.setDeliveryRadius(request.getDeliveryRadius());
-        pharmacy.setIsVerified(false); // Require admin verification
+        pharmacy.setIsVerified(false);
+
+        // Add location mapping
+        pharmacy.setLatitude(request.getLatitude());
+        pharmacy.setLongitude(request.getLongitude());
+
+        pharmacy.setIsVerified(false);
         pharmacy.setIsActive(true);
 
         return pharmacy;
@@ -365,55 +369,160 @@ public class Mapper {
         return dto;
     }
 
-    public void updatePharmacyFromDTO(Pharmacy pharmacy, PharmacyDTO dto) {
-        if (dto.getName() != null) {
-            pharmacy.setName(dto.getName());
+    public void updatePharmacyFromDTO(Pharmacy pharmacy, PharmacyDTO pharmacyDTO) {
+        if (pharmacyDTO.getName() != null) {
+            pharmacy.setName(pharmacyDTO.getName());
         }
-        if (dto.getAddress() != null) {
-            pharmacy.setAddress(dto.getAddress());
+        if (pharmacyDTO.getAddress() != null) {
+            pharmacy.setAddress(pharmacyDTO.getAddress());
         }
-        if (dto.getPhoneNumber() != null) {
-            pharmacy.setPhoneNumber(dto.getPhoneNumber());
+        if (pharmacyDTO.getLatitude() != null) {
+            pharmacy.setLatitude(pharmacyDTO.getLatitude());
         }
-        if (dto.getEmail() != null) {
-            pharmacy.setEmail(dto.getEmail());
+        if (pharmacyDTO.getLongitude() != null) {
+            pharmacy.setLongitude(pharmacyDTO.getLongitude());
         }
-        if (dto.getOperatingHours() != null) {
-            pharmacy.setOperatingHours(dto.getOperatingHours());
+        if (pharmacyDTO.getPhoneNumber() != null) {
+            pharmacy.setPhoneNumber(pharmacyDTO.getPhoneNumber());
         }
-        if (dto.getServices() != null) {
-            pharmacy.setServices(dto.getServices());
+        if (pharmacyDTO.getEmail() != null) {
+            pharmacy.setEmail(pharmacyDTO.getEmail());
         }
-        if (dto.getDeliveryAvailable() != null) {
-            pharmacy.setDeliveryAvailable(dto.getDeliveryAvailable());
+        if (pharmacyDTO.getLicenseNumber() != null) {
+            pharmacy.setLicenseNumber(pharmacyDTO.getLicenseNumber());
         }
-        if (dto.getDeliveryRadius() != null) {
-            pharmacy.setDeliveryRadius(dto.getDeliveryRadius());
+        if (pharmacyDTO.getLicenseExpiryDate() != null) {
+            pharmacy.setLicenseExpiryDate(pharmacyDTO.getLicenseExpiryDate());
+        }
+        if (pharmacyDTO.getLogoUrl() != null) {
+            pharmacy.setLogoUrl(pharmacyDTO.getLogoUrl());
+        }
+        if (pharmacyDTO.getLogoPublicId() != null) {
+            pharmacy.setLogoPublicId(pharmacyDTO.getLogoPublicId());
+        }
+        if (pharmacyDTO.getBannerUrl() != null) {
+            pharmacy.setBannerUrl(pharmacyDTO.getBannerUrl());
+        }
+        if (pharmacyDTO.getBannerPublicId() != null) {
+            pharmacy.setBannerPublicId(pharmacyDTO.getBannerPublicId());
+        }
+        if (pharmacyDTO.getOperatingHours() != null) {
+            pharmacy.setOperatingHours(pharmacyDTO.getOperatingHours());
+        }
+        if (pharmacyDTO.getServices() != null) {
+            pharmacy.setServices(pharmacyDTO.getServices());
+        }
+        if (pharmacyDTO.getDeliveryAvailable() != null) {
+            pharmacy.setDeliveryAvailable(pharmacyDTO.getDeliveryAvailable());
+        }
+        if (pharmacyDTO.getDeliveryRadius() != null) {
+            pharmacy.setDeliveryRadius(pharmacyDTO.getDeliveryRadius());
         }
     }
-//    public PharmacistProfileDTO convertToPharmacistProfileDTO(Pharmacist pharmacist) {
-//        PharmacistProfileDTO dto = new PharmacistProfileDTO();
-//
-//        dto.setId(pharmacist.getId());
-//        dto.setEmail(pharmacist.getEmail());
-//        dto.setFullName(pharmacist.getFullName());
-//        dto.setPhoneNumber(pharmacist.getPhoneNumber());
-//        dto.setDateOfBirth(pharmacist.getDateOfBirth());
-//        dto.setProfilePictureUrl(pharmacist.getProfilePictureUrl());
-//
-//        // Pharmacist specific fields
-//        dto.setPharmacyId(pharmacist.getPharmacy().getId());
-//        dto.setPharmacyName(pharmacist.getPharmacy().getName());
-//        dto.setLicenseNumber(pharmacist.getLicenseNumber());
-//        dto.setLicenseExpiryDate(pharmacist.getLicenseExpiryDate());
-//        dto.setSpecialization(pharmacist.getSpecialization());
-//        dto.setYearsOfExperience(pharmacist.getYearsOfExperience());
-//        dto.setHireDate(pharmacist.getHireDate());
-//        dto.setShiftSchedule(pharmacist.getShiftSchedule());
-//        dto.setCertifications(pharmacist.getCertifications());
-//        dto.setIsVerified(pharmacist.getIsVerified());
-//        dto.setIsActive(pharmacist.getIsActive());
-//
-//        return dto;
-//    }
+
+    public PharmacistProfileDTO convertToPharmacistProfileDTO(PharmacistUser pharmacist) {
+        if (pharmacist == null) {
+            return null;
+        }
+        PharmacistProfileDTO dto = new PharmacistProfileDTO();
+        dto.setId(pharmacist.getId());
+        //dto.setUsername(pharmacist.getUsername());
+        dto.setEmail(pharmacist.getEmail());
+        dto.setFullName(pharmacist.getFullName());
+        dto.setPhoneNumber(pharmacist.getPhoneNumber());
+        dto.setDateOfBirth(pharmacist.getDateOfBirth());
+        //dto.setAddress(pharmacist.getAddress());
+        dto.setProfilePictureUrl(pharmacist.getProfilePictureUrl());
+
+        // Pharmacist specific fields
+        if (pharmacist.getPharmacy() != null) {
+            dto.setPharmacyId(pharmacist.getPharmacy().getId());
+            dto.setPharmacyName(pharmacist.getPharmacy().getName());
+        }
+        dto.setLicenseNumber(pharmacist.getLicenseNumber());
+        dto.setLicenseExpiryDate(pharmacist.getLicenseExpiryDate());
+        dto.setSpecialization(pharmacist.getSpecialization());
+        dto.setYearsOfExperience(pharmacist.getYearsOfExperience());
+        dto.setHireDate(pharmacist.getHireDate());
+        dto.setShiftSchedule(pharmacist.getShiftSchedule());
+        dto.setCertifications(Collections.singletonList(pharmacist.getCertifications()));
+        dto.setIsVerified(pharmacist.getIsVerified());
+        dto.setIsActive(pharmacist.getIsActive());
+
+        // dto.setEmailVerified(pharmacist.getEmailVerified());
+        // dto.setPhoneVerified(pharmacist.getPhoneVerified());
+        return dto;
+    }
+
+    // Prescription mappings
+    public PrescriptionDTO toPrescriptionDTO(Prescription p) {
+        if (p == null) return null;
+        PrescriptionDTO dto = new PrescriptionDTO();
+        dto.setId(p.getId());
+        dto.setCode(p.getCode());
+        if (p.getCustomer() != null) {
+            dto.setCustomerId(p.getCustomer().getId());
+            dto.setCustomerName(p.getCustomer().getFullName());
+        }
+        if (p.getPharmacy() != null) {
+            dto.setPharmacyId(p.getPharmacy().getId());
+            dto.setPharmacyName(p.getPharmacy().getName());
+        }
+        dto.setStatus(p.getStatus());
+        dto.setImageUrl(p.getImageUrl());
+        dto.setNote(p.getNote());
+        dto.setDeliveryPreference(p.getDeliveryPreference());
+        dto.setDeliveryAddress(p.getDeliveryAddress());
+        dto.setLatitude(p.getLatitude());
+        dto.setLongitude(p.getLongitude());
+        dto.setTotalPrice(p.getTotalPrice());
+        if (p.getItems() != null) {
+            dto.setItems(p.getItems().stream().map(this::toPrescriptionItemDTO).toList());
+        }
+        dto.setCreatedAt(p.getCreatedAt());
+        dto.setUpdatedAt(p.getUpdatedAt());
+        return dto;
+    }
+
+    public PrescriptionListItemDTO toPrescriptionListItemDTO(Prescription p) {
+        if (p == null) return null;
+        return PrescriptionListItemDTO.builder()
+                .id(p.getId())
+                .code(p.getCode())
+                .pharmacyName(p.getPharmacy() != null ? p.getPharmacy().getName() : null)
+                .status(p.getStatus())
+                .createdAt(p.getCreatedAt())
+                .updatedAt(p.getUpdatedAt())
+                .build();
+    }
+
+    public PrescriptionItemDTO toPrescriptionItemDTO(PrescriptionItem item) {
+        if (item == null) return null;
+        return PrescriptionItemDTO.builder()
+                .id(item.getId())
+                .medicineName(item.getMedicineName())
+                .genericName(item.getGenericName())
+                .dosage(item.getDosage())
+                .quantity(item.getQuantity())
+                .unitPrice(item.getUnitPrice())
+                .totalPrice(item.getTotalPrice())
+                .available(item.getAvailable())
+                .notes(item.getNotes())
+                .build();
+    }
+
+    public PrescriptionItem toPrescriptionItemEntity(PrescriptionItemDTO dto) {
+        if (dto == null) return null;
+        return PrescriptionItem.builder()
+                .id(dto.getId())
+                .medicineName(dto.getMedicineName())
+                .genericName(dto.getGenericName())
+                .dosage(dto.getDosage())
+                .quantity(dto.getQuantity())
+                .unitPrice(dto.getUnitPrice())
+                .totalPrice(dto.getTotalPrice())
+                .available(dto.getAvailable())
+                .notes(dto.getNotes())
+                .build();
+    }
 }

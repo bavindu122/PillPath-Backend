@@ -4,9 +4,18 @@ import lombok.Getter;
 
 @Getter
 public enum PrescriptionStatus {
-    PENDING("Pending Verification"),
-    VERIFIED("Verified"),
+    // New workflow
+    PENDING_REVIEW("Pending Review"),
+    IN_PROGRESS("In Progress"),
+    CLARIFICATION_NEEDED("Clarification Needed"),
+    READY_FOR_PICKUP("Ready for Pickup"),
     REJECTED("Rejected"),
+    COMPLETED("Completed"),
+    CANCELLED("Cancelled"),
+
+    // Legacy statuses kept for backward compatibility
+    PENDING("Pending"),
+    VERIFIED("Verified"),
     EXPIRED("Expired"),
     FULFILLED("Fulfilled");
 

@@ -56,4 +56,23 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
                                              Pageable pageable);
     @Query("SELECT p FROM Pharmacy p ORDER BY p.createdAt DESC")
     List<Pharmacy> findTop10ByOrderByCreatedAtDesc();
+    @Query("SELECT p FROM Pharmacy p WHERE p.isActive = true AND p.isVerified = true " +
+            "AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL")
+    List<Pharmacy> findByIsActiveTrueAndIsVerifiedTrueAndLatitudeIsNotNullAndLongitudeIsNotNull();
+
+    // Optional: Add distance-based query if needed
+    @Query(value = "SELECT * FROM pharmacies p WHERE p.is_active = true AND p.is_verified = true " +
+            "AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL " +
+            "AND (6371 * acos(cos(radians(?1)) * cos(radians(p.latitude)) * " +
+            "cos(radians(p.longitude) - radians(?2)) + sin(radians(?1)) * " +
+            "sin(radians(p.latitude)))) <= ?3", nativeQuery = true)
+    List<Pharmacy> findActivePharmaciesWithinRadius(Double userLat, Double userLng, Double radiusKm);
+
+    // New method for pharmacy profile details
+    @Query("SELECT p FROM Pharmacy p WHERE p.id = :id AND p.isActive = true")
+    Optional<Pharmacy> findActivePharmacyById(@Param("id") Long id);
+
+    @Query("SELECT p FROM Pharmacy p WHERE p.id = :id")
+    Optional<Pharmacy> findPharmacyForProfile(@Param("id") Long id);
+
 }
