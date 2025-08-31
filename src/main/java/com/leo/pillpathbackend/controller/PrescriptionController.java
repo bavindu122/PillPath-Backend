@@ -5,7 +5,7 @@ import com.leo.pillpathbackend.dto.PrescriptionItemDTO;
 import com.leo.pillpathbackend.dto.PrescriptionListItemDTO;
 import com.leo.pillpathbackend.dto.request.CreatePrescriptionRequest;
 import com.leo.pillpathbackend.dto.activity.PrescriptionActivityListResponse;
-import com.leo.pillpathbackend.entity.PharmacistUser;
+import com.leo.pillpathbackend.entity.Pharmacist;
 import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.PrescriptionService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
@@ -117,7 +117,7 @@ public class PrescriptionController {
     public ResponseEntity<?> pharmacyPrescriptions(HttpServletRequest request) {
         try {
             Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
-            PharmacistUser pharmacist = (PharmacistUser) userRepository.findById(pharmacistId)
+            Pharmacist pharmacist = (Pharmacist) userRepository.findById(pharmacistId)
                     .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
             if (pharmacist.getPharmacy() == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Pharmacist is not assigned to a pharmacy"));
@@ -139,7 +139,7 @@ public class PrescriptionController {
     public ResponseEntity<?> pharmacyPrescription(@PathVariable Long id, HttpServletRequest request) {
         try {
             Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
-            PharmacistUser pharmacist = (PharmacistUser) userRepository.findById(pharmacistId)
+            Pharmacist pharmacist = (Pharmacist) userRepository.findById(pharmacistId)
                     .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
             if (pharmacist.getPharmacy() == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Pharmacist is not assigned to a pharmacy"));
@@ -165,7 +165,7 @@ public class PrescriptionController {
     ) {
         try {
             Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
-            PharmacistUser pharmacist = (PharmacistUser) userRepository.findById(pharmacistId)
+            Pharmacist pharmacist = (Pharmacist) userRepository.findById(pharmacistId)
                     .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
             if (pharmacist.getPharmacy() == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Pharmacist is not assigned to a pharmacy"));

@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -420,7 +419,7 @@ public class Mapper {
         }
     }
 
-    public PharmacistProfileDTO convertToPharmacistProfileDTO(PharmacistUser pharmacist) {
+    public PharmacistProfileDTO convertToPharmacistProfileDTO(Pharmacist pharmacist) {
         if (pharmacist == null) {
             return null;
         }
@@ -445,7 +444,7 @@ public class Mapper {
         dto.setYearsOfExperience(pharmacist.getYearsOfExperience());
         dto.setHireDate(pharmacist.getHireDate());
         dto.setShiftSchedule(pharmacist.getShiftSchedule());
-        dto.setCertifications(Collections.singletonList(pharmacist.getCertifications()));
+        dto.setCertifications(pharmacist.getCertifications());
         dto.setIsVerified(pharmacist.getIsVerified());
         dto.setIsActive(pharmacist.getIsActive());
 

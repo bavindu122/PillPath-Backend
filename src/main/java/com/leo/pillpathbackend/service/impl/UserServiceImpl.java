@@ -86,15 +86,15 @@ public class UserServiceImpl implements UserService {
                     .userId(admin.getId())
                     .userProfile(profileDTO)
                     .build();
-        }else if (user instanceof PharmacistUser pharmacistUser) {
-            PharmacistProfileDTO profileDTO = mapper.convertToPharmacistProfileDTO(pharmacistUser);
-            String token = jwtService.generateToken(pharmacistUser.getId(), "PHARMACIST");
+        }else if (user instanceof Pharmacist pharmacist) {
+            PharmacistProfileDTO profileDTO = mapper.convertToPharmacistProfileDTO(pharmacist);
+            String token = jwtService.generateToken(pharmacist.getId(), "PHARMACIST");
             return UnifiedLoginResponse.builder()
                     .success(true)
                     .message("Login successful")
                     .token(token)
                     .userType("PHARMACIST")
-                    .userId(pharmacistUser.getId())
+                    .userId(pharmacist.getId())
                     .userProfile(profileDTO)
                     .build();
         }
