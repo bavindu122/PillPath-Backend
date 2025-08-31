@@ -5,6 +5,7 @@ import com.leo.pillpathbackend.dto.PrescriptionItemDTO;
 import com.leo.pillpathbackend.dto.PrescriptionListItemDTO;
 import com.leo.pillpathbackend.dto.activity.*;
 import com.leo.pillpathbackend.dto.request.CreatePrescriptionRequest;
+import com.leo.pillpathbackend.dto.PharmacistSubmissionItemsDTO;
 import com.leo.pillpathbackend.entity.*;
 import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
 import com.leo.pillpathbackend.repository.CustomerRepository;
@@ -275,22 +276,174 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         return toQueueDTO(submission);
     }
 
-    private com.leo.pillpathbackend.dto.PharmacistQueueItemDTO toQueueDTO(PrescriptionSubmission s) {
-        Prescription prescription = s.getPrescription();
-        return com.leo.pillpathbackend.dto.PharmacistQueueItemDTO.builder()
-                .submissionId(s.getId())
-                .prescriptionCode(prescription.getCode())
-                .uploadedAt(prescription.getCreatedAt() != null ? prescription.getCreatedAt().format(ISO_SECOND_FORMAT) : null)
-                .status(s.getStatus())
-                .imageUrl(prescription.getImageUrl())
-                .note(prescription.getNote())
-                .claimed(s.getAssignedPharmacist() != null)
-                .assignedPharmacistId(s.getAssignedPharmacist() != null ? s.getAssignedPharmacist().getId() : null)
+    @Override
+    public PharmacistSubmissionItemsDTO getSubmissionItems(Long pharmacistId, Long submissionId) {
+        PrescriptionSubmission submission = loadAndAuthorizeSubmission(pharmacistId, submissionId, false);
+        return buildSubmissionItemsDTO(submission, pharmacistId);
+    }
+
+    @Override
+    public PharmacistSubmissionItemsDTO addSubmissionItem(Long pharmacistId, Long submissionId, PrescriptionItemDTO itemDTO) {
+        PrescriptionSubmission submission = loadAndAuthorizeSubmission(pharmacistId, submissionId, true);
+        // If unclaimed and pending, claim & set IN_PROGRESS
+        if (submission.getAssignedPharmacist() == null && submission.getStatus() == PrescriptionStatus.PENDING_REVIEW) {
+            User pharmacist = userRepository.findById(pharmacistId).orElseThrow();
+            submission.setAssignedPharmacist(pharmacist);
+            submission.setStatus(PrescriptionStatus.IN_PROGRESS);
+        }
+        ensureEditable(pharmacistId, submission);
+        PrescriptionSubmissionItem item = toSubmissionItemEntity(itemDTO);
+        item.setSubmission(submission);
+        submission.getItems().add(item);
+        recalcSubmissionTotals(submission);
+        prescriptionSubmissionRepository.save(submission);
+        return buildSubmissionItemsDTO(submission, pharmacistId);
+    }
+
+    @Override
+    public PharmacistSubmissionItemsDTO updateSubmissionItem(Long pharmacistId, Long submissionId, Long itemId, PrescriptionItemDTO itemDTO) {
+        PrescriptionSubmission submission = loadAndAuthorizeSubmission(pharmacistId, submissionId, true);
+        ensureEditable(pharmacistId, submission);
+        PrescriptionSubmissionItem existing = submission.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("Item not found"));
+        // Update mutable fields
+        existing.setMedicineName(itemDTO.getMedicineName());
+        existing.setGenericName(itemDTO.getGenericName());
+        existing.setDosage(itemDTO.getDosage());
+        existing.setQuantity(itemDTO.getQuantity());
+        existing.setUnitPrice(itemDTO.getUnitPrice());
+        existing.setAvailable(itemDTO.getAvailable());
+        existing.setNotes(itemDTO.getNotes());
+        // Recalculate totalPrice for item
+        if (itemDTO.getTotalPrice() != null) {
+            existing.setTotalPrice(itemDTO.getTotalPrice());
+        } else if (existing.getUnitPrice() != null && existing.getQuantity() != null) {
+            existing.setTotalPrice(existing.getUnitPrice().multiply(java.math.BigDecimal.valueOf(existing.getQuantity())));
+        } else {
+            existing.setTotalPrice(null);
+        }
+        recalcSubmissionTotals(submission);
+        prescriptionSubmissionRepository.save(submission);
+        return buildSubmissionItemsDTO(submission, pharmacistId);
+    }
+
+    @Override
+    public PharmacistSubmissionItemsDTO removeSubmissionItem(Long pharmacistId, Long submissionId, Long itemId) {
+        PrescriptionSubmission submission = loadAndAuthorizeSubmission(pharmacistId, submissionId, true);
+        ensureEditable(pharmacistId, submission);
+        boolean removed = submission.getItems().removeIf(i -> i.getId().equals(itemId));
+        if (!removed) throw new IllegalArgumentException("Item not found");
+        recalcSubmissionTotals(submission);
+        prescriptionSubmissionRepository.save(submission);
+        return buildSubmissionItemsDTO(submission, pharmacistId);
+    }
+
+    // Helper: authorize pharmacist and load submission
+    private PrescriptionSubmission loadAndAuthorizeSubmission(Long pharmacistId, Long submissionId, boolean forModification) {
+        User pharmacist = userRepository.findById(pharmacistId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
+        if (!(pharmacist instanceof PharmacistUser phUser)) {
+            throw new IllegalArgumentException("User is not a pharmacist");
+        }
+        Pharmacy pharmacy = phUser.getPharmacy();
+        if (pharmacy == null) throw new IllegalArgumentException("Pharmacist not assigned to a pharmacy");
+        PrescriptionSubmission submission = prescriptionSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new IllegalArgumentException("Submission not found"));
+        if (!submission.getPharmacy().getId().equals(pharmacy.getId())) {
+            throw new IllegalArgumentException("Submission does not belong to pharmacist's pharmacy");
+        }
+        if (forModification) {
+            if (submission.getStatus() != PrescriptionStatus.PENDING_REVIEW && submission.getStatus() != PrescriptionStatus.IN_PROGRESS) {
+                throw new IllegalStateException("Cannot modify submission in current status");
+            }
+        }
+        return submission;
+    }
+
+    private void ensureEditable(Long pharmacistId, PrescriptionSubmission submission) {
+        if (submission.getAssignedPharmacist() != null && !submission.getAssignedPharmacist().getId().equals(pharmacistId)) {
+            throw new IllegalStateException("Submission already claimed by another pharmacist");
+        }
+    }
+
+    private void recalcSubmissionTotals(PrescriptionSubmission submission) {
+        java.math.BigDecimal total = java.math.BigDecimal.ZERO;
+        for (PrescriptionSubmissionItem it : submission.getItems()) {
+            if (it.getTotalPrice() != null) {
+                total = total.add(it.getTotalPrice());
+            } else if (it.getUnitPrice() != null && it.getQuantity() != null) {
+                java.math.BigDecimal line = it.getUnitPrice().multiply(java.math.BigDecimal.valueOf(it.getQuantity()));
+                it.setTotalPrice(line);
+                total = total.add(line);
+            }
+        }
+        submission.setTotalPrice(total.compareTo(java.math.BigDecimal.ZERO) > 0 ? total : null);
+    }
+
+    private PharmacistSubmissionItemsDTO buildSubmissionItemsDTO(PrescriptionSubmission submission, Long pharmacistId) {
+        boolean editable = (submission.getStatus() == PrescriptionStatus.PENDING_REVIEW || submission.getStatus() == PrescriptionStatus.IN_PROGRESS) &&
+                (submission.getAssignedPharmacist() == null || submission.getAssignedPharmacist().getId().equals(pharmacistId));
+        java.util.List<PrescriptionItemDTO> items = submission.getItems().stream().map(this::toItemDTO).toList();
+        return PharmacistSubmissionItemsDTO.builder()
+                .submissionId(submission.getId())
+                .prescriptionCode(submission.getPrescription().getCode())
+                .pharmacyId(submission.getPharmacy().getId())
+                .status(submission.getStatus())
+                .totalPrice(submission.getTotalPrice())
+                .editable(editable)
+                .items(items)
+                .build();
+    }
+
+    private PrescriptionSubmissionItem toSubmissionItemEntity(PrescriptionItemDTO dto) {
+        if (dto == null) throw new IllegalArgumentException("Item data required");
+        PrescriptionSubmissionItem entity = new PrescriptionSubmissionItem();
+        entity.setMedicineName(dto.getMedicineName());
+        entity.setGenericName(dto.getGenericName());
+        entity.setDosage(dto.getDosage());
+        entity.setQuantity(dto.getQuantity());
+        entity.setUnitPrice(dto.getUnitPrice());
+        entity.setAvailable(dto.getAvailable());
+        entity.setNotes(dto.getNotes());
+        if (dto.getTotalPrice() != null) {
+            entity.setTotalPrice(dto.getTotalPrice());
+        } else if (dto.getUnitPrice() != null && dto.getQuantity() != null) {
+            entity.setTotalPrice(dto.getUnitPrice().multiply(java.math.BigDecimal.valueOf(dto.getQuantity())));
+        }
+        return entity;
+    }
+
+    private PrescriptionItemDTO toItemDTO(PrescriptionSubmissionItem entity) {
+        return PrescriptionItemDTO.builder()
+                .id(entity.getId())
+                .medicineName(entity.getMedicineName())
+                .genericName(entity.getGenericName())
+                .dosage(entity.getDosage())
+                .quantity(entity.getQuantity())
+                .unitPrice(entity.getUnitPrice())
+                .totalPrice(entity.getTotalPrice())
+                .available(entity.getAvailable())
+                .notes(entity.getNotes())
                 .build();
     }
 
     private String generateCode() {
         return "RX-" + LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
                 + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+    }
+
+    private com.leo.pillpathbackend.dto.PharmacistQueueItemDTO toQueueDTO(PrescriptionSubmission s) {
+        Prescription prescription = s.getPrescription();
+        return com.leo.pillpathbackend.dto.PharmacistQueueItemDTO.builder()
+                .submissionId(s.getId())
+                .prescriptionCode(prescription != null ? prescription.getCode() : null)
+                .uploadedAt(prescription != null && prescription.getCreatedAt() != null ? prescription.getCreatedAt().format(ISO_SECOND_FORMAT) : null)
+                .status(s.getStatus())
+                .imageUrl(prescription != null ? prescription.getImageUrl() : null)
+                .note(prescription != null ? prescription.getNote() : null)
+                .claimed(s.getAssignedPharmacist() != null)
+                .assignedPharmacistId(s.getAssignedPharmacist() != null ? s.getAssignedPharmacist().getId() : null)
+                .build();
     }
 }

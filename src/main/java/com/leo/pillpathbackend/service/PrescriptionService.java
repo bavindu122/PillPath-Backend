@@ -31,4 +31,13 @@ public interface PrescriptionService {
     List<PharmacistQueueItemDTO> getPharmacistQueue(Long pharmacistId, PrescriptionStatus status);
 
     PharmacistQueueItemDTO claimSubmission(Long pharmacistId, Long submissionId);
+
+    // Pharmacist per-submission item management (order preview building)
+    com.leo.pillpathbackend.dto.PharmacistSubmissionItemsDTO getSubmissionItems(Long pharmacistId, Long submissionId);
+
+    com.leo.pillpathbackend.dto.PharmacistSubmissionItemsDTO addSubmissionItem(Long pharmacistId, Long submissionId, PrescriptionItemDTO itemDTO);
+
+    com.leo.pillpathbackend.dto.PharmacistSubmissionItemsDTO updateSubmissionItem(Long pharmacistId, Long submissionId, Long itemId, PrescriptionItemDTO itemDTO);
+
+    com.leo.pillpathbackend.dto.PharmacistSubmissionItemsDTO removeSubmissionItem(Long pharmacistId, Long submissionId, Long itemId);
 }

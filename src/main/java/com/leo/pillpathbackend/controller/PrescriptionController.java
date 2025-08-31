@@ -5,6 +5,7 @@ import com.leo.pillpathbackend.dto.PrescriptionItemDTO;
 import com.leo.pillpathbackend.dto.PrescriptionListItemDTO;
 import com.leo.pillpathbackend.dto.request.CreatePrescriptionRequest;
 import com.leo.pillpathbackend.dto.activity.PrescriptionActivityListResponse;
+import com.leo.pillpathbackend.dto.PharmacistSubmissionItemsDTO;
 import com.leo.pillpathbackend.entity.PharmacistUser;
 import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.PrescriptionService;
@@ -228,6 +229,77 @@ public class PrescriptionController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Pharmacist: list items in a submission (order preview)
+    @GetMapping("/pharmacist/submissions/{submissionId}/items")
+    public ResponseEntity<?> getSubmissionItems(@PathVariable Long submissionId, HttpServletRequest request) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            PharmacistSubmissionItemsDTO dto = prescriptionService.getSubmissionItems(pharmacistId, submissionId);
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Pharmacist: add an item
+    @PostMapping("/pharmacist/submissions/{submissionId}/items")
+    public ResponseEntity<?> addSubmissionItem(@PathVariable Long submissionId,
+                                               @RequestBody PrescriptionItemDTO item,
+                                               HttpServletRequest request) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            PharmacistSubmissionItemsDTO dto = prescriptionService.addSubmissionItem(pharmacistId, submissionId, item);
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Pharmacist: update an item
+    @PutMapping("/pharmacist/submissions/{submissionId}/items/{itemId}")
+    public ResponseEntity<?> updateSubmissionItem(@PathVariable Long submissionId,
+                                                  @PathVariable Long itemId,
+                                                  @RequestBody PrescriptionItemDTO item,
+                                                  HttpServletRequest request) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            PharmacistSubmissionItemsDTO dto = prescriptionService.updateSubmissionItem(pharmacistId, submissionId, itemId, item);
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Pharmacist: remove an item
+    @DeleteMapping("/pharmacist/submissions/{submissionId}/items/{itemId}")
+    public ResponseEntity<?> deleteSubmissionItem(@PathVariable Long submissionId,
+                                                  @PathVariable Long itemId,
+                                                  HttpServletRequest request) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            PharmacistSubmissionItemsDTO dto = prescriptionService.removeSubmissionItem(pharmacistId, submissionId, itemId);
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
