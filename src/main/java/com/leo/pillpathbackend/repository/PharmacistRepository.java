@@ -31,8 +31,8 @@ public interface PharmacistRepository extends JpaRepository<Pharmacist, Long> {
     // Find pharmacist by license number
     Optional<Pharmacist> findByLicenseNumber(String licenseNumber);
 
-    // Find pharmacist by user email (direct field from User parent class)
-    @Query("SELECT p FROM Pharmacist p WHERE p.email = :email")
+    // Find pharmacist by user email (through PharmacistUser relationship)
+    @Query("SELECT p FROM Pharmacist p WHERE p.pharmacistUser.email = :email")
     Optional<Pharmacist> findByUserEmail(@Param("email") String email);
 
     // Find all active pharmacists for a pharmacy (custom query)

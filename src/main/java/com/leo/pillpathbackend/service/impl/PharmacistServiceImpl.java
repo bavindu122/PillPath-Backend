@@ -4,6 +4,7 @@ import com.leo.pillpathbackend.dto.PharmacistCreateRequestDTO;
 import com.leo.pillpathbackend.dto.PharmacistUpdateRequestDTO;
 import com.leo.pillpathbackend.dto.PharmacistResponseDTO;
 import com.leo.pillpathbackend.entity.Pharmacist;
+import com.leo.pillpathbackend.entity.PharmacistUser;
 import com.leo.pillpathbackend.entity.Pharmacy;
 import com.leo.pillpathbackend.entity.enums.EmploymentStatus;
 import com.leo.pillpathbackend.repository.PharmacistRepository;
@@ -19,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -71,26 +71,40 @@ public class PharmacistServiceImpl implements PharmacistService {
         Pharmacy pharmacy = pharmacyRepository.findById(request.getPharmacyId())
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found with ID: " + request.getPharmacyId()));
 
-        // Create Pharmacist entity (extends User)
+        // Create PharmacistUser first (for login capability)
+        PharmacistUser user = new PharmacistUser();
+        user.setEmail(request.getEmail().trim());
+        user.setUsername(request.getEmail().trim()); // Use email as username
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFullName(request.getFullName().trim());
+        user.setPhoneNumber(request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null);
+        user.setDateOfBirth(request.getDateOfBirth());
+        user.setProfilePictureUrl(request.getProfilePictureUrl());
+        user.setIsActive(true);
+        user.setEmailVerified(false);
+        user.setPhoneVerified(false);
+
+        // Save user first
+        PharmacistUser savedUser = (PharmacistUser) userRepository.save(user);
+        log.info("Created user with ID: {}", savedUser.getId());
+
+        // Create Pharmacist entity
         Pharmacist pharmacist = new Pharmacist();
-        log.info("Created Pharmacist instance, UserType: {}", pharmacist.getUserType());
         
-        // Set User fields
+        // Set BOTH the direct fields (required by entity) AND the relationship
+        // Direct fields (to satisfy nullable = false constraints)
         pharmacist.setEmail(request.getEmail().trim());
-        pharmacist.setUsername(request.getEmail().trim()); // Use email as username
         pharmacist.setPassword(passwordEncoder.encode(request.getPassword()));
         pharmacist.setFullName(request.getFullName().trim());
         pharmacist.setPhoneNumber(request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null);
         pharmacist.setDateOfBirth(request.getDateOfBirth());
         pharmacist.setProfilePictureUrl(request.getProfilePictureUrl());
-        pharmacist.setIsActive(true);
-        pharmacist.setEmailVerified(false);
-        pharmacist.setPhoneVerified(false);
-        log.info("Set basic User fields for pharmacist");
+        
+        // Set the PharmacistUser relationship
+        pharmacist.setPharmacistUser(savedUser);
         
         // Set pharmacy relationship
         pharmacist.setPharmacy(pharmacy);
-        log.info("Set pharmacy relationship: {}", pharmacy.getName());
         
         // Set pharmacist-specific fields
         pharmacist.setLicenseNumber(request.getLicenseNumber().trim());
@@ -100,42 +114,12 @@ public class PharmacistServiceImpl implements PharmacistService {
         pharmacist.setHireDate(request.getHireDate() != null ? request.getHireDate() : LocalDate.now());
         pharmacist.setShiftSchedule(request.getShiftSchedule());
         pharmacist.setCertifications(request.getCertifications());
+        pharmacist.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
         pharmacist.setIsVerified(request.getIsVerified() != null ? request.getIsVerified() : false);
         pharmacist.setEmploymentStatus(request.getEmploymentStatus() != null ? request.getEmploymentStatus() : EmploymentStatus.ACTIVE);
-        log.info("Set pharmacist-specific fields, license: {}", request.getLicenseNumber());
 
-        log.info("About to save pharmacist entity...");
-        log.info("Pharmacist details before save - Email: {}, FullName: {}, UserType: {}, License: {}, Pharmacy ID: {}", 
-            pharmacist.getEmail(), pharmacist.getFullName(), pharmacist.getUserType(), 
-            pharmacist.getLicenseNumber(), pharmacist.getPharmacy() != null ? pharmacist.getPharmacy().getId() : "null");
-        
         Pharmacist savedPharmacist = pharmacistRepository.save(pharmacist);
-        
-        log.info("Pharmacist saved successfully with ID: {}", savedPharmacist.getId());
-        log.info("Saved pharmacist details - Email: {}, FullName: {}, UserType: {}, License: {}, Pharmacy ID: {}", 
-            savedPharmacist.getEmail(), savedPharmacist.getFullName(), savedPharmacist.getUserType(), 
-            savedPharmacist.getLicenseNumber(), savedPharmacist.getPharmacy() != null ? savedPharmacist.getPharmacy().getId() : "null");
-        
-        // Immediately try to find the saved pharmacist
-        log.info("Attempting to find saved pharmacist by ID: {}", savedPharmacist.getId());
-        Optional<Pharmacist> foundById = pharmacistRepository.findById(savedPharmacist.getId());
-        log.info("Found by ID: {}", foundById.isPresent());
-        
-        if (foundById.isPresent()) {
-            Pharmacist found = foundById.get();
-            log.info("Found pharmacist - Email: {}, UserType: {}, License: {}", 
-                found.getEmail(), found.getUserType(), found.getLicenseNumber());
-        }
-        
-        // Try to find by pharmacy
-        if (savedPharmacist.getPharmacy() != null) {
-            log.info("Attempting to find pharmacists by pharmacy ID: {}", savedPharmacist.getPharmacy().getId());
-            List<Pharmacist> pharmacistsByPharmacy = pharmacistRepository.findByPharmacyId(savedPharmacist.getPharmacy().getId());
-            log.info("Found {} pharmacists for pharmacy", pharmacistsByPharmacy.size());
-            for (Pharmacist p : pharmacistsByPharmacy) {
-                log.info("Pharmacy pharmacist - ID: {}, Email: {}, UserType: {}", p.getId(), p.getEmail(), p.getUserType());
-            }
-        }
+        log.info("Created pharmacist with ID: {}", savedPharmacist.getId());
 
         return convertToResponse(savedPharmacist);
     }
@@ -148,21 +132,39 @@ public class PharmacistServiceImpl implements PharmacistService {
         Pharmacist pharmacist = pharmacistRepository.findById(pharmacistId)
                 .orElseThrow(() -> new RuntimeException("Pharmacist not found with ID: " + pharmacistId));
 
-        // Update User fields
+        // Update BOTH direct fields and PharmacistUser fields
+        PharmacistUser user = pharmacist.getPharmacistUser();
+        
         if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
+            // Update both direct field and user field
             pharmacist.setFullName(request.getFullName().trim());
+            if (user != null) {
+                user.setFullName(request.getFullName().trim());
+            }
         }
         
         if (request.getPhoneNumber() != null) {
+            // Update both direct field and user field
             pharmacist.setPhoneNumber(request.getPhoneNumber().trim());
+            if (user != null) {
+                user.setPhoneNumber(request.getPhoneNumber().trim());
+            }
         }
         
         if (request.getDateOfBirth() != null) {
+            // Update both direct field and user field
             pharmacist.setDateOfBirth(request.getDateOfBirth());
+            if (user != null) {
+                user.setDateOfBirth(request.getDateOfBirth());
+            }
         }
         
         if (request.getProfilePictureUrl() != null) {
+            // Update both direct field and user field
             pharmacist.setProfilePictureUrl(request.getProfilePictureUrl());
+            if (user != null) {
+                user.setProfilePictureUrl(request.getProfilePictureUrl());
+            }
         }
         
         // Update pharmacist-specific data
@@ -180,6 +182,11 @@ public class PharmacistServiceImpl implements PharmacistService {
         }
         if (request.getCertifications() != null) {
             pharmacist.setCertifications(request.getCertifications());
+        }
+
+        // Save the updated user first if it exists
+        if (user != null) {
+            userRepository.save(user);
         }
 
         Pharmacist savedPharmacist = pharmacistRepository.save(pharmacist);
@@ -204,22 +211,10 @@ public class PharmacistServiceImpl implements PharmacistService {
     public List<PharmacistResponseDTO> getPharmacistsByPharmacyId(Long pharmacyId) {
         log.info("Fetching pharmacists for pharmacy ID: {}", pharmacyId);
         
-        try {
-            List<Pharmacist> pharmacists = pharmacistRepository.findByPharmacyIdAndIsActiveTrue(pharmacyId);
-            log.info("Found {} pharmacists for pharmacy {}", pharmacists.size(), pharmacyId);
-            
-            for (Pharmacist p : pharmacists) {
-                log.info("Pharmacist ID: {}, Name: {}, Email: {}, UserType: {}, License: {}", 
-                    p.getId(), p.getFullName(), p.getEmail(), p.getUserType(), p.getLicenseNumber());
-            }
-            
-            return pharmacists.stream()
-                    .map(this::convertToResponse)
-                    .collect(Collectors.toList());
-        } catch (Exception e) {
-            log.error("Error fetching pharmacists for pharmacy {}: {}", pharmacyId, e.getMessage(), e);
-            throw e;
-        }
+        List<Pharmacist> pharmacists = pharmacistRepository.findByPharmacyIdAndIsActiveTrue(pharmacyId);
+        return pharmacists.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -255,6 +250,13 @@ public class PharmacistServiceImpl implements PharmacistService {
         pharmacist.setIsActive(false);
         pharmacist.setEmploymentStatus(EmploymentStatus.TERMINATED);
         
+        // Also deactivate the associated user
+        PharmacistUser user = pharmacist.getPharmacistUser();
+        if (user != null) {
+            user.setIsActive(false);
+            userRepository.save(user);
+        }
+        
         pharmacistRepository.save(pharmacist);
         log.info("Soft deleted pharmacist with ID: {}", pharmacistId);
     }
@@ -273,6 +275,13 @@ public class PharmacistServiceImpl implements PharmacistService {
             pharmacist.setEmploymentStatus(EmploymentStatus.ACTIVE);
         } else {
             pharmacist.setEmploymentStatus(EmploymentStatus.INACTIVE);
+        }
+        
+        // Update associated user status
+        PharmacistUser user = pharmacist.getPharmacistUser();
+        if (user != null) {
+            user.setIsActive(isActive);
+            userRepository.save(user);
         }
         
         Pharmacist savedPharmacist = pharmacistRepository.save(pharmacist);
@@ -300,7 +309,7 @@ public class PharmacistServiceImpl implements PharmacistService {
         PharmacistResponseDTO response = new PharmacistResponseDTO();
         response.setId(pharmacist.getId());
         
-        // Use User fields (since Pharmacist extends User)
+        // Use direct fields for now (since they're required by the entity)
         response.setFullName(pharmacist.getFullName());
         response.setEmail(pharmacist.getEmail());
         response.setPhoneNumber(pharmacist.getPhoneNumber());
@@ -342,16 +351,24 @@ public class PharmacistServiceImpl implements PharmacistService {
         String oldProfilePictureUrl = pharmacist.getProfilePictureUrl();
         if (oldProfilePictureUrl != null && !oldProfilePictureUrl.isEmpty()) {
             try {
-                // Use newer method if available, or handle deprecated method
-                cloudinaryService.deleteImage(oldProfilePictureUrl);
+                String publicId = cloudinaryService.extractPublicIdFromUrl(oldProfilePictureUrl);
+                if (publicId != null) {
+                    cloudinaryService.deleteImage(publicId);
+                }
             } catch (Exception e) {
                 log.warn("Failed to delete old profile picture: {}", e.getMessage());
                 // Don't fail the operation if old image deletion fails
             }
         }
 
-        // Update profile picture
+        // Update both direct field and user field
         pharmacist.setProfilePictureUrl(imageUrl);
+
+        PharmacistUser user = pharmacist.getPharmacistUser();
+        if (user != null) {
+            user.setProfilePictureUrl(imageUrl);
+            userRepository.save(user);
+        }
 
         Pharmacist savedPharmacist = pharmacistRepository.save(pharmacist);
         log.info("Updated profile picture for pharmacist ID: {}", pharmacistId);
@@ -371,16 +388,24 @@ public class PharmacistServiceImpl implements PharmacistService {
         String profilePictureUrl = pharmacist.getProfilePictureUrl();
         if (profilePictureUrl != null && !profilePictureUrl.isEmpty()) {
             try {
-                // Use newer method if available, or handle deprecated method
-                cloudinaryService.deleteImage(profilePictureUrl);
+                String publicId = cloudinaryService.extractPublicIdFromUrl(profilePictureUrl);
+                if (publicId != null) {
+                    cloudinaryService.deleteImage(publicId);
+                }
             } catch (Exception e) {
                 log.warn("Failed to delete profile picture from Cloudinary: {}", e.getMessage());
                 // Don't fail the operation if image deletion fails
             }
         }
 
-        // Remove profile picture URL
+        // Remove profile picture URLs
         pharmacist.setProfilePictureUrl(null);
+
+        PharmacistUser user = pharmacist.getPharmacistUser();
+        if (user != null) {
+            user.setProfilePictureUrl(null);
+            userRepository.save(user);
+        }
 
         Pharmacist savedPharmacist = pharmacistRepository.save(pharmacist);
         log.info("Removed profile picture for pharmacist ID: {}", pharmacistId);

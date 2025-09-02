@@ -35,6 +35,15 @@ public class PharmacistResponseDTO {
     private List<String> certifications = new ArrayList<>();
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long pharmacistUserId;
+
+    public void setUserId(Long pharmacistUserId) {
+        this.pharmacistUserId = pharmacistUserId;
+    }
+
+    public Long getUserId() {
+        return pharmacistUserId;
+    }
 
     public PharmacistResponseDTO(Pharmacist pharmacist) {
         this.id = pharmacist.getId();

@@ -1,140 +1,124 @@
 package com.leo.pillpathbackend.entity;
+import com.leo.pillpathbackend.entity.enums.EmploymentStatus;
+import com.leo.pillpathbackend.entity.enums.UserType;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-
-import com.leo.pillpathbackend.entity.enums.UserType;
-import com.leo.pillpathbackend.entity.enums.EmploymentStatus;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.DiscriminatorValue;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.CollectionTable;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.leo.pillpathbackend.entity.enums.*;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 @Entity
-@DiscriminatorValue("PHARMACIST")
-@Getter
-@Setter
+@Table(name = "pharmacists")
+@Data
 @NoArgsConstructor
-public class Pharmacist extends User {
+@AllArgsConstructor
+public class Pharmacist {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Override
+     //Remove these duplicate fields - they exist in PharmacistUser
+     @Column(unique = true, nullable = false)
+     private String email;
+
+     @Column(nullable = false)
+     private String password;
+
+     @Column(name = "full_name", nullable = false)
+     private String fullName;
+
+     @Column(name = "phone_number")
+     private String phoneNumber;
+
+     @Column(name = "date_of_birth")
+     private LocalDate dateOfBirth;
+
+     @Column(name = "profile_picture_url")
+     private String profilePictureUrl;
+
+     //Pharmacist-specific fields only
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pharmacy_id", nullable = false)
+    private Pharmacy pharmacy;
+
+    @Column(name = "license_number", unique = true, nullable = false)
+    private String licenseNumber;
+
+    @Column(name = "license_expiry_date")
+    private LocalDate licenseExpiryDate;
+
+    @Column(name = "specialization")
+    private String specialization;
+
+    @Column(name = "years_of_experience")
+    private Integer yearsOfExperience;
+
+    @Column(name = "hire_date")
+    private LocalDate hireDate;
+
+    @Column(name = "is_active")
+    private Boolean isActive = true;
+
+    @Column(name = "is_verified")
+    private Boolean isVerified = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "employment_status")
+    private EmploymentStatus employmentStatus = EmploymentStatus.ACTIVE;
+
+    @Column(name = "shift_schedule")
+    private String shiftSchedule;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "certifications", columnDefinition = "jsonb")
+    private List<String> certifications = new ArrayList<>();
+
+    @CreationTimestamp
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    // Relationships
+
+    @OneToMany(mappedBy = "processedBy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Order> processedOrders = new ArrayList<>();
+
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "pharmacist_user_id", nullable = false)
+    private PharmacistUser pharmacistUser;
+
     public UserType getUserType() {
         return UserType.PHARMACIST;
     }
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pharmacy_id")
-    private Pharmacy pharmacy;
-    
-    @Column(name = "license_number")
-    private String licenseNumber;
-    
-    @Column(name = "license_expiry_date")
-    private LocalDate licenseExpiryDate;
-    
-    @Column(name = "specialization")
-    private String specialization;
-    
-    @Column(name = "years_of_experience")
-    private Integer yearsOfExperience;
-    
-    @Column(name = "hire_date")
-    private LocalDate hireDate;
-    
-    @Column(name = "shift_schedule")
-    private String shiftSchedule;
-    
-    @ElementCollection
-    @CollectionTable(name = "pharmacist_certifications", joinColumns = @JoinColumn(name = "pharmacist_id"))
-    @Column(name = "certification")
-    private List<String> certifications;
-    
-    @Column(name = "is_verified")
-    private Boolean isVerified;
-    
-    @Enumerated(EnumType.STRING)
-    @Column(name = "employment_status")
-    private EmploymentStatus employmentStatus;
-
-    public Pharmacy getPharmacy() {
-        return pharmacy;
+    public PharmacistUser getUser() {
+        return pharmacistUser;
     }
 
-    public void setPharmacy(Pharmacy pharmacy) {
-        this.pharmacy = pharmacy;
+    public void setUser(PharmacistUser pharmacistUser) {
+        this.pharmacistUser = pharmacistUser;
     }
 
-    public String getLicenseNumber() {
-        return licenseNumber;
-    }
-    
-    public void setLicenseNumber(String licenseNumber) {
-        this.licenseNumber = licenseNumber;
+    // Convenience methods to access user fields
+    public String getEmail() {
+        return pharmacistUser != null ? pharmacistUser.getEmail() : null;
     }
 
-    public LocalDate getLicenseExpiryDate() {
-        return licenseExpiryDate;
-    }
-    
-    public void setLicenseExpiryDate(LocalDate licenseExpiryDate) {
-        this.licenseExpiryDate = licenseExpiryDate;
+    public String getFullName() {
+        return pharmacistUser != null ? pharmacistUser.getFullName() : null;
     }
 
-    public String getSpecialization() {
-        return specialization;
-    }
-    
-    public void setSpecialization(String specialization) {
-        this.specialization = specialization;
-    }
-
-    public Integer getYearsOfExperience() {
-        return yearsOfExperience;
-    }
-    
-    public void setYearsOfExperience(Integer yearsOfExperience) {
-        this.yearsOfExperience = yearsOfExperience;
-    }
-
-    public LocalDate getHireDate() {
-        return hireDate;
-    }
-    
-    public void setHireDate(LocalDate hireDate) {
-        this.hireDate = hireDate;
-    }
-
-    public String getShiftSchedule() {
-        return shiftSchedule;
-    }
-    
-    public void setShiftSchedule(String shiftSchedule) {
-        this.shiftSchedule = shiftSchedule;
-    }
-
-    public List<String> getCertifications() {
-        return certifications;
-    }
-    
-    public void setCertifications(List<String> certifications) {
-        this.certifications = certifications;
-    }
-
-    public Boolean getIsVerified() {
-        return isVerified;
-    }
-    
-    public void setIsVerified(Boolean isVerified) {
-        this.isVerified = isVerified;
+    public String getPhoneNumber() {
+        return pharmacistUser != null ? pharmacistUser.getPhoneNumber() : null;
     }
 }
