@@ -483,7 +483,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     }
 
     private String generateCode() {
-        return "RX-" + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-                + "-" + java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return "RX-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
     }
 }
