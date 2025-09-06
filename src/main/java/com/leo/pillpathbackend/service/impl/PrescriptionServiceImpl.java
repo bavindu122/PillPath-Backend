@@ -486,4 +486,70 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         return "RX-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
                 + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.leo.pillpathbackend.dto.orderpreview.OrderPreviewDTO getCustomerOrderPreview(Long customerId, String code, Long pharmacyId) {
+        if (code == null || code.isBlank() || pharmacyId == null) {
+            throw new IllegalArgumentException("code and pharmacyId are required");
+        }
+        PrescriptionSubmission submission = prescriptionSubmissionRepository
+                .findForCustomerPreview(customerId, code, pharmacyId)
+                .orElseThrow(() -> new NoSuchElementException("Order preview not found"));
+        Prescription p = submission.getPrescription();
+
+        // Map items
+        List<com.leo.pillpathbackend.dto.orderpreview.OrderPreviewItemDTO> items = submission.getItems().stream()
+                .map(it -> com.leo.pillpathbackend.dto.orderpreview.OrderPreviewItemDTO.builder()
+                        .id(it.getId())
+                        .medicineName(it.getMedicineName())
+                        .genericName(it.getGenericName())
+                        .dosage(it.getDosage())
+                        .quantity(it.getQuantity())
+                        .unitPrice(it.getUnitPrice())
+                        .totalPrice(it.getTotalPrice() != null ? it.getTotalPrice() :
+                                (it.getUnitPrice() != null && it.getQuantity() != null ? it.getUnitPrice().multiply(BigDecimal.valueOf(it.getQuantity())) : null))
+                        .available(it.getAvailable())
+                        .notes(it.getNotes())
+                        .build())
+                .toList();
+
+        // Totals
+        BigDecimal subtotal = items.stream()
+                .map(com.leo.pillpathbackend.dto.orderpreview.OrderPreviewItemDTO::getTotalPrice)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        com.leo.pillpathbackend.dto.orderpreview.OrderPreviewTotalsDTO totals = com.leo.pillpathbackend.dto.orderpreview.OrderPreviewTotalsDTO.builder()
+                .subtotal(subtotal)
+                .discount(BigDecimal.ZERO)
+                .tax(BigDecimal.ZERO)
+                .shipping(BigDecimal.ZERO)
+                .total(subtotal)
+                .currency("LKR")
+                .build();
+
+        boolean hasItems = !items.isEmpty();
+        com.leo.pillpathbackend.dto.orderpreview.OrderPreviewActionsDTO actions = com.leo.pillpathbackend.dto.orderpreview.OrderPreviewActionsDTO.builder()
+                .canViewOrderPreview(hasItems)
+                .canProceedToPayment(false)
+                .build();
+
+        List<String> unavailable = submission.getItems().stream()
+                .filter(i -> Boolean.FALSE.equals(i.getAvailable()))
+                .map(i -> i.getMedicineName() != null ? i.getMedicineName() : (i.getGenericName() != null ? i.getGenericName() : "Item"))
+                .toList();
+
+        return com.leo.pillpathbackend.dto.orderpreview.OrderPreviewDTO.builder()
+                .code(p != null ? p.getCode() : code)
+                .pharmacyId(submission.getPharmacy().getId())
+                .pharmacyName(submission.getPharmacy().getName())
+                .uploadedAt(p != null && p.getCreatedAt() != null ? p.getCreatedAt().format(ISO_SECOND_FORMAT) : null)
+                .imageUrl(p != null ? p.getImageUrl() : null)
+                .status(submission.getStatus())
+                .items(items)
+                .totals(totals)
+                .actions(actions)
+                .unavailableItems(unavailable)
+                .build();
+    }
 }

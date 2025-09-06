@@ -304,4 +304,20 @@ public class PrescriptionController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
+
+    // Customer: fetch a single order preview by prescription code and pharmacyId
+    @GetMapping("/order-preview")
+    public ResponseEntity<?> getOrderPreview(@RequestParam("code") String code,
+                                             @RequestParam("pharmacyId") Long pharmacyId,
+                                             HttpServletRequest request) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+            var dto = prescriptionService.getCustomerOrderPreview(customerId, code, pharmacyId);
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
+    }
 }
