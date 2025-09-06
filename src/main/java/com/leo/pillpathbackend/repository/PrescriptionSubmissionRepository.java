@@ -1,8 +1,12 @@
 package com.leo.pillpathbackend.repository;
 
 import com.leo.pillpathbackend.entity.PrescriptionSubmission;
+import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -13,5 +17,19 @@ public interface PrescriptionSubmissionRepository extends JpaRepository<Prescrip
 
     @EntityGraph(attributePaths = {"pharmacy"})
     List<PrescriptionSubmission> findWithPharmacyByPrescriptionIdIn(List<Long> prescriptionIds);
-}
 
+    // Queue queries
+    @EntityGraph(attributePaths = {"prescription"})
+    List<PrescriptionSubmission> findByPharmacyIdAndStatusOrderByCreatedAtAsc(Long pharmacyId, PrescriptionStatus status);
+
+    @EntityGraph(attributePaths = {"prescription"})
+    List<PrescriptionSubmission> findByPharmacyIdAndStatusAndAssignedPharmacistIsNullOrderByCreatedAtAsc(Long pharmacyId, PrescriptionStatus status);
+
+    @EntityGraph(attributePaths = {"prescription"})
+    List<PrescriptionSubmission> findByPharmacyIdAndAssignedPharmacistIdAndStatusOrderByCreatedAtAsc(Long pharmacyId, Long pharmacistId, PrescriptionStatus status);
+
+    // Atomic claim; returns number of rows updated
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update PrescriptionSubmission s set s.assignedPharmacist.id = :pharmacistId, s.status = com.leo.pillpathbackend.entity.enums.PrescriptionStatus.IN_PROGRESS where s.id = :id and s.status = com.leo.pillpathbackend.entity.enums.PrescriptionStatus.PENDING_REVIEW and s.assignedPharmacist is null")
+    int claim(@Param("id") Long id, @Param("pharmacistId") Long pharmacistId);
+}
