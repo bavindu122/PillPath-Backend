@@ -12,8 +12,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.leo.pillpathbackend.entity.enums.AdminLevel;
 
 import java.util.Date;
+import java.time.LocalDate;
 import java.util.Optional;
 
 @Service
@@ -205,6 +207,19 @@ public class UserServiceImpl implements UserService {
                 .adminLevel(admin.getAdminLevel().name())
                 .token(token)
                 .build();
+    }
+
+    //add moderator
+    @Override
+    public AddModeratorRequest addModerator(AddModeratorRequest request) {
+        Admin moderator = new Admin();
+        moderator.setUsername(request.getUsername());
+        moderator.setPassword(passwordEncoder.encode(request.getPassword()));
+        moderator.setAdminLevel(AdminLevel.MODERATOR);
+        moderator.setHireDate(LocalDate.now());
+        // Set other required fields if needed
+        userRepository.save(moderator);
+        return request;
     }
 
     public void logout(String token) {

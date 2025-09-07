@@ -14,4 +14,7 @@ public interface UserService {
     AdminLoginResponse loginAdmin(AdminLoginRequest request);
     UnifiedLoginResponse unifiedLogin(UnifiedLoginRequest request);
     void logout(String token);
+
+    AddModeratorRequest addModerator(AddModeratorRequest request);
+
 }

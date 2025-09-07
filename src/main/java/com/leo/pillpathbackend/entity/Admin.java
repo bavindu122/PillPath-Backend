@@ -7,6 +7,7 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +30,8 @@ public class Admin extends User {
     @Enumerated(EnumType.STRING)
     @Column(name = "admin_level")
     private AdminLevel adminLevel = AdminLevel.STANDARD;
+    @Column(name = "hire_date")
+    private LocalDate hireDate;
 
     @Column(name = "last_login")
     private LocalDateTime lastLogin;

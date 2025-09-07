@@ -1,20 +1,19 @@
+// PillPath-Backend/src/main/java/com/leo/pillpathbackend/controller/AdminController.java
 package com.leo.pillpathbackend.controller;
 
+import com.leo.pillpathbackend.dto.AddAnnouncementResponse;
 import com.leo.pillpathbackend.dto.AdminDashboardResponseDTO;
+import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
+import com.leo.pillpathbackend.dto.AddModeratorRequest;
+import com.leo.pillpathbackend.entity.Announcement;
 import com.leo.pillpathbackend.service.AdminService;
+import com.leo.pillpathbackend.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
-import com.leo.pillpathbackend.dto.AddAnnouncementResponse;
-import com.leo.pillpathbackend.entity.Announcement;
-import com.leo.pillpathbackend.service.AdminService;
-import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
-
 import java.util.List;
-
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -23,13 +22,12 @@ import java.util.List;
 public class AdminController {
 
     private final AdminService adminService;
-
+    private final UserService userService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<AdminDashboardResponseDTO> getDashboardData() {
         try {
-            AdminDashboardResponseDTO dashboardData = adminService.getDashboardData();
-            return ResponseEntity.ok(dashboardData);
+            return ResponseEntity.ok(adminService.getDashboardData());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
@@ -44,18 +42,15 @@ public class AdminController {
 
     @GetMapping("/announcements")
     public ResponseEntity<List<Announcement>> getAllAnnouncements() {
-        List<Announcement> announcements = adminService.getAllAnnouncementsLatestFirst();
-        return ResponseEntity.ok(announcements);
+        return ResponseEntity.ok(adminService.getAllAnnouncementsLatestFirst());
     }
 
     @PutMapping("/announcements/{id}")
     public ResponseEntity<Announcement> updateAnnouncement(
             @PathVariable Long id,
             @Valid @RequestBody AddAnnouncementRequest request) {
-
         try {
-            Announcement updatedAnnouncement = adminService.updateAnnouncement(id, request);
-            return ResponseEntity.ok(updatedAnnouncement);
+            return ResponseEntity.ok(adminService.updateAnnouncement(id, request));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -64,8 +59,7 @@ public class AdminController {
     @PatchMapping("/announcements/{id}/toggle-status")
     public ResponseEntity<Announcement> toggleAnnouncementStatus(@PathVariable Long id) {
         try {
-            Announcement updatedAnnouncement = adminService.toggleAnnouncementStatus(id);
-            return ResponseEntity.ok(updatedAnnouncement);
+            return ResponseEntity.ok(adminService.toggleAnnouncementStatus(id));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -81,14 +75,10 @@ public class AdminController {
         }
     }
 
-
-
-
-
-
-
-    // Future admin endpoints:
-    // @GetMapping("/users")
-    // @PostMapping("/users/{id}/deactivate")
-    // etc.
+    // New endpoint: add moderator under admin controller
+    @PostMapping("/moderators")
+    public ResponseEntity<AddModeratorRequest> addModerator(@RequestBody AddModeratorRequest request) {
+        AddModeratorRequest created = userService.addModerator(request);
+        return ResponseEntity.ok(created);
+    }
 }

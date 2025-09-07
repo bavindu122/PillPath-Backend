@@ -132,3 +132,13 @@ Authorization: Bearer {{authToken}}
 Content-Type: multipart/form-data
 
 file=@C:\Users\ASUS\Downloads\pharmacy-logo.jpg;type=image/jpeg
+### Create a moderator user (accessed by admin)
+
+POST http://localhost:8080/api/v1/users/moderators
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NjYzMzQ2NywiZXhwIjoxNzU2NzE5ODY3LCJzdWIiOiIxIiwidWlkIjoxLCJyb2xlIjoiQURNSU4ifQ.rg48WQIrOi58CEWCzBizd7XUfXulKu3U370QCIFpokw
+Content-Type: application/json
+
+{
+  "username": "mod1",
+  "password": "pass123"
+}

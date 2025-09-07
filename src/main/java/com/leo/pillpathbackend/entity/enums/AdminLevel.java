@@ -6,7 +6,8 @@ import lombok.Getter;
 public enum AdminLevel {
     STANDARD("Standard Admin"),
     SUPER("Super Admin"),
-    SYSTEM("System Admin");
+    SYSTEM("System Admin"),
+    MODERATOR("Moderator Admin");
 
     private final String displayName;
 

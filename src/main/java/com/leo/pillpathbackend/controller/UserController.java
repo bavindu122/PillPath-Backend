@@ -56,6 +56,14 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
     }
+
+    @PostMapping("/moderators")
+    public ResponseEntity<AddModeratorRequest> addModerator(@RequestBody AddModeratorRequest request) {
+        AddModeratorRequest created = userService.addModerator(request);
+        return ResponseEntity.ok(created);
+    }
+
+
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(HttpServletRequest request) {
         Map<String, Object> response = new HashMap<>();
