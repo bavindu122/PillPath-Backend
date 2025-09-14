@@ -470,6 +470,10 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
     private com.leo.pillpathbackend.dto.PharmacistQueueItemDTO toQueueDTO(PrescriptionSubmission s) {
         Prescription prescription = s.getPrescription();
+        String customerName = null;
+        if (prescription != null && prescription.getCustomer() != null) {
+            customerName = prescription.getCustomer().getFullName();
+        }
         return com.leo.pillpathbackend.dto.PharmacistQueueItemDTO.builder()
                 .submissionId(s.getId())
                 .prescriptionCode(prescription != null ? prescription.getCode() : null)
@@ -479,6 +483,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                 .note(prescription != null ? prescription.getNote() : null)
                 .claimed(s.getAssignedPharmacist() != null)
                 .assignedPharmacistId(s.getAssignedPharmacist() != null ? s.getAssignedPharmacist().getId() : null)
+                .customerName(customerName)
                 .build();
     }
 
@@ -490,16 +495,15 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     @Override
     @Transactional(readOnly = true)
     public com.leo.pillpathbackend.dto.orderpreview.OrderPreviewDTO getCustomerOrderPreview(Long customerId, String code, Long pharmacyId) {
-        if (code == null || code.isBlank() || pharmacyId == null) {
-            throw new IllegalArgumentException("code and pharmacyId are required");
+        if (customerId == null || code == null || code.isBlank() || pharmacyId == null) {
+            throw new IllegalArgumentException("customerId, code and pharmacyId are required");
         }
-        PrescriptionSubmission submission = prescriptionSubmissionRepository
-                .findForCustomerPreview(customerId, code, pharmacyId)
-                .orElseThrow(() -> new NoSuchElementException("Order preview not found"));
-        Prescription p = submission.getPrescription();
+        // Repository method expected to join submission + prescription + pharmacy filtered by owner
+        java.util.Optional<PrescriptionSubmission> opt = prescriptionSubmissionRepository.findForCustomerPreview(customerId, code, pharmacyId);
+        PrescriptionSubmission submission = opt.orElseThrow(() -> new NoSuchElementException("Order preview not found"));
+        Prescription prescription = submission.getPrescription();
 
-        // Map items
-        List<com.leo.pillpathbackend.dto.orderpreview.OrderPreviewItemDTO> items = submission.getItems().stream()
+        java.util.List<com.leo.pillpathbackend.dto.orderpreview.OrderPreviewItemDTO> items = submission.getItems() == null ? java.util.List.of() : submission.getItems().stream()
                 .map(it -> com.leo.pillpathbackend.dto.orderpreview.OrderPreviewItemDTO.builder()
                         .id(it.getId())
                         .medicineName(it.getMedicineName())
@@ -507,18 +511,17 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                         .dosage(it.getDosage())
                         .quantity(it.getQuantity())
                         .unitPrice(it.getUnitPrice())
-                        .totalPrice(it.getTotalPrice() != null ? it.getTotalPrice() :
-                                (it.getUnitPrice() != null && it.getQuantity() != null ? it.getUnitPrice().multiply(BigDecimal.valueOf(it.getQuantity())) : null))
+                        .totalPrice(it.getTotalPrice() != null ? it.getTotalPrice() : (it.getUnitPrice() != null && it.getQuantity() != null ? it.getUnitPrice().multiply(BigDecimal.valueOf(it.getQuantity())) : null))
                         .available(it.getAvailable())
                         .notes(it.getNotes())
                         .build())
                 .toList();
 
-        // Totals
         BigDecimal subtotal = items.stream()
                 .map(com.leo.pillpathbackend.dto.orderpreview.OrderPreviewItemDTO::getTotalPrice)
-                .filter(Objects::nonNull)
+                .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         com.leo.pillpathbackend.dto.orderpreview.OrderPreviewTotalsDTO totals = com.leo.pillpathbackend.dto.orderpreview.OrderPreviewTotalsDTO.builder()
                 .subtotal(subtotal)
                 .discount(BigDecimal.ZERO)
@@ -534,17 +537,17 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                 .canProceedToPayment(false)
                 .build();
 
-        List<String> unavailable = submission.getItems().stream()
+        java.util.List<String> unavailable = submission.getItems() == null ? java.util.List.of() : submission.getItems().stream()
                 .filter(i -> Boolean.FALSE.equals(i.getAvailable()))
                 .map(i -> i.getMedicineName() != null ? i.getMedicineName() : (i.getGenericName() != null ? i.getGenericName() : "Item"))
                 .toList();
 
         return com.leo.pillpathbackend.dto.orderpreview.OrderPreviewDTO.builder()
-                .code(p != null ? p.getCode() : code)
+                .code(prescription != null ? prescription.getCode() : code)
                 .pharmacyId(submission.getPharmacy().getId())
                 .pharmacyName(submission.getPharmacy().getName())
-                .uploadedAt(p != null && p.getCreatedAt() != null ? p.getCreatedAt().format(ISO_SECOND_FORMAT) : null)
-                .imageUrl(p != null ? p.getImageUrl() : null)
+                .uploadedAt(prescription != null && prescription.getCreatedAt() != null ? prescription.getCreatedAt().format(ISO_SECOND_FORMAT) : null)
+                .imageUrl(prescription != null ? prescription.getImageUrl() : null)
                 .status(submission.getStatus())
                 .items(items)
                 .totals(totals)
