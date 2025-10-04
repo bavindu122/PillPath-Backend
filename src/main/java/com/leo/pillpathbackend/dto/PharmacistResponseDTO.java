@@ -1,6 +1,6 @@
 package com.leo.pillpathbackend.dto;
 
-import com.leo.pillpathbackend.entity.Pharmacist;
+import com.leo.pillpathbackend.entity.PharmacistUser;
 import com.leo.pillpathbackend.entity.enums.EmploymentStatus;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -35,34 +35,31 @@ public class PharmacistResponseDTO {
     private List<String> certifications = new ArrayList<>();
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private Long pharmacistUserId;
 
-    public void setUserId(Long pharmacistUserId) {
-        this.pharmacistUserId = pharmacistUserId;
-    }
-
-    public Long getUserId() {
-        return pharmacistUserId;
-    }
-
-    public PharmacistResponseDTO(Pharmacist pharmacist) {
-        this.id = pharmacist.getId();
-        this.fullName = pharmacist.getFullName();
-        this.email = pharmacist.getEmail();
-        this.phoneNumber = pharmacist.getPhoneNumber();
-        this.dateOfBirth = pharmacist.getDateOfBirth();
-        this.profilePictureUrl = pharmacist.getProfilePictureUrl();
-        this.licenseNumber = pharmacist.getLicenseNumber();
-        this.licenseExpiryDate = pharmacist.getLicenseExpiryDate();
-        this.specialization = pharmacist.getSpecialization();
-        this.yearsOfExperience = pharmacist.getYearsOfExperience();
-        this.hireDate = pharmacist.getHireDate();
-        this.shiftSchedule = pharmacist.getShiftSchedule();
-        this.certifications = pharmacist.getCertifications();
-        this.isActive = pharmacist.getIsActive();
-        this.isVerified = pharmacist.getIsVerified();
-        this.employmentStatus = pharmacist.getEmploymentStatus();
-        this.createdAt = pharmacist.getCreatedAt();
-        this.updatedAt = pharmacist.getUpdatedAt();
+    public static PharmacistResponseDTO fromEntity(PharmacistUser u) {
+        PharmacistResponseDTO dto = new PharmacistResponseDTO();
+        dto.id = u.getId();
+        dto.fullName = u.getFullName();
+        dto.email = u.getEmail();
+        dto.phoneNumber = u.getPhoneNumber();
+        dto.dateOfBirth = u.getDateOfBirth();
+        dto.profilePictureUrl = u.getProfilePictureUrl();
+        if (u.getPharmacy() != null) {
+            dto.pharmacyId = u.getPharmacy().getId();
+            dto.pharmacyName = u.getPharmacy().getName();
+        }
+        dto.licenseNumber = u.getLicenseNumber();
+        dto.licenseExpiryDate = u.getLicenseExpiryDate();
+        dto.specialization = u.getSpecialization();
+        dto.yearsOfExperience = u.getYearsOfExperience();
+        dto.hireDate = u.getHireDate();
+        dto.isActive = u.getIsActive();
+        dto.isVerified = u.getIsVerified();
+        dto.employmentStatus = u.getEmploymentStatus();
+        dto.shiftSchedule = u.getShiftSchedule();
+        dto.certifications = u.getCertifications() != null ? u.getCertifications() : new ArrayList<>();
+        dto.createdAt = u.getCreatedAt();
+        dto.updatedAt = u.getUpdatedAt();
+        return dto;
     }
 }

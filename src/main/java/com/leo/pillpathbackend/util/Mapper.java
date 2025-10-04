@@ -426,15 +426,11 @@ public class Mapper {
         }
         PharmacistProfileDTO dto = new PharmacistProfileDTO();
         dto.setId(pharmacist.getId());
-        //dto.setUsername(pharmacist.getUsername());
         dto.setEmail(pharmacist.getEmail());
         dto.setFullName(pharmacist.getFullName());
         dto.setPhoneNumber(pharmacist.getPhoneNumber());
         dto.setDateOfBirth(pharmacist.getDateOfBirth());
-        //dto.setAddress(pharmacist.getAddress());
         dto.setProfilePictureUrl(pharmacist.getProfilePictureUrl());
-
-        // Pharmacist specific fields
         if (pharmacist.getPharmacy() != null) {
             dto.setPharmacyId(pharmacist.getPharmacy().getId());
             dto.setPharmacyName(pharmacist.getPharmacy().getName());
@@ -445,12 +441,9 @@ public class Mapper {
         dto.setYearsOfExperience(pharmacist.getYearsOfExperience());
         dto.setHireDate(pharmacist.getHireDate());
         dto.setShiftSchedule(pharmacist.getShiftSchedule());
-        dto.setCertifications(Collections.singletonList(pharmacist.getCertifications()));
+        dto.setCertifications(pharmacist.getCertifications());
         dto.setIsVerified(pharmacist.getIsVerified());
         dto.setIsActive(pharmacist.getIsActive());
-
-        // dto.setEmailVerified(pharmacist.getEmailVerified());
-        // dto.setPhoneVerified(pharmacist.getPhoneVerified());
         return dto;
     }
 
