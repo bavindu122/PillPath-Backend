@@ -8,6 +8,7 @@ import com.leo.pillpathbackend.dto.request.CreatePrescriptionRequest;
 import com.leo.pillpathbackend.dto.PharmacistSubmissionItemsDTO;
 import com.leo.pillpathbackend.entity.*;
 import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
+import com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus;
 import com.leo.pillpathbackend.repository.*;
 import com.leo.pillpathbackend.service.CloudinaryService;
 import com.leo.pillpathbackend.service.PrescriptionService;
@@ -42,6 +43,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final PrescriptionSubmissionRepository prescriptionSubmissionRepository;
     private final UserRepository userRepository;
     private final PrescriptionSubmissionItemRepository prescriptionSubmissionItemRepository;
+    private final PharmacyOrderRepository pharmacyOrderRepository;
 
     private static final DateTimeFormatter ISO_SECOND_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
@@ -168,6 +170,12 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         List<PrescriptionSubmission> submissions = prescriptionIds.isEmpty() ? List.of() :
                 prescriptionSubmissionRepository.findWithPharmacyByPrescriptionIdIn(prescriptionIds);
 
+        // Collect submission ids for order lookup
+        List<Long> submissionIds = submissions.stream().map(PrescriptionSubmission::getId).toList();
+        Map<Long, PharmacyOrderStatus> submissionOrderStatus = submissionIds.isEmpty() ? Map.of() :
+                pharmacyOrderRepository.findBySubmissionIdIn(submissionIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(po -> po.getSubmission().getId(), PharmacyOrder::getStatus, (a,b)->a));
+
         // group submissions by prescription id
         java.util.Map<Long, List<PrescriptionSubmission>> byPrescription = submissions.stream()
                 .collect(java.util.stream.Collectors.groupingBy(s -> s.getPrescription().getId()));
@@ -178,20 +186,22 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
                     List<PharmacyActivityDTO> pharmacyActivities = subs.stream()
                             .map(s -> {
-                                // Build actions based on status and presence of items
                                 boolean hasItems = s.getItems() != null && !s.getItems().isEmpty();
                                 ActivityStatus actStatus = toActivityStatus(s.getStatus());
+                                PharmacyOrderStatus existingStatus = submissionOrderStatus.get(s.getId());
+                                boolean activeOrderExists = existingStatus != null && existingStatus != PharmacyOrderStatus.CANCELLED && existingStatus != PharmacyOrderStatus.HANDED_OVER;
                                 PharmacyActivityDTO.PharmacyActivityDTOBuilder builder = PharmacyActivityDTO.builder()
                                         .pharmacyId(String.valueOf(s.getPharmacy().getId()))
                                         .pharmacyName(s.getPharmacy().getName())
                                         .address(s.getPharmacy().getAddress())
                                         .status(actStatus)
+                                        .accepted(existingStatus != null)
+                                        .orderStatus(existingStatus != null ? existingStatus.name() : null)
                                         .actions(PharmacyActivityDTO.Actions.builder()
                                                 .canViewOrderPreview(hasItems)
-                                                .canProceedToPayment(false)
+                                                .canProceedToPayment(hasItems && !activeOrderExists)
                                                 .build());
                                 if (hasItems) {
-                                    // Map items for customer view
                                     java.util.List<MedicationSummaryDTO> meds = s.getItems().stream().map(it -> MedicationSummaryDTO.builder()
                                             .medicationId(String.valueOf(it.getId()))
                                             .name(it.getMedicineName())
@@ -226,6 +236,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                             .code(p.getCode() != null ? p.getCode() : String.valueOf(p.getId()))
                             .uploadedAt(p.getCreatedAt() != null ? p.getCreatedAt().format(ISO_SECOND_FORMAT) : null)
                             .imageUrl(p.getImageUrl())
+                            .prescriptionStatus(p.getStatus() != null ? p.getStatus().name() : null)
                             .pharmacies(pharmacyActivities)
                             .build();
                 })

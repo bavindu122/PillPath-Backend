@@ -7,6 +7,8 @@ public enum PrescriptionStatus {
     // New workflow
     PENDING_REVIEW("Pending Review"),
     IN_PROGRESS("In Progress"),
+    ORDER_PLACED("Order Placed"), // added
+    PREPARING_ORDER("Preparing Your Order"), // added (used at submission level post-order placement)
     CLARIFICATION_NEEDED("Clarification Needed"),
     READY_FOR_PICKUP("Ready for Pickup"),
     REJECTED("Rejected"),

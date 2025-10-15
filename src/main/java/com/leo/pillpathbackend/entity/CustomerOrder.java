@@ -59,6 +59,10 @@ public class CustomerOrder {
     @Column(length = 8)
     private String currency = "LKR";
 
+    // New field to store external payment reference / transaction id
+    @Column(length = 128)
+    private String paymentReference;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 
