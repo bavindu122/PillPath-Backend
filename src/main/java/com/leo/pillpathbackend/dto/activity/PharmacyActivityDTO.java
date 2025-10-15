@@ -11,6 +11,8 @@ public class PharmacyActivityDTO {
     private String pharmacyName;
     private String address;
     private ActivityStatus status;
+    private boolean accepted; // new: customer placed order including this submission
+    private String orderStatus; // new: pharmacy order workflow status (PREPARING, READY_FOR_PICKUP,...)
     private Actions actions;
     private List<MedicationSummaryDTO> medications; // nullable
     private TotalsDTO totals; // nullable
@@ -22,4 +24,3 @@ public class PharmacyActivityDTO {
         private boolean canProceedToPayment;
     }
 }
-

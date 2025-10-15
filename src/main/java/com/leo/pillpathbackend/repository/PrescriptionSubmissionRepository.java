@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface PrescriptionSubmissionRepository extends JpaRepository<PrescriptionSubmission, Long> {
     List<PrescriptionSubmission> findByPrescriptionId(Long prescriptionId);
@@ -32,4 +33,11 @@ public interface PrescriptionSubmissionRepository extends JpaRepository<Prescrip
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update PrescriptionSubmission s set s.assignedPharmacist.id = :pharmacistId, s.status = com.leo.pillpathbackend.entity.enums.PrescriptionStatus.IN_PROGRESS where s.id = :id and s.status = com.leo.pillpathbackend.entity.enums.PrescriptionStatus.PENDING_REVIEW and s.assignedPharmacist is null")
     int claim(@Param("id") Long id, @Param("pharmacistId") Long pharmacistId);
+
+    // Customer order preview lookup by public code/pharmacy/customer
+    @EntityGraph(attributePaths = {"items", "pharmacy", "prescription"})
+    @Query("select s from PrescriptionSubmission s join s.prescription p where p.code = :code and s.pharmacy.id = :pharmacyId and p.customer.id = :customerId")
+    Optional<PrescriptionSubmission> findForCustomerPreview(@Param("customerId") Long customerId,
+                                                            @Param("code") String code,
+                                                            @Param("pharmacyId") Long pharmacyId);
 }

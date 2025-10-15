@@ -19,5 +19,5 @@ public class PharmacistQueueItemDTO {
     private String note;                // note provided by customer
     private Boolean claimed;            // whether claimed by a pharmacist
     private Long assignedPharmacistId;  // who claimed
+    private String customerName;        // name of the customer
 }
-
