@@ -98,9 +98,9 @@ public class Pharmacy {
     // Relationships
     @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<PharmacyAdmin> pharmacyAdmins = new ArrayList<>();
-
-    @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Pharmacist> pharmacists = new ArrayList<>();
+//
+//    @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+//    private List<Pharmacist> pharmacists = new ArrayList<>();
 
     @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Order> orders = new ArrayList<>();

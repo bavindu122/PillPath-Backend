@@ -1,0 +1,373 @@
+package com.leo.pillpathbackend.service.impl;
+
+import com.leo.pillpathbackend.dto.order.*;
+import com.leo.pillpathbackend.entity.*;
+import com.leo.pillpathbackend.entity.enums.*;
+import com.leo.pillpathbackend.repository.*;
+import com.leo.pillpathbackend.service.OrderService;
+import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class OrderServiceImpl implements OrderService {
+    private final PrescriptionRepository prescriptionRepository;
+    private final PrescriptionSubmissionRepository submissionRepository;
+    private final CustomerOrderRepository customerOrderRepository;
+    private final PharmacyOrderRepository pharmacyOrderRepository;
+    private final UserRepository userRepository;
+
+    @Override
+    public CustomerOrderDTO placeOrder(Long customerId, PlaceOrderRequestDTO request) {
+        if (request == null) throw new IllegalArgumentException("Request is null");
+        if (request.getPrescriptionCode() == null || request.getPrescriptionCode().isBlank()) {
+            throw new IllegalArgumentException("prescriptionCode required");
+        }
+        if (request.getPharmacies() == null || request.getPharmacies().isEmpty()) {
+            throw new IllegalArgumentException("At least one pharmacy selection required");
+        }
+
+        Prescription prescription = prescriptionRepository.findByCode(request.getPrescriptionCode())
+                .orElseThrow(() -> new IllegalArgumentException("Prescription not found"));
+        if (prescription.getCustomer() == null || !Objects.equals(prescription.getCustomer().getId(), customerId)) {
+            throw new IllegalArgumentException("Prescription does not belong to customer");
+        }
+        boolean hasActiveOrder = customerOrderRepository.existsByPrescriptionIdAndCustomerIdAndStatusIn(
+                prescription.getId(), customerId,
+                java.util.List.of(CustomerOrderStatus.PENDING, CustomerOrderStatus.PAID)
+        );
+        if (hasActiveOrder) {
+            throw new IllegalStateException("An active order already exists for this prescription");
+        }
+
+        Customer cust = resolveCustomer(prescription.getCustomer());
+
+        CustomerOrder order = CustomerOrder.builder()
+                .orderCode(generateOrderCode())
+                .customer(cust)
+                .prescription(prescription)
+                .status(CustomerOrderStatus.PENDING)
+                .paymentMethod(request.getPaymentMethod())
+                .paymentStatus(PaymentStatus.PENDING)
+                .currency("LKR")
+                .paymentReference(null)
+                .build();
+        if (order.getPharmacyOrders() == null) order.setPharmacyOrders(new ArrayList<>());
+
+        // Preload submissions mapped by pharmacyId
+        List<PrescriptionSubmission> allSubs = submissionRepository.findByPrescriptionId(prescription.getId());
+        Map<Long, PrescriptionSubmission> subByPharmacy = allSubs.stream()
+                .collect(Collectors.toMap(s -> s.getPharmacy().getId(), s -> s));
+
+        BigDecimal overallSubtotal = BigDecimal.ZERO;
+        int idx = 0;
+        for (PharmacyOrderSelectionDTO sel : request.getPharmacies()) {
+            final int selectionIndex = idx++;
+            if (sel.getPharmacyId() == null) {
+                throw new IllegalArgumentException("Selection[" + selectionIndex + "]: pharmacyId required");
+            }
+            PrescriptionSubmission submission = subByPharmacy.get(sel.getPharmacyId());
+            if (submission == null) {
+                throw new IllegalArgumentException("Selection[" + selectionIndex + "]: no submission found for pharmacy " + sel.getPharmacyId());
+            }
+            if (sel.getItems() == null || sel.getItems().isEmpty()) {
+                throw new IllegalArgumentException("Selection[" + selectionIndex + "]: at least one item required");
+            }
+
+            Map<Long, PrescriptionSubmissionItem> itemsMap = submission.getItems().stream()
+                    .collect(Collectors.toMap(PrescriptionSubmissionItem::getId, i -> i));
+
+            BigDecimal subSubtotal = BigDecimal.ZERO;
+            PharmacyOrder pOrder = PharmacyOrder.builder()
+                    .customerOrder(order)
+                    .pharmacy(submission.getPharmacy())
+                    .submission(submission)
+                    .status(PharmacyOrderStatus.RECEIVED)
+                    .pickupCode(generatePickupCode(submission.getPharmacy().getId()))
+                    .pickupLocation(submission.getPharmacy().getAddress())
+                    .customerNote(sel.getNote())
+                    .build();
+
+            List<PharmacyOrderItem> orderItems = new ArrayList<>();
+            for (PharmacyOrderItemSelectionDTO itemSel : sel.getItems()) {
+                if (itemSel.getSubmissionId() == null) {
+                    throw new IllegalArgumentException("Selection[" + selectionIndex + "]: item missing submissionId (item id)");
+                }
+                PrescriptionSubmissionItem psi = itemsMap.get(itemSel.getSubmissionId());
+                if (psi == null) {
+                    throw new IllegalArgumentException("Selection[" + selectionIndex + "]: item id " + itemSel.getSubmissionId() + " not part of submission");
+                }
+                int qty = itemSel.getQuantity() != null && itemSel.getQuantity() > 0 ? itemSel.getQuantity() : (psi.getQuantity() != null ? psi.getQuantity() : 0);
+                if (qty <= 0) {
+                    throw new IllegalArgumentException("Selection[" + selectionIndex + "]: item id " + itemSel.getSubmissionId() + " has zero quantity");
+                }
+                BigDecimal unit = psi.getUnitPrice() != null ? psi.getUnitPrice() : BigDecimal.ZERO;
+                BigDecimal lineTotal = unit.multiply(BigDecimal.valueOf(qty));
+                subSubtotal = subSubtotal.add(lineTotal);
+                PharmacyOrderItem poi = PharmacyOrderItem.builder()
+                        .pharmacyOrder(pOrder)
+                        .submissionItem(psi)
+                        .medicineName(psi.getMedicineName())
+                        .genericName(psi.getGenericName())
+                        .dosage(psi.getDosage())
+                        .quantity(qty)
+                        .unitPrice(unit)
+                        .totalPrice(lineTotal)
+                        .build();
+                orderItems.add(poi);
+            }
+            if (orderItems.isEmpty()) {
+                throw new IllegalArgumentException("Selection[" + selectionIndex + "]: no valid items selected");
+            }
+            pOrder.setItems(orderItems);
+            pOrder.setSubtotal(subSubtotal);
+            pOrder.setTotal(subSubtotal);
+            overallSubtotal = overallSubtotal.add(subSubtotal);
+            order.getPharmacyOrders().add(pOrder);
+
+            // Force submission status transition & persist immediately so other read endpoints see it
+            PrescriptionStatus current = submission.getStatus();
+            if (current == PrescriptionStatus.PENDING_REVIEW || current == PrescriptionStatus.PENDING || current == PrescriptionStatus.IN_PROGRESS) {
+                submission.setStatus(PrescriptionStatus.PREPARING_ORDER);
+                submissionRepository.save(submission); // immediate persistence
+            }
+        }
+
+        // Determine unselected submissions (no items) to delete
+        java.util.Set<Long> selectedPharmacyIds = request.getPharmacies().stream()
+                .map(PharmacyOrderSelectionDTO::getPharmacyId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        java.util.List<PrescriptionSubmission> toDelete = new java.util.ArrayList<>();
+        for (PrescriptionSubmission sub : allSubs) {
+            Long pid = sub.getPharmacy().getId();
+            if (!selectedPharmacyIds.contains(pid)) {
+                if (sub.getItems() == null || sub.getItems().isEmpty()) {
+                    // Only delete if no items were ever provided (no preview sent)
+                    toDelete.add(sub);
+                }
+            }
+        }
+        if (!toDelete.isEmpty()) {
+            submissionRepository.deleteAll(toDelete);
+            // Remove deleted from local structures to avoid later unintended use
+            toDelete.forEach(d -> subByPharmacy.remove(d.getPharmacy().getId()));
+        }
+
+        PrescriptionStatus ps = prescription.getStatus();
+        if (ps == PrescriptionStatus.PENDING_REVIEW || ps == PrescriptionStatus.PENDING || ps == PrescriptionStatus.IN_PROGRESS) {
+            prescription.setStatus(PrescriptionStatus.ORDER_PLACED);
+            prescriptionRepository.save(prescription); // persist parent status change early
+        }
+
+        order.setSubtotal(overallSubtotal);
+        order.setTotal(overallSubtotal);
+
+        CustomerOrder saved = customerOrderRepository.save(order);
+        return toCustomerDTO(saved, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CustomerOrderDTO getCustomerOrder(Long customerId, String orderCode) {
+        CustomerOrder order = customerOrderRepository.findByOrderCodeAndCustomerId(orderCode, customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+        return toCustomerDTO(order, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PharmacyOrderDTO getPharmacyOrder(Long pharmacistId, Long pharmacyOrderId) {
+        User user = userRepository.findById(pharmacistId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
+        if (!(user instanceof PharmacistUser phUser) || phUser.getPharmacy() == null) {
+            throw new IllegalArgumentException("Pharmacist not assigned to pharmacy");
+        }
+        PharmacyOrder po = pharmacyOrderRepository.findByIdAndPharmacyId(pharmacyOrderId, phUser.getPharmacy().getId())
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacy order not found"));
+        return toPharmacyDTO(po, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PharmacyOrderDTO> listPharmacyOrders(Long pharmacistId, PharmacyOrderStatus status) {
+        User user = userRepository.findById(pharmacistId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
+        if (!(user instanceof PharmacistUser phUser) || phUser.getPharmacy() == null) {
+            throw new IllegalArgumentException("Pharmacist not assigned to pharmacy");
+        }
+        Long pharmacyId = phUser.getPharmacy().getId();
+        List<PharmacyOrder> list = (status == null)
+                ? pharmacyOrderRepository.findByPharmacyIdOrderByCreatedAtDesc(pharmacyId)
+                : pharmacyOrderRepository.findByPharmacyIdAndStatusOrderByCreatedAtDesc(pharmacyId, status);
+        return list.stream().map(o -> toPharmacyDTO(o, false)).toList();
+    }
+
+    @Override
+    public PharmacyOrderDTO updatePharmacyOrderStatus(Long pharmacistId, Long pharmacyOrderId, PharmacyOrderStatus status) {
+        if (status == null) throw new IllegalArgumentException("status required");
+        User user = userRepository.findById(pharmacistId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
+        if (!(user instanceof PharmacistUser phUser) || phUser.getPharmacy() == null) {
+            throw new IllegalArgumentException("Pharmacist not assigned to pharmacy");
+        }
+        PharmacyOrder po = pharmacyOrderRepository.findByIdAndPharmacyId(pharmacyOrderId, phUser.getPharmacy().getId())
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacy order not found"));
+        if (!isValidTransition(po.getStatus(), status)) {
+            throw new IllegalStateException("Invalid status transition");
+        }
+        po.setStatus(status);
+        return toPharmacyDTO(po, true);
+    }
+
+    @Override
+    public CustomerOrderDTO payOrder(Long customerId, String orderCode, PayOrderRequestDTO request) {
+        CustomerOrder order = customerOrderRepository.findByOrderCodeAndCustomerId(orderCode, customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new IllegalStateException("Order already paid");
+        }
+        if (order.getStatus() == CustomerOrderStatus.CANCELLED) {
+            throw new IllegalStateException("Order is cancelled");
+        }
+        // Override payment method if provided
+        if (request != null && request.getPaymentMethod() != null) {
+            order.setPaymentMethod(request.getPaymentMethod());
+        }
+        if (request != null && request.getReference() != null && !request.getReference().isBlank()) {
+            order.setPaymentReference(request.getReference());
+        }
+        // Mark payment
+        order.setPaymentStatus(PaymentStatus.PAID);
+        order.setStatus(CustomerOrderStatus.PAID);
+        // Move each pharmacy order from RECEIVED to PREPARING if still initial
+        if (order.getPharmacyOrders() != null) {
+            for (PharmacyOrder po : order.getPharmacyOrders()) {
+                if (po.getStatus() == PharmacyOrderStatus.RECEIVED) {
+                    po.setStatus(PharmacyOrderStatus.PREPARING);
+                }
+            }
+        }
+        // Update prescription status to IN_PROGRESS if present and still in review/pending
+        if (order.getPrescription() != null) {
+            PrescriptionStatus ps = order.getPrescription().getStatus();
+            if (ps == PrescriptionStatus.PENDING_REVIEW || ps == PrescriptionStatus.PENDING) {
+                order.getPrescription().setStatus(PrescriptionStatus.IN_PROGRESS);
+            }
+        }
+        CustomerOrder saved = customerOrderRepository.save(order);
+        return toCustomerDTO(saved, true);
+    }
+
+    private boolean isValidTransition(PharmacyOrderStatus from, PharmacyOrderStatus to) {
+        if (from == to) return true;
+        return switch (from) {
+            case RECEIVED -> (to == PharmacyOrderStatus.PREPARING || to == PharmacyOrderStatus.CANCELLED);
+            case PREPARING -> (to == PharmacyOrderStatus.READY_FOR_PICKUP || to == PharmacyOrderStatus.CANCELLED);
+            case READY_FOR_PICKUP -> (to == PharmacyOrderStatus.HANDED_OVER || to == PharmacyOrderStatus.CANCELLED);
+            case HANDED_OVER, CANCELLED -> false;
+        };
+    }
+
+    private CustomerOrderDTO toCustomerDTO(CustomerOrder order, boolean includeItems) {
+        List<PharmacyOrderDTO> slices = order.getPharmacyOrders().stream()
+                .map(po -> toPharmacyDTO(po, includeItems))
+                .toList();
+        return CustomerOrderDTO.builder()
+                .orderId(order.getId())
+                .orderCode(order.getOrderCode())
+                .createdAt(formatTime(order.getCreatedAt()))
+                .updatedAt(formatTime(order.getUpdatedAt()))
+                .prescriptionCode(order.getPrescription() != null ? order.getPrescription().getCode() : null)
+                .status(order.getStatus())
+                .payment(PaymentDTO.builder()
+                        .method(order.getPaymentMethod())
+                        .status(order.getPaymentStatus())
+                        .amount(order.getTotal())
+                        .currency(order.getCurrency())
+                        .reference(order.getPaymentReference())
+                        .build())
+                .totals(OrderTotalsDTO.builder()
+                        .subtotal(order.getSubtotal())
+                        .discount(order.getDiscount())
+                        .tax(order.getTax())
+                        .shipping(order.getShipping())
+                        .total(order.getTotal())
+                        .currency(order.getCurrency())
+                        .build())
+                .currency(order.getCurrency())
+                .pharmacyOrders(slices)
+                .build();
+    }
+
+    private PharmacyOrderDTO toPharmacyDTO(PharmacyOrder po, boolean includeItems) {
+        List<PharmacyOrderItemDTO> items = includeItems ? po.getItems().stream().map(it -> PharmacyOrderItemDTO.builder()
+                .itemId(it.getId())
+                .previewItemId(it.getSubmissionItem() != null ? it.getSubmissionItem().getId() : null)
+                .medicineName(it.getMedicineName())
+                .genericName(it.getGenericName())
+                .dosage(it.getDosage())
+                .quantity(it.getQuantity())
+                .unitPrice(it.getUnitPrice())
+                .totalPrice(it.getTotalPrice())
+                .build()).toList() : null;
+        return PharmacyOrderDTO.builder()
+                .pharmacyOrderId(po.getId())
+                .pharmacyId(po.getPharmacy().getId())
+                .pharmacyName(po.getPharmacy().getName())
+                .status(po.getStatus())
+                .pickupCode(po.getPickupCode())
+                .pickupLocation(po.getPickupLocation())
+                .pickupLat(po.getPickupLat())
+                .pickupLng(po.getPickupLng())
+                .customerNote(po.getCustomerNote())
+                .pharmacistNote(po.getPharmacistNote())
+                .createdAt(formatTime(po.getCreatedAt()))
+                .updatedAt(formatTime(po.getUpdatedAt()))
+                .items(items)
+                .totals(OrderTotalsDTO.builder()
+                        .subtotal(po.getSubtotal())
+                        .discount(po.getDiscount())
+                        .tax(po.getTax())
+                        .shipping(po.getShipping())
+                        .total(po.getTotal())
+                        .currency("LKR")
+                        .build())
+                .customerName(po.getCustomerOrder() != null && po.getCustomerOrder().getCustomer() != null ? po.getCustomerOrder().getCustomer().getFullName() : null)
+                .prescriptionCode(po.getCustomerOrder() != null && po.getCustomerOrder().getPrescription() != null ? po.getCustomerOrder().getPrescription().getCode() : null)
+                .build();
+    }
+
+    private String generateOrderCode() {
+        return "ORD-" + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                + "-" + UUID.randomUUID().toString().substring(0,6).toUpperCase();
+    }
+
+    private String generatePickupCode(Long pharmacyId) {
+        return "PU-" + pharmacyId + "-" + UUID.randomUUID().toString().substring(0,4).toUpperCase();
+    }
+
+    private Customer resolveCustomer(User user) {
+        if (user == null) throw new IllegalStateException("User null");
+        if (user instanceof Customer c) return c;
+        if (user.getUserType() == UserType.CUSTOMER) {
+            Object unproxied = Hibernate.unproxy(user);
+            if (unproxied instanceof Customer cu) return cu;
+            User reloaded = userRepository.findById(user.getId())
+                    .orElseThrow(() -> new IllegalStateException("Customer user disappeared"));
+            if (reloaded instanceof Customer cr) return cr;
+            throw new IllegalStateException("User with CUSTOMER type not mapped to Customer subclass");
+        }
+        throw new IllegalStateException("Prescription owner userType=" + user.getUserType() + " is not CUSTOMER");
+    }
+
+    private String formatTime(java.time.LocalDateTime dt) { return dt == null ? null : dt.toString(); }
+}
