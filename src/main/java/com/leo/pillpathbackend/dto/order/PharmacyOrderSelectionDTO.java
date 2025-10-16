@@ -5,9 +5,7 @@ import java.util.List;
 
 @Data
 public class PharmacyOrderSelectionDTO {
-    private Long pharmacyId;
-    private Long submissionId; // link to prescription submission
-    private List<Long> itemIds; // selected submission item ids
-    private String customerNote; // optional note per pharmacy
+    private Long pharmacyId; // required
+    private List<PharmacyOrderItemSelectionDTO> items; // required - items selected for this pharmacy
+    private String note; // optional note (was customerNote)
 }
-

@@ -2,6 +2,7 @@ package com.leo.pillpathbackend.controller;
 
 import com.leo.pillpathbackend.dto.order.CustomerOrderDTO;
 import com.leo.pillpathbackend.dto.order.PlaceOrderRequestDTO;
+import com.leo.pillpathbackend.dto.order.PayOrderRequestDTO;
 import com.leo.pillpathbackend.service.OrderService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
 import lombok.RequiredArgsConstructor;
@@ -59,5 +60,22 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
-}
 
+    // Customer pays for an order
+    @PostMapping("/{orderCode}/pay")
+    public ResponseEntity<?> payOrder(@PathVariable String orderCode, @RequestBody(required = false) PayOrderRequestDTO request, HttpServletRequest httpRequest) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(httpRequest);
+            log.info("Customer {} paying order {}", customerId, orderCode);
+            CustomerOrderDTO dto = orderService.payOrder(customerId, orderCode, request);
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error paying order {}", orderCode, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+}
