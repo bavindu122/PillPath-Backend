@@ -40,9 +40,10 @@ public class OrderServiceImpl implements OrderService {
         if (prescription.getCustomer() == null || !Objects.equals(prescription.getCustomer().getId(), customerId)) {
             throw new IllegalArgumentException("Prescription does not belong to customer");
         }
+
         boolean hasActiveOrder = customerOrderRepository.existsByPrescriptionIdAndCustomerIdAndStatusIn(
                 prescription.getId(), customerId,
-                java.util.List.of(CustomerOrderStatus.PENDING, CustomerOrderStatus.PAID)
+                List.of(CustomerOrderStatus.PENDING, CustomerOrderStatus.PAID)
         );
         if (hasActiveOrder) {
             throw new IllegalStateException("An active order already exists for this prescription");
@@ -62,7 +63,7 @@ public class OrderServiceImpl implements OrderService {
                 .build();
         if (order.getPharmacyOrders() == null) order.setPharmacyOrders(new ArrayList<>());
 
-        // Preload submissions mapped by pharmacyId
+        // Load all submissions for this prescription and index by pharmacyId
         List<PrescriptionSubmission> allSubs = submissionRepository.findByPrescriptionId(prescription.getId());
         Map<Long, PrescriptionSubmission> subByPharmacy = allSubs.stream()
                 .collect(Collectors.toMap(s -> s.getPharmacy().getId(), s -> s));
@@ -91,6 +92,8 @@ public class OrderServiceImpl implements OrderService {
                     .pharmacy(submission.getPharmacy())
                     .submission(submission)
                     .status(PharmacyOrderStatus.RECEIVED)
+                    // set unique pharmacy-specific order code
+                    .orderCode(generatePharmacyOrderCode(submission.getPharmacy().getId()))
                     .pickupCode(generatePickupCode(submission.getPharmacy().getId()))
                     .pickupLocation(submission.getPharmacy().getAddress())
                     .customerNote(sel.getNote())
@@ -105,13 +108,16 @@ public class OrderServiceImpl implements OrderService {
                 if (psi == null) {
                     throw new IllegalArgumentException("Selection[" + selectionIndex + "]: item id " + itemSel.getSubmissionId() + " not part of submission");
                 }
-                int qty = itemSel.getQuantity() != null && itemSel.getQuantity() > 0 ? itemSel.getQuantity() : (psi.getQuantity() != null ? psi.getQuantity() : 0);
+                int qty = itemSel.getQuantity() != null && itemSel.getQuantity() > 0
+                        ? itemSel.getQuantity()
+                        : (psi.getQuantity() != null ? psi.getQuantity() : 0);
                 if (qty <= 0) {
                     throw new IllegalArgumentException("Selection[" + selectionIndex + "]: item id " + itemSel.getSubmissionId() + " has zero quantity");
                 }
                 BigDecimal unit = psi.getUnitPrice() != null ? psi.getUnitPrice() : BigDecimal.ZERO;
                 BigDecimal lineTotal = unit.multiply(BigDecimal.valueOf(qty));
                 subSubtotal = subSubtotal.add(lineTotal);
+
                 PharmacyOrderItem poi = PharmacyOrderItem.builder()
                         .pharmacyOrder(pOrder)
                         .submissionItem(psi)
@@ -124,48 +130,60 @@ public class OrderServiceImpl implements OrderService {
                         .build();
                 orderItems.add(poi);
             }
+
             if (orderItems.isEmpty()) {
                 throw new IllegalArgumentException("Selection[" + selectionIndex + "]: no valid items selected");
             }
+
             pOrder.setItems(orderItems);
             pOrder.setSubtotal(subSubtotal);
             pOrder.setTotal(subSubtotal);
             overallSubtotal = overallSubtotal.add(subSubtotal);
             order.getPharmacyOrders().add(pOrder);
 
-            // Force submission status transition & persist immediately so other read endpoints see it
+            // Mark selected submission as PREPARING_ORDER only if it's still in an initial state
             PrescriptionStatus current = submission.getStatus();
-            if (current == PrescriptionStatus.PENDING_REVIEW || current == PrescriptionStatus.PENDING || current == PrescriptionStatus.IN_PROGRESS) {
+            if (current == PrescriptionStatus.PENDING_REVIEW || current == PrescriptionStatus.PENDING) {
                 submission.setStatus(PrescriptionStatus.PREPARING_ORDER);
-                submissionRepository.save(submission); // immediate persistence
+                submissionRepository.save(submission);
             }
         }
 
-        // Determine unselected submissions (no items) to delete
-        java.util.Set<Long> selectedPharmacyIds = request.getPharmacies().stream()
+        // Optionally delete unselected submissions that never sent any items (no preview)
+        Set<Long> selectedPharmacyIds = request.getPharmacies().stream()
                 .map(PharmacyOrderSelectionDTO::getPharmacyId)
                 .filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.toSet());
-        java.util.List<PrescriptionSubmission> toDelete = new java.util.ArrayList<>();
+                .collect(Collectors.toSet());
+        List<PrescriptionSubmission> toDelete = new ArrayList<>();
         for (PrescriptionSubmission sub : allSubs) {
             Long pid = sub.getPharmacy().getId();
             if (!selectedPharmacyIds.contains(pid)) {
                 if (sub.getItems() == null || sub.getItems().isEmpty()) {
-                    // Only delete if no items were ever provided (no preview sent)
                     toDelete.add(sub);
                 }
             }
         }
         if (!toDelete.isEmpty()) {
             submissionRepository.deleteAll(toDelete);
-            // Remove deleted from local structures to avoid later unintended use
-            toDelete.forEach(d -> subByPharmacy.remove(d.getPharmacy().getId()));
         }
 
+        // After attaching all PharmacyOrders, mark their submissions as ORDER_PLACED
+        if (order.getPharmacyOrders() != null) {
+            for (PharmacyOrder po : order.getPharmacyOrders()) {
+                PrescriptionSubmission sub = po.getSubmission();
+                if (sub != null && sub.getStatus() != PrescriptionStatus.ORDER_PLACED) {
+                    sub.setStatus(PrescriptionStatus.ORDER_PLACED);
+                    submissionRepository.save(sub);
+                }
+            }
+        }
+
+        // Update parent prescription status
+        // depending on your desired flow. Example: only set if still pending.
         PrescriptionStatus ps = prescription.getStatus();
-        if (ps == PrescriptionStatus.PENDING_REVIEW || ps == PrescriptionStatus.PENDING || ps == PrescriptionStatus.IN_PROGRESS) {
+        if (ps == PrescriptionStatus.PENDING_REVIEW || ps == PrescriptionStatus.PENDING) {
             prescription.setStatus(PrescriptionStatus.ORDER_PLACED);
-            prescriptionRepository.save(prescription); // persist parent status change early
+            prescriptionRepository.save(prescription);
         }
 
         order.setSubtotal(overallSubtotal);
@@ -224,7 +242,55 @@ public class OrderServiceImpl implements OrderService {
         if (!isValidTransition(po.getStatus(), status)) {
             throw new IllegalStateException("Invalid status transition");
         }
+
+        // 1) Update slice and persist (ensures updatedAt for completedDate)
         po.setStatus(status);
+        po = pharmacyOrderRepository.save(po);
+
+        // 2) Update linked submission status (resolve if missing) - restrict to statuses allowed by DB constraint
+        PrescriptionSubmission sub = po.getSubmission();
+        if (sub != null) {
+            switch (status) {
+                case RECEIVED, PREPARING -> sub.setStatus(PrescriptionStatus.PREPARING_ORDER);
+                case READY_FOR_PICKUP -> sub.setStatus(PrescriptionStatus.READY_FOR_PICKUP);
+                case HANDED_OVER      -> sub.setStatus(PrescriptionStatus.COMPLETED);
+                case CANCELLED        -> sub.setStatus(PrescriptionStatus.CANCELLED);
+            }
+            submissionRepository.save(sub);
+        }
+
+        // 3) Roll up to parent order + prescription from fresh DB slices
+        CustomerOrder parent = po.getCustomerOrder();
+        if (parent != null) {
+            List<PharmacyOrder> slices = pharmacyOrderRepository.findByCustomerOrderId(parent.getId());
+            boolean hasSlices = !slices.isEmpty();
+            boolean allHandedOver = hasSlices && slices.stream().allMatch(s -> s.getStatus() == PharmacyOrderStatus.HANDED_OVER);
+            boolean allCancelled = hasSlices && slices.stream().allMatch(s -> s.getStatus() == PharmacyOrderStatus.CANCELLED);
+            boolean anyReady = slices.stream().anyMatch(s -> s.getStatus() == PharmacyOrderStatus.READY_FOR_PICKUP);
+            boolean anyPreparing = slices.stream().anyMatch(s -> s.getStatus() == PharmacyOrderStatus.PREPARING);
+
+            if (allHandedOver) {
+                parent.setStatus(CustomerOrderStatus.COMPLETED);
+            } else if (allCancelled) {
+                parent.setStatus(CustomerOrderStatus.CANCELLED);
+            }
+            customerOrderRepository.save(parent);
+
+            Prescription pres = parent.getPrescription();
+            if (pres != null) {
+                if (allHandedOver) {
+                    pres.setStatus(PrescriptionStatus.COMPLETED);
+                } else if (allCancelled) {
+                    pres.setStatus(PrescriptionStatus.CANCELLED);
+                } else if (anyReady) {
+                    pres.setStatus(PrescriptionStatus.READY_FOR_PICKUP);
+                } else if (anyPreparing) {
+                    pres.setStatus(PrescriptionStatus.IN_PROGRESS);
+                }
+                prescriptionRepository.save(pres);
+            }
+        }
+
         return toPharmacyDTO(po, true);
     }
 
@@ -238,17 +304,20 @@ public class OrderServiceImpl implements OrderService {
         if (order.getStatus() == CustomerOrderStatus.CANCELLED) {
             throw new IllegalStateException("Order is cancelled");
         }
-        // Override payment method if provided
-        if (request != null && request.getPaymentMethod() != null) {
-            order.setPaymentMethod(request.getPaymentMethod());
+
+        if (request != null) {
+            if (request.getPaymentMethod() != null) {
+                order.setPaymentMethod(request.getPaymentMethod());
+            }
+            if (request.getReference() != null && !request.getReference().isBlank()) {
+                order.setPaymentReference(request.getReference());
+            }
         }
-        if (request != null && request.getReference() != null && !request.getReference().isBlank()) {
-            order.setPaymentReference(request.getReference());
-        }
-        // Mark payment
+
+        // Mark paid and advance pharmacy slices from RECEIVED -> PREPARING
         order.setPaymentStatus(PaymentStatus.PAID);
         order.setStatus(CustomerOrderStatus.PAID);
-        // Move each pharmacy order from RECEIVED to PREPARING if still initial
+
         if (order.getPharmacyOrders() != null) {
             for (PharmacyOrder po : order.getPharmacyOrders()) {
                 if (po.getStatus() == PharmacyOrderStatus.RECEIVED) {
@@ -256,19 +325,29 @@ public class OrderServiceImpl implements OrderService {
                 }
             }
         }
-        // Update prescription status to IN_PROGRESS if present and still in review/pending
-        if (order.getPrescription() != null) {
-            PrescriptionStatus ps = order.getPrescription().getStatus();
-            if (ps == PrescriptionStatus.PENDING_REVIEW || ps == PrescriptionStatus.PENDING) {
-                order.getPrescription().setStatus(PrescriptionStatus.IN_PROGRESS);
+
+        // Nudge prescription to IN_PROGRESS if still pending/review
+        Prescription prescription = order.getPrescription();
+        if (prescription != null) {
+            PrescriptionStatus pstatus = prescription.getStatus();
+            if (pstatus == PrescriptionStatus.PENDING_REVIEW || pstatus == PrescriptionStatus.PENDING) {
+                prescription.setStatus(PrescriptionStatus.IN_PROGRESS);
+                prescriptionRepository.save(prescription);
             }
         }
+
         CustomerOrder saved = customerOrderRepository.save(order);
         return toCustomerDTO(saved, true);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<CustomerOrderDTO> listCustomerOrders(Long customerId, boolean includeItems) {
+        List<CustomerOrder> orders = customerOrderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId);
+        return orders.stream().map(o -> toCustomerDTO(o, includeItems)).toList();
+    }
+
     private boolean isValidTransition(PharmacyOrderStatus from, PharmacyOrderStatus to) {
-        if (from == to) return true;
         return switch (from) {
             case RECEIVED -> (to == PharmacyOrderStatus.PREPARING || to == PharmacyOrderStatus.CANCELLED);
             case PREPARING -> (to == PharmacyOrderStatus.READY_FOR_PICKUP || to == PharmacyOrderStatus.CANCELLED);
@@ -278,7 +357,8 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private CustomerOrderDTO toCustomerDTO(CustomerOrder order, boolean includeItems) {
-        List<PharmacyOrderDTO> slices = order.getPharmacyOrders().stream()
+        List<PharmacyOrder> poList = order.getPharmacyOrders() != null ? order.getPharmacyOrders() : Collections.emptyList();
+        List<PharmacyOrderDTO> slices = poList.stream()
                 .map(po -> toPharmacyDTO(po, includeItems))
                 .toList();
         return CustomerOrderDTO.builder()
@@ -286,6 +366,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderCode(order.getOrderCode())
                 .createdAt(formatTime(order.getCreatedAt()))
                 .updatedAt(formatTime(order.getUpdatedAt()))
+                .prescriptionId(order.getPrescription() != null ? order.getPrescription().getId() : null)
                 .prescriptionCode(order.getPrescription() != null ? order.getPrescription().getCode() : null)
                 .status(order.getStatus())
                 .payment(PaymentDTO.builder()
@@ -309,16 +390,35 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private PharmacyOrderDTO toPharmacyDTO(PharmacyOrder po, boolean includeItems) {
-        List<PharmacyOrderItemDTO> items = includeItems ? po.getItems().stream().map(it -> PharmacyOrderItemDTO.builder()
-                .itemId(it.getId())
-                .previewItemId(it.getSubmissionItem() != null ? it.getSubmissionItem().getId() : null)
-                .medicineName(it.getMedicineName())
-                .genericName(it.getGenericName())
-                .dosage(it.getDosage())
-                .quantity(it.getQuantity())
-                .unitPrice(it.getUnitPrice())
-                .totalPrice(it.getTotalPrice())
-                .build()).toList() : null;
+        List<PharmacyOrderItemDTO> items = includeItems ?
+                (Optional.ofNullable(po.getItems()).orElse(Collections.emptyList())).stream().map(it -> PharmacyOrderItemDTO.builder()
+                        .itemId(it.getId())
+                        .previewItemId(it.getSubmissionItem() != null ? it.getSubmissionItem().getId() : null)
+                        .medicineName(it.getMedicineName())
+                        .genericName(it.getGenericName())
+                        .dosage(it.getDosage())
+                        .quantity(it.getQuantity())
+                        .unitPrice(it.getUnitPrice())
+                        .totalPrice(it.getTotalPrice())
+                        .notes(it.getSubmissionItem() != null ? it.getSubmissionItem().getNotes() : null)
+                        .build()).toList()
+                : null;
+
+        CustomerOrder parent = po.getCustomerOrder();
+        Prescription pres = parent != null ? parent.getPrescription() : null;
+        Customer cust = (parent != null && parent.getCustomer() instanceof Customer c) ? c : null;
+
+        String completedAt = (po.getStatus() == PharmacyOrderStatus.HANDED_OVER && po.getUpdatedAt() != null)
+                ? formatTime(po.getUpdatedAt()) : null;
+
+        PaymentDTO payment = PaymentDTO.builder()
+                .method(parent != null ? parent.getPaymentMethod() : null)
+                .status(parent != null ? parent.getPaymentStatus() : null)
+                .amount(po.getTotal())
+                .currency(parent != null ? parent.getCurrency() : "LKR")
+                .reference(parent != null ? parent.getPaymentReference() : null)
+                .build();
+
         return PharmacyOrderDTO.builder()
                 .pharmacyOrderId(po.getId())
                 .pharmacyId(po.getPharmacy().getId())
@@ -332,6 +432,9 @@ public class OrderServiceImpl implements OrderService {
                 .pharmacistNote(po.getPharmacistNote())
                 .createdAt(formatTime(po.getCreatedAt()))
                 .updatedAt(formatTime(po.getUpdatedAt()))
+                .completedDate(completedAt)
+                .orderCode(po.getOrderCode() != null ? po.getOrderCode() : (parent != null ? parent.getOrderCode() : null))
+                .payment(payment)
                 .items(items)
                 .totals(OrderTotalsDTO.builder()
                         .subtotal(po.getSubtotal())
@@ -339,20 +442,32 @@ public class OrderServiceImpl implements OrderService {
                         .tax(po.getTax())
                         .shipping(po.getShipping())
                         .total(po.getTotal())
-                        .currency("LKR")
+                        .currency(parent != null ? parent.getCurrency() : "LKR")
                         .build())
-                .customerName(po.getCustomerOrder() != null && po.getCustomerOrder().getCustomer() != null ? po.getCustomerOrder().getCustomer().getFullName() : null)
-                .prescriptionCode(po.getCustomerOrder() != null && po.getCustomerOrder().getPrescription() != null ? po.getCustomerOrder().getPrescription().getCode() : null)
+                .customerName(cust != null ? cust.getFullName() : null)
+                .patientEmail(cust != null ? cust.getEmail() : null)
+                .patientPhone(cust != null ? cust.getPhoneNumber() : null)
+                .patientAddress(pres != null && pres.getDeliveryAddress() != null && !pres.getDeliveryAddress().isBlank()
+                        ? pres.getDeliveryAddress() : (cust != null ? cust.getAddress() : null))
+                .prescriptionId(pres != null ? pres.getId() : null)
+                .prescriptionCode(pres != null ? pres.getCode() : null)
+                .prescriptionImageUrl(pres != null ? pres.getImageUrl() : null)
                 .build();
     }
 
     private String generateOrderCode() {
         return "ORD-" + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-                + "-" + UUID.randomUUID().toString().substring(0,6).toUpperCase();
+                + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
     }
 
     private String generatePickupCode(Long pharmacyId) {
-        return "PU-" + pharmacyId + "-" + UUID.randomUUID().toString().substring(0,4).toUpperCase();
+        return "PU-" + pharmacyId + "-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+    }
+
+    // generate a unique pharmacy-specific order code
+    private String generatePharmacyOrderCode(Long pharmacyId) {
+        return "PORD-" + pharmacyId + "-" + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
     }
 
     private Customer resolveCustomer(User user) {
@@ -369,5 +484,7 @@ public class OrderServiceImpl implements OrderService {
         throw new IllegalStateException("Prescription owner userType=" + user.getUserType() + " is not CUSTOMER");
     }
 
-    private String formatTime(java.time.LocalDateTime dt) { return dt == null ? null : dt.toString(); }
+    private String formatTime(java.time.LocalDateTime dt) {
+        return dt == null ? null : dt.toString();
+    }
 }

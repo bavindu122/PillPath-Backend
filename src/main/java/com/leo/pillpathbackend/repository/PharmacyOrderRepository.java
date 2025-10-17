@@ -16,4 +16,7 @@ public interface PharmacyOrderRepository extends JpaRepository<PharmacyOrder, Lo
     List<PharmacyOrder> findBySubmissionIdIn(List<Long> submissionIds);
     // Check if there exists a pharmacy order for a submission whose parent customer order is in active statuses
     boolean existsBySubmissionIdAndCustomerOrder_StatusIn(Long submissionId, Collection<CustomerOrderStatus> statuses);
+
+    // New: fetch all slices for a parent customer order id
+    List<PharmacyOrder> findByCustomerOrderId(Long customerOrderId);
 }
