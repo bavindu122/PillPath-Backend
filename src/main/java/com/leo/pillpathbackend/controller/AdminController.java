@@ -1,6 +1,7 @@
 package com.leo.pillpathbackend.controller;
 
 import com.leo.pillpathbackend.dto.AdminDashboardResponseDTO;
+import com.leo.pillpathbackend.dto.CustomerDTO;
 import com.leo.pillpathbackend.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +11,7 @@ import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
 import com.leo.pillpathbackend.dto.AddAnnouncementResponse;
 import com.leo.pillpathbackend.entity.Announcement;
 import com.leo.pillpathbackend.service.AdminService;
+import com.leo.pillpathbackend.dto.SuspendCustomerRequest;
 import jakarta.validation.Valid;
 
 import java.util.List;
@@ -80,11 +82,31 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/customers")
+    public ResponseEntity<List<CustomerDTO>> getAllCustomers() {
+        List<CustomerDTO> customers = adminService.getAllCustomers();
+        return ResponseEntity.ok(customers);
+    }
 
+    @PatchMapping("/customers/{id}/suspend")
+    public ResponseEntity<String> suspendCustomer(@PathVariable Long id, @RequestBody SuspendCustomerRequest request) {
+        try {
+            adminService.suspendCustomer(id, request.getReason());
+            return ResponseEntity.ok("Customer suspended successfully");
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
 
-
-
-
+    @PatchMapping("/customers/{id}/activate")
+    public ResponseEntity<String> activateCustomer(@PathVariable Long id) {
+        try {
+            adminService.activateCustomer(id);
+            return ResponseEntity.ok("Customer activated successfully");
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
 
     // Future admin endpoints:
     // @GetMapping("/users")

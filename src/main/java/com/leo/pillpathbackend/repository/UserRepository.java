@@ -36,6 +36,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
     List<User> findTop5ByOrderByCreatedAtDesc();
 
+    @Query("SELECT u FROM User u WHERE u.class = Customer")
+    List<User> findAllCustomers();
+
     @Query(value = """
         SELECT
             TO_CHAR(created_at, 'Mon') as month,

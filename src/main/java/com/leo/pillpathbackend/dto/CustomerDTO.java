@@ -33,4 +33,8 @@ public class CustomerDTO {
     private String emergencyContactName;
     private String emergencyContactPhone;
     private Long preferredPharmacyId;
+    private String suspendReason;
+
+
+
 }
