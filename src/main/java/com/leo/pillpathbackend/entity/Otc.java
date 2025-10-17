@@ -44,6 +44,11 @@ import java.time.LocalDateTime;
         @Column(name = "added_to_store")
         private Boolean addedToStore = true;
 
+            // Add the relationship to Pharmacy
+        @ManyToOne(fetch = FetchType.LAZY)
+        @JoinColumn(name = "pharmacy_id", nullable = true)
+        private Pharmacy pharmacy;
+
 
         @CreationTimestamp
         @Column(name = "created_at")
@@ -56,12 +61,13 @@ import java.time.LocalDateTime;
         public Otc() {}
 
         // Constructor with parameters
-        public Otc(String name, String description, Double price, Integer stock, String imageUrl) {
+        public Otc(String name, String description, Double price, Integer stock, String imageUrl,Pharmacy pharmacy) {
             this.name = name;
             this.description = description;
             this.price = price;
             this.stock = stock;
             this.imageUrl = imageUrl;
+            this.pharmacy = pharmacy;
             this.addedToStore = true; // New products are added to store by default
             this.status = calculateStatus(stock);
             this.createdAt = LocalDateTime.now();
