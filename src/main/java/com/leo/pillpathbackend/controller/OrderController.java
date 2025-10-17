@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -38,10 +39,35 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.CREATED).body(dto);
         } catch (IllegalArgumentException e) {
             log.warn("Order placement validation error: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Bad request" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", msg));
+        } catch (IllegalStateException e) {
+            log.warn("Order placement state error: {}", e.getMessage());
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Invalid order state" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", msg));
         } catch (Exception e) {
             log.error("Unexpected error placing order", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Internal server error" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
+        }
+    }
+
+    // Customer: list own orders (optionally include items)
+    @GetMapping("/my")
+    public ResponseEntity<?> myOrders(@RequestParam(name = "includeItems", defaultValue = "false") boolean includeItems,
+                                      HttpServletRequest httpRequest) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(httpRequest);
+            log.info("Customer {} listing orders includeItems={}", customerId, includeItems);
+            List<CustomerOrderDTO> list = orderService.listCustomerOrders(customerId, includeItems);
+            return ResponseEntity.ok(list);
+        } catch (IllegalArgumentException e) {
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Unauthorized" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", msg));
+        } catch (Exception e) {
+            log.error("Unexpected error listing customer orders", e);
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Internal server error" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
         }
     }
 
@@ -57,7 +83,8 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Unexpected error fetching order {}", orderCode, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Internal server error" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
         }
     }
 
@@ -75,7 +102,8 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Unexpected error paying order {}", orderCode, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Internal server error" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
         }
     }
 }
