@@ -12,6 +12,7 @@ import com.leo.pillpathbackend.service.PrescriptionService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/prescriptions")
 @RequiredArgsConstructor
+@Slf4j
 @CrossOrigin(origins = "*")
 public class PrescriptionController {
 
@@ -193,9 +195,12 @@ public class PrescriptionController {
             PrescriptionActivityListResponse resp = prescriptionService.getCustomerActivities(customerId, page, size);
             return ResponseEntity.ok(resp);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Unauthorized" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(java.util.Map.of("error", msg));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+            log.error("Unexpected error in customerActivities", e);
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? e.getClass().getSimpleName() : e.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(java.util.Map.of("error", msg));
         }
     }
 
@@ -318,6 +323,51 @@ public class PrescriptionController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // New: Pharmacist updates submission status directly (matches frontend PATCH /api/prescriptions/{id}/status)
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<?> updateSubmissionStatus(@PathVariable("id") Long submissionId,
+                                                    @RequestBody Map<String, String> body,
+                                                    HttpServletRequest request) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            String statusStr = body != null ? body.get("status") : null;
+            if (statusStr == null || statusStr.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "status is required"));
+            }
+            com.leo.pillpathbackend.entity.enums.PrescriptionStatus status;
+            try {
+                status = com.leo.pillpathbackend.entity.enums.PrescriptionStatus.valueOf(statusStr.toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid status"));
+            }
+            prescriptionService.updateSubmissionStatus(pharmacistId, submissionId, status);
+            return ResponseEntity.ok(Map.of("id", submissionId, "status", status.name()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // New: Pharmacist deletes a submission (matches frontend DELETE /api/prescriptions/{id})
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteSubmission(@PathVariable("id") Long submissionId,
+                                              HttpServletRequest request) {
+        try {
+            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
+            prescriptionService.deleteSubmission(pharmacistId, submissionId);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 }

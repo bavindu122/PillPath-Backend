@@ -1,3 +1,4 @@
+// java
 package com.leo.pillpathbackend.entity;
 
 import com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus;
@@ -41,6 +42,9 @@ public class PharmacyOrder {
     @Column(length = 16)
     private String pickupCode;
 
+    @Column(length = 64, unique = true)
+    private String orderCode;
+
     @Column(length = 255)
     private String pickupLocation;
 
@@ -55,12 +59,16 @@ public class PharmacyOrder {
 
     @Column(precision = 12, scale = 2)
     private BigDecimal subtotal = BigDecimal.ZERO;
+
     @Column(precision = 12, scale = 2)
     private BigDecimal discount = BigDecimal.ZERO;
+
     @Column(precision = 12, scale = 2)
     private BigDecimal tax = BigDecimal.ZERO;
+
     @Column(precision = 12, scale = 2)
     private BigDecimal shipping = BigDecimal.ZERO;
+
     @Column(precision = 12, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
@@ -74,3 +82,4 @@ public class PharmacyOrder {
     @Builder.Default
     private List<PharmacyOrderItem> items = new ArrayList<>();
 }
+
