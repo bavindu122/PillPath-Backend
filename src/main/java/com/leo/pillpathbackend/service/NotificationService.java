@@ -2,8 +2,10 @@ package com.leo.pillpathbackend.service;
 
 import com.leo.pillpathbackend.dto.NotificationDTO;
 import com.leo.pillpathbackend.entity.Notification;
+import com.leo.pillpathbackend.entity.PharmacistUser;
 import com.leo.pillpathbackend.enums.NotificationType;
 import com.leo.pillpathbackend.repository.NotificationRepository;
+import com.leo.pillpathbackend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,8 @@ import java.util.stream.Collectors;
 public class NotificationService {
     
     private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
+    private final EmailService emailService;
     
     /**
      * Get all notifications for a user
@@ -99,8 +103,29 @@ public class NotificationService {
                 notification.setLink(String.format("/pharmacist/prescriptions/%d", prescriptionId));
                 notification.setCreatedAt(LocalDateTime.now());
                 
-                notificationRepository.save(notification);
+                Notification savedNotification = notificationRepository.save(notification);
                 log.info("Created prescription notification for pharmacist {}", pharmacistId);
+                
+                // Send email notification
+                try {
+                    userRepository.findById(pharmacistId).ifPresent(user -> {
+                        if (user instanceof PharmacistUser pharmacist) {
+                            String prescriptionCode = "RX-" + prescriptionId;
+                            emailService.sendPrescriptionSentEmail(
+                                    pharmacist.getEmail(),
+                                    pharmacist.getFullName() != null ? pharmacist.getFullName() : pharmacist.getUsername(),
+                                    customerName,
+                                    prescriptionId,
+                                    pharmacyId,
+                                    prescriptionCode,
+                                    LocalDateTime.now(),
+                                    savedNotification.getId()
+                            );
+                        }
+                    });
+                } catch (Exception e) {
+                    log.error("Failed to send prescription email to pharmacist {}: {}", pharmacistId, e.getMessage());
+                }
             }
         }
     }
@@ -134,8 +159,27 @@ public class NotificationService {
             notification.setLink(String.format("/customer/orders/%d/preview", orderId));
             notification.setCreatedAt(LocalDateTime.now());
             
-            notificationRepository.save(notification);
+            Notification savedNotification = notificationRepository.save(notification);
             log.info("Created order preview notification for customer {}", customerId);
+            
+            // Send email notification
+            try {
+                userRepository.findById(customerId).ifPresent(user -> {
+                    String orderCode = "ORD-" + orderId;
+                    emailService.sendOrderPreviewReadyEmail(
+                            user.getEmail(),
+                            user.getFullName() != null ? user.getFullName() : user.getUsername(),
+                            pharmacyName,
+                            orderId,
+                            prescriptionId,
+                            orderCode,
+                            null, // estimated total - can be added later if available
+                            savedNotification.getId()
+                    );
+                });
+            } catch (Exception e) {
+                log.error("Failed to send order preview email to customer {}: {}", customerId, e.getMessage());
+            }
         }
     }
     
@@ -163,8 +207,28 @@ public class NotificationService {
             notification.setLink(String.format("/pharmacist/orders/%d", orderId));
             notification.setCreatedAt(LocalDateTime.now());
             
-            notificationRepository.save(notification);
+            Notification savedNotification = notificationRepository.save(notification);
             log.info("Created order confirmed notification for pharmacist {}", pharmacistId);
+            
+            // Send email notification
+            try {
+                userRepository.findById(pharmacistId).ifPresent(user -> {
+                    if (user instanceof PharmacistUser pharmacist) {
+                        String orderCode = "ORD-" + orderId;
+                        emailService.sendOrderConfirmedEmail(
+                                pharmacist.getEmail(),
+                                pharmacist.getFullName() != null ? pharmacist.getFullName() : pharmacist.getUsername(),
+                                customerName,
+                                orderId,
+                                orderCode,
+                                pharmacyId,
+                                savedNotification.getId()
+                        );
+                    }
+                });
+            } catch (Exception e) {
+                log.error("Failed to send order confirmed email to pharmacist {}: {}", pharmacistId, e.getMessage());
+            }
         }
     }
     
@@ -197,8 +261,29 @@ public class NotificationService {
             notification.setLink(String.format("/pharmacist/orders/%d", orderId));
             notification.setCreatedAt(LocalDateTime.now());
             
-            notificationRepository.save(notification);
+            Notification savedNotification = notificationRepository.save(notification);
             log.info("Created order declined notification for pharmacist {}", pharmacistId);
+            
+            // Send email notification
+            try {
+                userRepository.findById(pharmacistId).ifPresent(user -> {
+                    if (user instanceof PharmacistUser pharmacist) {
+                        String orderCode = "ORD-" + orderId;
+                        emailService.sendOrderDeclinedEmail(
+                                pharmacist.getEmail(),
+                                pharmacist.getFullName() != null ? pharmacist.getFullName() : pharmacist.getUsername(),
+                                customerName,
+                                orderId,
+                                orderCode,
+                                reason,
+                                pharmacyId,
+                                savedNotification.getId()
+                        );
+                    }
+                });
+            } catch (Exception e) {
+                log.error("Failed to send order declined email to pharmacist {}: {}", pharmacistId, e.getMessage());
+            }
         }
     }
     
@@ -223,8 +308,29 @@ public class NotificationService {
         notification.setLink(String.format("/customer/orders/%d", orderId));
         notification.setCreatedAt(LocalDateTime.now());
         
-        notificationRepository.save(notification);
+        Notification savedNotification = notificationRepository.save(notification);
         log.info("Created order ready notification for customer {}", customerId);
+        
+        // Send email notification
+        try {
+            userRepository.findById(customerId).ifPresent(user -> {
+                String orderCode = "ORD-" + orderId;
+                String pickupCode = "PU-" + orderId; // Can be customized based on actual pickup code
+                emailService.sendOrderReadyEmail(
+                        user.getEmail(),
+                        user.getFullName() != null ? user.getFullName() : user.getUsername(),
+                        pharmacyName,
+                        orderId,
+                        orderCode,
+                        pickupCode,
+                        pharmacyName, // Location - can be enhanced with actual address
+                        customerId,
+                        savedNotification.getId()
+                );
+            });
+        } catch (Exception e) {
+            log.error("Failed to send order ready email to customer {}: {}", customerId, e.getMessage());
+        }
     }
     
     /**
