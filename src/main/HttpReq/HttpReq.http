@@ -15,7 +15,7 @@ POST http://localhost:8080/api/v1/users/login
 Content-Type: application/json
 
 {
-  "email": "nirmi@gmail.com",
+  "email": "bavindu122@gmail.com",
   "password": "12345678"
 }
 
@@ -132,3 +132,83 @@ Authorization: Bearer {{authToken}}
 Content-Type: multipart/form-data
 
 file=@C:\Users\ASUS\Downloads\pharmacy-logo.jpg;type=image/jpeg
+
+@baseUrl = http://localhost:8080
+@customerToken = <customer-jwt>
+@pharmacistToken = <pharmacist-jwt>
+
+### Customer - Upload prescription (multipart) with JSON meta part
+POST http://localhost:8080/api/v1/prescriptions/upload
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NTgwMzQ3MywiZXhwIjoxNzU1ODg5ODczLCJzdWIiOiI4IiwidWlkIjo4LCJyb2xlIjoiQ1VTVE9NRVIifQ.zOV4BWEf4G1e3f1zwRDGw-k2OKSvFnntaVVA_WqZNe0
+Content-Type: multipart/form-data
+
+file=@C:\Users\ASUS\Downloads\pharmacy_logo.jpg;type=image/jpeg
+meta={
+  "pharmacyId": 1,
+  "note": "Please review and prepare.",
+  "deliveryPreference": "PICKUP",
+  "deliveryAddress": "",
+  "latitude": 6.9271,
+  "longitude": 79.8612
+};type=application/json
+
+### Customer - Upload prescription (multipart) with simple fields (no JSON part)
+POST {{baseUrl}}/api/v1/prescriptions/upload
+Authorization: Bearer {{customerToken}}
+Content-Type: multipart/form-data
+
+file=@C:\Users\ASUS\Downloads\prescription2.jpg;type=image/jpeg
+pharmacyId=1
+note=Please review quickly
+deliveryPreference=PICKUP
+latitude=6.9271
+longitude=79.8612
+
+### Customer - List my prescriptions
+GET {{baseUrl}}/api/v1/prescriptions/my
+Authorization: Bearer {{customerToken}}
+
+### Customer - View my prescription by ID
+GET {{baseUrl}}/api/v1/prescriptions/my/1
+Authorization: Bearer {{customerToken}}
+
+### Pharmacist - List prescriptions received by my pharmacy
+GET {{baseUrl}}/api/v1/prescriptions/pharmacy
+Authorization: Bearer {{pharmacistToken}}
+
+### Pharmacist - View a prescription received by my pharmacy
+GET {{baseUrl}}/api/v1/prescriptions/pharmacy/1
+Authorization: Bearer {{pharmacistToken}}
+
+### Pharmacist - Replace prescription items (order preview)
+PUT {{baseUrl}}/api/v1/prescriptions/pharmacy/1/items
+Authorization: Bearer {{pharmacistToken}}
+Content-Type: application/json
+
+[
+  {
+    "medicineName": "Amoxicillin 500mg",
+    "genericName": "Amoxicillin",
+    "dosage": "1 cap x 3/day",
+    "quantity": 10,
+    "unitPrice": 50.00,
+    "available": true,
+    "notes": "Generic ok"
+  },
+  {
+    "medicineName": "Paracetamol 500mg",
+    "genericName": "Acetaminophen",
+    "dosage": "1 tab x 3/day",
+    "quantity": 20,
+    "unitPrice": 5.00,
+    "available": true
+  }
+]
+
+### Customer - List my prescriptions (after pharmacist updated items)
+GET http://localhost:8080/api/v1/prescriptions/my
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NjEzNzQxMCwiZXhwIjoxNzU2MjIzODEwLCJzdWIiOiI4IiwidWlkIjo4LCJyb2xlIjoiQ1VTVE9NRVIifQ.L__sXppcF_GNc1YcV5nuDUZqzQqj52QL6wdcJTk1DTc
+
+### Pharmacist - Update prescription status
+GET http://localhost:8080/api/v1/prescriptions/activities?page=0&size=20
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwaWxscGF0aCIsImlhdCI6MTc1NjEzNzQxMCwiZXhwIjoxNzU2MjIzODEwLCJzdWIiOiI4IiwidWlkIjo4LCJyb2xlIjoiQ1VTVE9NRVIifQ.L__sXppcF_GNc1YcV5nuDUZqzQqj52QL6wdcJTk1DTc

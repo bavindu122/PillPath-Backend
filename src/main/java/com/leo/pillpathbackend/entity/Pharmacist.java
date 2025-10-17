@@ -1,3 +1,6 @@
+// DEPRECATED: Legacy Pharmacist entity replaced by PharmacistUser.
+// Keeping file to avoid dangling references during refactor. Do not use.
+/*
 package com.leo.pillpathbackend.entity;
 import com.leo.pillpathbackend.entity.enums.EmploymentStatus;
 import com.leo.pillpathbackend.entity.enums.UserType;
@@ -89,8 +92,6 @@ public class Pharmacist {
     private LocalDateTime updatedAt;
 
     // Relationships
-    @OneToMany(mappedBy = "verifiedBy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Prescription> verifiedPrescriptions = new ArrayList<>();
 
     @OneToMany(mappedBy = "processedBy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Order> processedOrders = new ArrayList<>();
@@ -124,3 +125,4 @@ public class Pharmacist {
         return pharmacistUser != null ? pharmacistUser.getPhoneNumber() : null;
     }
 }
+*/

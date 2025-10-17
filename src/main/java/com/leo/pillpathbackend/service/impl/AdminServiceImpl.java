@@ -11,11 +11,19 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
+import com.leo.pillpathbackend.entity.Announcement;
+import com.leo.pillpathbackend.repository.AnnouncementRepository;
+import com.leo.pillpathbackend.service.AdminService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
 @Service
 @RequiredArgsConstructor
 public class AdminServiceImpl implements AdminService {
 
     private final UserRepository userRepository;
+    private final AnnouncementRepository announcementRepository;
     // You can inject other repositories here as needed:
     // private final PharmacyRepository pharmacyRepository;
     // private final OrderRepository orderRepository;
@@ -126,5 +134,61 @@ public class AdminServiceImpl implements AdminService {
         if (minutes < 60) return minutes + " minutes ago";
         if (minutes < 1440) return (minutes / 60) + " hours ago";
         return (minutes / 1440) + " days ago";
+    }
+
+    @Override
+    public Announcement addAnnouncement(AddAnnouncementRequest request) {
+        Announcement announcement = new Announcement();
+        announcement.setTitle(request.getTitle());
+        announcement.setContent(request.getContent());
+        announcement.setExpiryDate(request.getExpiryDate());
+        // publishedDate is set automatically by @PrePersist
+        return announcementRepository.save(announcement);
+    }
+
+
+    @Override
+    public List<Announcement> getAllAnnouncementsLatestFirst() {
+        return announcementRepository.findAllByOrderByCreatedAtDesc();
+    }
+
+    @Override
+    public Announcement updateAnnouncement(Long id, AddAnnouncementRequest request) {
+        Announcement announcement = announcementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Announcement not found with id: " + id));
+
+        // Update only provided fields (partial update)
+        if (request.getTitle() != null && !request.getTitle().trim().isEmpty()) {
+            announcement.setTitle(request.getTitle());
+        }
+        if (request.getContent() != null && !request.getContent().trim().isEmpty()) {
+            announcement.setContent(request.getContent());
+        }
+        if (request.getExpiryDate() != null) {
+            announcement.setExpiryDate(request.getExpiryDate());
+        }
+
+        // publishedDate and other fields remain unchanged
+        return announcementRepository.save(announcement);
+    }
+
+    @Override
+    public Announcement toggleAnnouncementStatus(Long id) {
+        Announcement announcement = announcementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Announcement not found with id: " + id));
+
+        // Toggle the active status
+        announcement.setActive(!announcement.isActive());
+
+        // updatedAt will be automatically set by @PreUpdate
+        return announcementRepository.save(announcement);
+    }
+
+    @Override
+    public void deleteAnnouncement(Long id) {
+        Announcement announcement = announcementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Announcement not found with id: " + id));
+
+        announcementRepository.delete(announcement);
     }
 }

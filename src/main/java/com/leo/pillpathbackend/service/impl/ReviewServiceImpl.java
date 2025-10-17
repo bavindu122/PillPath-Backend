@@ -37,7 +37,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     public ReviewDTO updateReview(ReviewDTO reviewDTO) {
-        Review existingReview = reviewRepository.findById(reviewDTO.getId())
+        Review existingReview = reviewRepository.findById(Math.toIntExact(reviewDTO.getId()))
                 .orElseThrow(() -> new RuntimeException("Review not found with id: " + reviewDTO.getId()));
 
         existingReview.setEmail(reviewDTO.getEmail());

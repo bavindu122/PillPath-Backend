@@ -25,4 +25,8 @@ public interface PharmacyService {
     PharmacyDTO updatePharmacyDetails(Long pharmacyId, PharmacyDTO pharmacyDTO);
     PharmacyDTO getPharmacyProfileByAdminId(Long adminId);
     PharmacyDTO updatePharmacyProfile(Long adminId, PharmacyDTO pharmacyDTO);
+
+    // New method for pharmacy profile
+    PharmacyDTO getPharmacyProfile(Long pharmacyId);
+    List<OTCProductDTO> getPharmacyProducts(Long pharmacyId);
 }

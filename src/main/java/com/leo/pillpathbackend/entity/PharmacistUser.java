@@ -2,18 +2,25 @@
 package com.leo.pillpathbackend.entity;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
+import com.leo.pillpathbackend.entity.enums.EmploymentStatus;
 import com.leo.pillpathbackend.entity.enums.UserType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @DiscriminatorValue("PHARMACIST")
@@ -31,7 +38,7 @@ public class PharmacistUser extends User {
     @JoinColumn(name = "pharmacy_id")
     private Pharmacy pharmacy;
     
-    @Column(name = "license_number")
+    @Column(name = "license_number", unique = true)
     private String licenseNumber;
     
     @Column(name = "license_expiry_date")
@@ -49,11 +56,17 @@ public class PharmacistUser extends User {
     @Column(name = "shift_schedule")
     private String shiftSchedule;
     
-    @Column(name = "certifications")
-    private String certifications;
-    
+    // change to JSON array
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "certifications", columnDefinition = "jsonb")
+    private List<String> certifications = new ArrayList<>();
+
     @Column(name = "is_verified")
     private Boolean isVerified;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "employment_status")
+    private EmploymentStatus employmentStatus = EmploymentStatus.ACTIVE;
 
     public Pharmacy getPharmacy() {
         return pharmacy;
@@ -105,10 +118,10 @@ public void setShiftSchedule(String shiftSchedule) {
     this.shiftSchedule = shiftSchedule;
 }
 
-public String getCertifications() {
+public List<String> getCertifications() {
     return certifications;
 }
-public void setCertifications(String certifications) {
+public void setCertifications(List<String> certifications) {
     this.certifications = certifications;
 }
 
@@ -118,4 +131,12 @@ public Boolean getIsVerified() {
 public void setIsVerified(Boolean isVerified) {
     this.isVerified = isVerified;
 }
+
+public EmploymentStatus getEmploymentStatus() {
+        return employmentStatus;
+    }
+
+    public void setEmploymentStatus(EmploymentStatus employmentStatus) {
+        this.employmentStatus = employmentStatus;
+    }
 }

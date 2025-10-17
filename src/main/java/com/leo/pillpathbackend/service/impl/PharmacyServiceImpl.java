@@ -14,9 +14,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
+
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +30,6 @@ public class PharmacyServiceImpl implements PharmacyService {
     private final PharmacyAdminRepository pharmacyAdminRepository;
     private final Mapper mapper;
     private final PasswordEncoder passwordEncoder;
-
 
     @Override
     @Transactional
@@ -58,31 +61,6 @@ public class PharmacyServiceImpl implements PharmacyService {
         // Create response
         return mapper.convertToPharmacyRegistrationResponse(pharmacy, admin);
     }
-
-//    @Override
-//    public PharmacyAdminLoginResponse loginPharmacyAdmin(String email, String password) {
-//        PharmacyAdmin admin = pharmacyAdminRepository.findByEmail(email)
-//                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
-//
-//        if (!passwordEncoder.matches(password, admin.getPassword())) {
-//            throw new RuntimeException("Invalid credentials");
-//        }
-//
-//        if (!admin.getIsActive()) {
-//            throw new RuntimeException("Account is inactive");
-//        }
-//
-//        Pharmacy pharmacy = admin.getPharmacy();
-//        if (!pharmacy.getIsActive()) {
-//            throw new RuntimeException("Pharmacy account is inactive");
-//        }
-//
-//        if (!pharmacy.getIsVerified()) {
-//            throw new RuntimeException("Pharmacy is pending verification");
-//        }
-//
-//        return mapper.convertToPharmacyAdminLoginResponse(admin);
-//    }
 
     @Override
     public PharmacyAdminProfileDTO getPharmacyAdminProfileById(Long id) {
@@ -156,30 +134,29 @@ public class PharmacyServiceImpl implements PharmacyService {
         ).map(mapper::convertToPharmacyDTO);
     }
 
+    @Override
+    public PharmacyStatsDTO getPharmacyStats() {
+        Long activePharmacies = pharmacyRepository.countByIsActiveTrueAndIsVerifiedTrue();
+        Long pendingApproval = pharmacyRepository.countByIsActiveTrueAndIsVerifiedFalse();
+        Long suspendedPharmacies = pharmacyRepository.countByIsActiveFalseAndIsVerifiedTrue();
+        Long rejectedPharmacies = pharmacyRepository.countByIsActiveFalseAndIsVerifiedFalse();
 
-@Override
-public PharmacyStatsDTO getPharmacyStats() {
-    Long activePharmacies = pharmacyRepository.countByIsActiveTrueAndIsVerifiedTrue();
-    Long pendingApproval = pharmacyRepository.countByIsActiveTrueAndIsVerifiedFalse();
-    Long suspendedPharmacies = pharmacyRepository.countByIsActiveFalseAndIsVerifiedTrue();
-    Long rejectedPharmacies = pharmacyRepository.countByIsActiveFalseAndIsVerifiedFalse();
+        return PharmacyStatsDTO.builder()
+                .activePharmacies(activePharmacies)
+                .pendingApproval(pendingApproval)
+                .suspendedPharmacies(suspendedPharmacies)
+                .rejectedPharmacies(rejectedPharmacies)
+                .build();
+    }
 
-    return PharmacyStatsDTO.builder()
-            .activePharmacies(activePharmacies)
-            .pendingApproval(pendingApproval)
-            .suspendedPharmacies(suspendedPharmacies)
-            .rejectedPharmacies(rejectedPharmacies)
-            .build();
-}
-
-
-@Override
+    @Override
     public PharmacyDTO getPharmacyById(Long id) {
         Pharmacy pharmacy = pharmacyRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Pharmacy not found with ID: " + id));
 
         return mapper.convertToPharmacyDTO(pharmacy);
     }
+
     @Override
     @Transactional
     public PharmacyDTO approvePharmacy(Long pharmacyId) {
@@ -192,11 +169,12 @@ public PharmacyStatsDTO getPharmacyStats() {
 
         pharmacy.setIsVerified(true);
         pharmacy.setIsActive(true);
-       // Clear any previous rejection reason
+        // Clear any previous rejection reason
 
         pharmacy = pharmacyRepository.save(pharmacy);
         return mapper.convertToPharmacyDTO(pharmacy);
     }
+
     @Override
     @Transactional
     public PharmacyDTO rejectPharmacy(Long pharmacyId, String reason) {
@@ -209,7 +187,6 @@ public PharmacyStatsDTO getPharmacyStats() {
 
         pharmacy.setIsVerified(false);
         pharmacy.setIsActive(false);
-
 
         pharmacy = pharmacyRepository.save(pharmacy);
         return mapper.convertToPharmacyDTO(pharmacy);
@@ -280,6 +257,7 @@ public PharmacyStatsDTO getPharmacyStats() {
         pharmacy = pharmacyRepository.save(pharmacy);
         return mapper.convertToPharmacyDTO(pharmacy);
     }
+
     @Override
     public List<PharmacyMapDTO> getPharmaciesForMap(Double userLat, Double userLng, Double radiusKm) {
         List<Pharmacy> pharmacies;
@@ -357,5 +335,237 @@ public PharmacyStatsDTO getPharmacyStats() {
 
         pharmacy = pharmacyRepository.save(pharmacy);
         return mapper.convertToPharmacyDTO(pharmacy);
+    }
+
+    @Override
+    public PharmacyDTO getPharmacyProfile(Long pharmacyId) {
+        // Try to find pharmacy with the new method, fallback to regular findById
+        Pharmacy pharmacy;
+        try {
+            pharmacy = pharmacyRepository.findPharmacyForProfile(pharmacyId)
+                    .orElse(null);
+        } catch (Exception e) {
+            // If the custom method doesn't exist, use regular findById
+            System.out.println("Using fallback method to find pharmacy");
+            pharmacy = pharmacyRepository.findById(pharmacyId)
+                    .orElse(null);
+        }
+
+        if (pharmacy == null) {
+            throw new RuntimeException("Pharmacy not found with id: " + pharmacyId);
+        }
+
+        PharmacyDTO profileDTO = new PharmacyDTO();
+
+        // Map basic pharmacy data
+        profileDTO.setId(pharmacy.getId());
+        profileDTO.setName(pharmacy.getName());
+        profileDTO.setAddress(pharmacy.getAddress());
+        profileDTO.setLatitude(pharmacy.getLatitude());
+        profileDTO.setLongitude(pharmacy.getLongitude());
+        profileDTO.setPhoneNumber(pharmacy.getPhoneNumber());
+        profileDTO.setEmail(pharmacy.getEmail());
+        profileDTO.setLicenseNumber(pharmacy.getLicenseNumber());
+        profileDTO.setLicenseExpiryDate(pharmacy.getLicenseExpiryDate());
+        profileDTO.setLogoUrl(pharmacy.getLogoUrl());
+        profileDTO.setLogoPublicId(pharmacy.getLogoPublicId());
+        profileDTO.setBannerUrl(pharmacy.getBannerUrl());
+        profileDTO.setBannerPublicId(pharmacy.getBannerPublicId());
+        profileDTO.setOperatingHours(pharmacy.getOperatingHours());
+        profileDTO.setServices(pharmacy.getServices());
+        profileDTO.setIsVerified(pharmacy.getIsVerified());
+        profileDTO.setIsActive(pharmacy.getIsActive());
+        profileDTO.setDeliveryAvailable(pharmacy.getDeliveryAvailable());
+        profileDTO.setDeliveryRadius(pharmacy.getDeliveryRadius());
+        profileDTO.setAverageRating(pharmacy.getAverageRating());
+        profileDTO.setTotalReviews(pharmacy.getTotalReviews());
+        profileDTO.setCreatedAt(pharmacy.getCreatedAt());
+        profileDTO.setUpdatedAt(pharmacy.getUpdatedAt());
+
+        // Set computed fields
+        profileDTO.setStatus(getPharmacyStatus(pharmacy));
+        profileDTO.setHasDelivery(pharmacy.getDeliveryAvailable());
+        profileDTO.setHas24HourService(checkIf24HourService(pharmacy.getOperatingHours()));
+        profileDTO.setAcceptsInsurance(true); // Default or from settings
+        profileDTO.setHasVaccinations(pharmacy.getServices() != null &&
+                pharmacy.getServices().contains("Vaccination Services"));
+        profileDTO.setCurrentStatus(getCurrentOperatingStatus(pharmacy.getOperatingHours()));
+
+        // Add recent reviews and popular products
+        profileDTO.setRecentReviews(getRecentReviews(pharmacyId));
+        profileDTO.setPopularProducts(getPopularProducts(pharmacyId));
+
+        return profileDTO;
+    }
+
+    @Override
+    public List<OTCProductDTO> getPharmacyProducts(Long pharmacyId) {
+        // For now, return mock data - implement with actual product repository later
+        return getMockOTCProducts();
+    }
+
+    private String getPharmacyStatus(Pharmacy pharmacy) {
+        if (!pharmacy.getIsActive() && !pharmacy.getIsVerified()) {
+            return "Rejected";
+        } else if (!pharmacy.getIsActive() && pharmacy.getIsVerified()) {
+            return "Suspended";
+        } else if (pharmacy.getIsActive() && !pharmacy.getIsVerified()) {
+            return "Pending";
+        } else {
+            return "Active";
+        }
+    }
+
+    private Boolean checkIf24HourService(Map<String, String> operatingHours) {
+        if (operatingHours == null) return false;
+
+        return operatingHours.values().stream()
+                .anyMatch(hours -> hours != null &&
+                        (hours.contains("24") || hours.contains("00:00-23:59")));
+    }
+    
+    // ...existing code...
+
+    private String getCurrentOperatingStatus(Map<String, String> operatingHours) {
+        if (operatingHours == null) return "Hours not available";
+
+        String[] days = {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"};
+        int today = java.time.LocalDate.now().getDayOfWeek().getValue() % 7;
+        String todayKey = days[today];
+
+        String todayHours = operatingHours.get(todayKey);
+        if (todayHours == null || todayHours.trim().isEmpty()) {
+            return "Closed today";
+        }
+
+        // Simple check - could be enhanced with actual time parsing
+        if (todayHours.toLowerCase().contains("closed")) {
+            return "Closed today";
+        }
+
+        // Extract closing time from hours string
+        String closingTime = extractClosingTime(todayHours);
+        if (closingTime != null) {
+            return "Open today until " + closingTime;
+        }
+
+        // Fallback to showing full hours if we can't extract closing time
+        return "Open today: " + todayHours;
+    }
+
+    private String extractClosingTime(String hoursString) {
+        if (hoursString == null || hoursString.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            // Handle different formats:
+            // "8:00 AM - 9:00 PM"
+            // "08:00-21:00" 
+            // "8:00AM-9:00PM"
+            // "8 AM - 9 PM"
+            // "8:00-21:00"
+            
+            String[] parts;
+            
+            // Check for dash separator with spaces
+            if (hoursString.contains(" - ")) {
+                parts = hoursString.split(" - ");
+            } 
+            // Check for dash separator without spaces
+            else if (hoursString.contains("-")) {
+                parts = hoursString.split("-");
+            } 
+            // Check for "to" separator
+            else if (hoursString.toLowerCase().contains(" to ")) {
+                parts = hoursString.split("(?i) to ");
+            }
+            else {
+                return null; // Can't parse format
+            }
+            
+            if (parts.length >= 2) {
+                String closingTime = parts[1].trim();
+                
+                // If it's 24-hour format (like "21:00"), convert to 12-hour
+                if (closingTime.matches("\\d{1,2}:\\d{2}")) {
+                    return convertTo12Hour(closingTime);
+                }
+                
+                // If it already has AM/PM, return as is
+                if (closingTime.toUpperCase().contains("AM") || closingTime.toUpperCase().contains("PM")) {
+                    return closingTime;
+                }
+                
+                // If it's just numbers like "21", assume it's hour in 24-hour format
+                if (closingTime.matches("\\d{1,2}")) {
+                    return convertTo12Hour(closingTime + ":00");
+                }
+                
+                return closingTime;
+            }
+        } catch (Exception e) {
+            System.err.println("Error parsing hours string: " + hoursString + ", error: " + e.getMessage());
+            return null;
+        }
+        
+        return null;
+    }
+    
+    private String convertTo12Hour(String time24) {
+        try {
+            String[] parts = time24.split(":");
+            int hour = Integer.parseInt(parts[0]);
+            int minute = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+            
+            String amPm = "AM";
+            if (hour >= 12) {
+                amPm = "PM";
+                if (hour > 12) {
+                    hour -= 12;
+                }
+            }
+            if (hour == 0) {
+                hour = 12;
+            }
+            
+            // Format like "8:00 PM" or "10:30 AM"
+            if (minute == 0) {
+                return String.format("%d:00 %s", hour, amPm);
+            } else {
+                return String.format("%d:%02d %s", hour, minute, amPm);
+            }
+        } catch (Exception e) {
+            System.err.println("Error converting time: " + time24 + ", error: " + e.getMessage());
+            return time24; // Return original if conversion fails
+        }
+    }
+
+// ...existing code...
+
+    private List<ReviewDTO> getRecentReviews(Long pharmacyId) {
+        // Mock data - implement with actual review repository later
+        return List.of(
+                new ReviewDTO(1L, "John Doe", 5, "Excellent service and fast delivery!", "2024-08-20"),
+                new ReviewDTO(2L, "Jane Smith", 4, "Good pharmacy with helpful staff.", "2024-08-18"),
+                new ReviewDTO(3L, "Mike Wilson", 5, "Very professional and quick service.", "2024-08-15"),
+                new ReviewDTO(4L, "Sarah Johnson", 4, "Good selection of medicines.", "2024-08-12")
+        );
+    }
+
+    private List<OTCProductDTO> getPopularProducts(Long pharmacyId) {
+        // Mock data - implement with actual product repository later
+        return getMockOTCProducts();
+    }
+
+    private List<OTCProductDTO> getMockOTCProducts() {
+        return List.of(
+                new OTCProductDTO(1L, "Panadol", "GSK", "Pain relief medication",
+                        new BigDecimal("25.00"), true, null, 4.5, "Pain Relief", "500mg", 100),
+                new OTCProductDTO(2L, "Paracetamol", "Generic", "Fever and pain relief",
+                        new BigDecimal("15.00"), true, null, 4.2, "Pain Relief", "500mg", 150),
+                new OTCProductDTO(3L, "Ibuprofen", "Brufen", "Anti-inflammatory",
+                        new BigDecimal("30.00"), true, null, 4.3, "Pain Relief", "400mg", 80)
+        );
     }
 }

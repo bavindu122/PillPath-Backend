@@ -38,9 +38,9 @@ public class Order {
     @JoinColumn(name = "prescription_id")
     private Prescription prescription;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "processed_by")
-    private Pharmacist processedBy;
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "processed_by")
+//    private Pharmacist processedBy;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type")

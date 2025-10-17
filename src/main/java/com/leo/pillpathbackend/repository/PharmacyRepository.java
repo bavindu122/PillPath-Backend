@@ -67,4 +67,12 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
             "cos(radians(p.longitude) - radians(?2)) + sin(radians(?1)) * " +
             "sin(radians(p.latitude)))) <= ?3", nativeQuery = true)
     List<Pharmacy> findActivePharmaciesWithinRadius(Double userLat, Double userLng, Double radiusKm);
+
+    // New method for pharmacy profile details
+    @Query("SELECT p FROM Pharmacy p WHERE p.id = :id AND p.isActive = true")
+    Optional<Pharmacy> findActivePharmacyById(@Param("id") Long id);
+
+    @Query("SELECT p FROM Pharmacy p WHERE p.id = :id")
+    Optional<Pharmacy> findPharmacyForProfile(@Param("id") Long id);
+
 }

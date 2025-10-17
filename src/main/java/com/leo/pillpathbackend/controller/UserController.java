@@ -46,6 +46,7 @@ public class UserController {
                             .build());
         }
     }
+
     @PostMapping("/login")
     public ResponseEntity<UnifiedLoginResponse> login(@RequestBody UnifiedLoginRequest request) {
         UnifiedLoginResponse response = userService.unifiedLogin(request);

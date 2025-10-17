@@ -70,6 +70,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/pharmacies/**").permitAll()
                         .requestMatchers("/api/v1/pharmacy-admin/**").permitAll()
                         .requestMatchers("/api/pharmacy-admin/**").permitAll()
+                        .requestMatchers("/api/v1/prescriptions/**").permitAll()
+                        .requestMatchers("/api/v1/medicines/**").permitAll()
+                        .requestMatchers("/api/v1/orders/**").permitAll()
+
                         .anyRequest().authenticated()
                 );
 
@@ -80,7 +84,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of("*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT","PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 

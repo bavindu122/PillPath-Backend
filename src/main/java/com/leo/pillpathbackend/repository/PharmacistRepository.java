@@ -1,3 +1,5 @@
+// DEPRECATED: Legacy PharmacistRepository removed after consolidating to PharmacistUser.
+/*
 package com.leo.pillpathbackend.repository;
 
 import com.leo.pillpathbackend.entity.Pharmacist;
@@ -68,3 +70,4 @@ public interface PharmacistRepository extends JpaRepository<Pharmacist, Long> {
     @Query("SELECT p FROM Pharmacist p WHERE p.pharmacy.id = :pharmacyId AND p.isActive = true AND p.licenseExpiryDate < :date")
     List<Pharmacist> findByPharmacyIdAndLicenseExpiringSoon(@Param("pharmacyId") Long pharmacyId, @Param("date") LocalDate date);
 }
+*/
