@@ -10,6 +10,7 @@ import com.leo.pillpathbackend.repository.CustomerRepository;
 import com.leo.pillpathbackend.repository.MessageRepository;
 import com.leo.pillpathbackend.repository.PharmacyRepository;
 import com.leo.pillpathbackend.repository.PharmacyAdminRepository;
+import com.leo.pillpathbackend.repository.PharmacistUserRepository;
 import com.leo.pillpathbackend.service.ChatService;
 import com.leo.pillpathbackend.ws.WatchRegistry;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class ChatServiceImpl implements ChatService {
     private final SimpMessagingTemplate messagingTemplate;
     private final WatchRegistry watchRegistry;
     private final PharmacyAdminRepository pharmacyAdminRepository;
+    private final PharmacistUserRepository pharmacistUserRepository;
 
     @Override
     @Transactional
@@ -88,7 +90,13 @@ public class ChatServiceImpl implements ChatService {
         if ("CUSTOMER".equalsIgnoreCase(userType)) {
             chatRooms = chatRoomRepository.findByCustomerId(userId);
         } else if ("PHARMACIST".equalsIgnoreCase(userType)) {
-            chatRooms = chatRoomRepository.findByPharmacistId(userId);
+            // Show all chats for the pharmacist's pharmacy, not only those already assigned
+            PharmacistUser ph = pharmacistUserRepository.findById(userId).orElse(null);
+            if (ph != null && ph.getPharmacy() != null) {
+                chatRooms = chatRoomRepository.findByPharmacyId(ph.getPharmacy().getId());
+            } else {
+                chatRooms = java.util.Collections.emptyList();
+            }
         } else if ("ADMIN".equalsIgnoreCase(userType)) {
             // Treat ADMIN here as Pharmacy Admin listing their pharmacy chats
             PharmacyAdmin admin = pharmacyAdminRepository.findById(userId)
@@ -105,7 +113,14 @@ public class ChatServiceImpl implements ChatService {
         return chatRooms.stream()
                 .map(chatRoom -> {
                     String lastMessage = getLastMessage(chatRoom.getId());
-                    return convertToDTO(chatRoom, lastMessage);
+                    ChatRoomDTO dto = convertToDTO(chatRoom, lastMessage);
+                    // Set unread count depending on who is viewing
+                    if ("CUSTOMER".equalsIgnoreCase(userType)) {
+                        dto.setUnreadCount(chatRoom.getUnreadCountCustomer());
+                    } else {
+                        dto.setUnreadCount(chatRoom.getUnreadCountPharmacist());
+                    }
+                    return dto;
                 })
                 .collect(Collectors.toList());
     }
@@ -150,7 +165,9 @@ public class ChatServiceImpl implements ChatService {
                     .mapToInt(Integer::intValue)
                     .sum();
         } else if ("PHARMACIST".equalsIgnoreCase(userType)) {
-            List<ChatRoom> rooms = chatRoomRepository.findByPharmacistId(userId);
+            PharmacistUser ph = pharmacistUserRepository.findById(userId).orElse(null);
+            if (ph == null || ph.getPharmacy() == null) return 0;
+            List<ChatRoom> rooms = chatRoomRepository.findByPharmacyId(ph.getPharmacy().getId());
             return rooms.stream()
                     .map(ChatRoom::getUnreadCountPharmacist)
                     .filter(count -> count != null)
@@ -174,7 +191,21 @@ public class ChatServiceImpl implements ChatService {
             if (sender == null || !sender.getId().equals(senderId)) throw new IllegalArgumentException("not your chat");
             isCustomerSender = true;
         } else if ("ADMIN".equalsIgnoreCase(userType) || "PHARMACIST".equalsIgnoreCase(userType)) {
-            sender = chatRoom.getPharmacist() != null ? chatRoom.getPharmacist() : null;
+            // Resolve the actual pharmacy-side sender entity
+            sender = null;
+            if ("PHARMACIST".equalsIgnoreCase(userType)) {
+                // If chat has assigned pharmacist and matches, use it; otherwise try to load by senderId
+                if (chatRoom.getPharmacist() != null && chatRoom.getPharmacist().getId().equals(senderId)) {
+                    sender = chatRoom.getPharmacist();
+                } else {
+                    sender = pharmacistUserRepository.findById(senderId).orElse(null);
+                }
+            } else { // ADMIN (pharmacy admin)
+                sender = pharmacyAdminRepository.findById(senderId).orElse(null);
+            }
+            if (sender == null) {
+                throw new IllegalArgumentException("invalid pharmacy sender");
+            }
             isCustomerSender = false;
         } else {
             throw new IllegalArgumentException("invalid sender");
@@ -213,13 +244,19 @@ public class ChatServiceImpl implements ChatService {
                 messagingTemplate.convertAndSendToUser(target, "/queue/chat", payload);
             }
         }
+
+        // Also echo to pharmacy side primary destination if pharmacist/admin is logged as user destination
+        Long pharmacySideUserId = chatRoom.getPharmacist() != null ? chatRoom.getPharmacist().getId() : null;
+        if (pharmacySideUserId != null) {
+            messagingTemplate.convertAndSendToUser("pharmacist:" + pharmacySideUserId, "/queue/chat", payload);
+        }
     }
 
     
 
     private String getLastMessage(Long chatRoomId) {
-        List<Message> messages = messageRepository.findTop1ByChatRoomIdOrderByTimestampDesc(chatRoomId);
-        return messages.isEmpty() ? null : messages.get(0).getContent();
+        List<Message> messages = messageRepository.findTopByChatRoomIdOrderByTimestampDesc(chatRoomId, PageRequest.of(0,1));
+        return (messages == null || messages.isEmpty()) ? null : messages.get(0).getContent();
     }
 
     private ChatRoomDTO convertToDTO(ChatRoom chatRoom, String lastMessage) {

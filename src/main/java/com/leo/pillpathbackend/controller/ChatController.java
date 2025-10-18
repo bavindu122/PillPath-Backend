@@ -56,8 +56,9 @@ public class ChatController {
                 .findFirst()
                 .map(grantedAuthority -> {
                     String authority = grantedAuthority.getAuthority();
-                    if ("ROLE_USER".equals(authority)) return "CUSTOMER";
+                    if ("ROLE_USER".equals(authority) || "ROLE_CUSTOMER".equals(authority)) return "CUSTOMER";
                     if ("ROLE_PHARMACIST".equals(authority)) return "PHARMACIST";
+                    if ("ROLE_PHARMACY_ADMIN".equals(authority)) return "ADMIN"; // treat pharmacy admin as admin side
                     if ("ROLE_ADMIN".equals(authority)) return "ADMIN";
                     return "CUSTOMER";
                 })
@@ -82,8 +83,9 @@ public class ChatController {
                 .findFirst()
                 .map(grantedAuthority -> {
                     String authority = grantedAuthority.getAuthority();
-                    if ("ROLE_USER".equals(authority)) return "CUSTOMER";
+                    if ("ROLE_USER".equals(authority) || "ROLE_CUSTOMER".equals(authority)) return "CUSTOMER";
                     if ("ROLE_PHARMACIST".equals(authority)) return "PHARMACIST";
+                    if ("ROLE_PHARMACY_ADMIN".equals(authority)) return "ADMIN";
                     if ("ROLE_ADMIN".equals(authority)) return "ADMIN";
                     return "CUSTOMER";
                 })
@@ -140,8 +142,9 @@ public class ChatController {
                 .findFirst()
                 .map(grantedAuthority -> {
                     String authority = grantedAuthority.getAuthority();
-                    if ("ROLE_USER".equals(authority)) return "CUSTOMER";
+                    if ("ROLE_USER".equals(authority) || "ROLE_CUSTOMER".equals(authority)) return "CUSTOMER";
                     if ("ROLE_PHARMACIST".equals(authority)) return "PHARMACIST";
+                    if ("ROLE_PHARMACY_ADMIN".equals(authority)) return "ADMIN";
                     if ("ROLE_ADMIN".equals(authority)) return "ADMIN";
                     return "CUSTOMER";
                 })
@@ -186,8 +189,9 @@ public class ChatController {
                     .findFirst()
                     .map(a -> a.getAuthority())
                     .map(role -> {
-                        if ("ROLE_USER".equals(role)) return "CUSTOMER";
+                        if ("ROLE_USER".equals(role) || "ROLE_CUSTOMER".equals(role)) return "CUSTOMER";
                         if ("ROLE_PHARMACIST".equals(role)) return "PHARMACIST";
+                        if ("ROLE_PHARMACY_ADMIN".equals(role)) return "ADMIN";
                         if ("ROLE_ADMIN".equals(role)) return "ADMIN";
                         return "CUSTOMER";
                     })

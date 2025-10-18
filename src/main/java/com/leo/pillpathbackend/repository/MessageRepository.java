@@ -19,7 +19,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query("SELECT m FROM Message m WHERE m.chatRoom.id = :chatRoomId ORDER BY m.timestamp DESC")
     List<Message> findByChatRoomIdOrderByTimestampDesc(@Param("chatRoomId") Long chatRoomId);
 
-    @Query("SELECT m FROM Message m WHERE m.chatRoom.id = :chatRoomId ORDER BY m.timestamp DESC")
-    List<Message> findTop1ByChatRoomIdOrderByTimestampDesc(@Param("chatRoomId") Long chatRoomId);
+    @Query(value = "SELECT m FROM Message m WHERE m.chatRoom.id = :chatRoomId ORDER BY m.timestamp DESC")
+    List<Message> findTopByChatRoomIdOrderByTimestampDesc(@Param("chatRoomId") Long chatRoomId, Pageable pageable);
 }
 
