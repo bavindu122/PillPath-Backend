@@ -18,4 +18,5 @@ public class CustomerLoginResponse {
     private boolean success;
     private String token; // For future JWT implementation
     private CustomerProfileDTO user;// Add this for frontend compatibilityA
+    private String suspendReason; // Add this field for suspension reason
 }
