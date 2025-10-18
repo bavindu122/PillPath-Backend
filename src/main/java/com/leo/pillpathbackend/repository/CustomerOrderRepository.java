@@ -11,5 +11,7 @@ import java.util.Optional;
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
     Optional<CustomerOrder> findByOrderCodeAndCustomerId(String orderCode, Long customerId);
     boolean existsByPrescriptionIdAndCustomerIdAndStatusIn(Long prescriptionId, Long customerId, Collection<CustomerOrderStatus> statuses);
+
     List<CustomerOrder> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
+    long countByCustomerId(Long customerId);
 }

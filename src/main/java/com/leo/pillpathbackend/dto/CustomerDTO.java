@@ -3,6 +3,7 @@ package com.leo.pillpathbackend.dto;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,7 +35,9 @@ public class CustomerDTO {
     private String emergencyContactPhone;
     private Long preferredPharmacyId;
     private String suspendReason;
-
+    private LocalDateTime createdAt;
+    private int prescriptionCount;
+    private int orderCount;
 
 
 }

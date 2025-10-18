@@ -7,6 +7,7 @@ import com.leo.pillpathbackend.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +18,8 @@ import com.leo.pillpathbackend.repository.AnnouncementRepository;
 import com.leo.pillpathbackend.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.leo.pillpathbackend.repository.PrescriptionRepository;
+import com.leo.pillpathbackend.repository.CustomerOrderRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +27,8 @@ public class AdminServiceImpl implements AdminService {
 
     private final UserRepository userRepository;
     private final AnnouncementRepository announcementRepository;
+    private final PrescriptionRepository prescriptionRepository;
+    private final CustomerOrderRepository customerOrderRepository;
     // You can inject other repositories here as needed:
     // private final PharmacyRepository pharmacyRepository;
     // private final OrderRepository orderRepository;
@@ -210,6 +215,10 @@ public class AdminServiceImpl implements AdminService {
             dto.setProfilePictureUrl(user.getProfilePictureUrl());
             dto.setIsActive(user.getIsActive());
             dto.setSuspendReason(user.getSuspendReason());
+            dto.setCreatedAt(user.getCreatedAt());
+            dto.setPrescriptionCount((int) prescriptionRepository.countByCustomerId(user.getId()));
+            dto.setOrderCount((int) customerOrderRepository.countByCustomerId(user.getId()));
+
             // Set other fields as needed
             dtos.add(dto);
         }
