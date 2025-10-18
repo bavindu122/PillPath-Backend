@@ -2,7 +2,6 @@ package com.leo.pillpathbackend.service;
 
 import com.leo.pillpathbackend.dto.NotificationDTO;
 import com.leo.pillpathbackend.entity.Notification;
-import com.leo.pillpathbackend.entity.PharmacistUser;
 import com.leo.pillpathbackend.enums.NotificationType;
 import com.leo.pillpathbackend.repository.NotificationRepository;
 import com.leo.pillpathbackend.repository.UserRepository;
@@ -109,19 +108,17 @@ public class NotificationService {
                 // Send email notification
                 try {
                     userRepository.findById(pharmacistId).ifPresent(user -> {
-                        if (user instanceof PharmacistUser pharmacist) {
-                            String prescriptionCode = "RX-" + prescriptionId;
-                            emailService.sendPrescriptionSentEmail(
-                                    pharmacist.getEmail(),
-                                    pharmacist.getFullName() != null ? pharmacist.getFullName() : pharmacist.getUsername(),
-                                    customerName,
-                                    prescriptionId,
-                                    pharmacyId,
-                                    prescriptionCode,
-                                    LocalDateTime.now(),
-                                    savedNotification.getId()
-                            );
-                        }
+                        String prescriptionCode = "RX-" + prescriptionId;
+                        emailService.sendPrescriptionSentEmail(
+                                user.getEmail(),
+                                user.getFullName() != null ? user.getFullName() : user.getUsername(),
+                                customerName,
+                                prescriptionId,
+                                pharmacyId,
+                                prescriptionCode,
+                                LocalDateTime.now(),
+                                savedNotification.getId()
+                        );
                     });
                 } catch (Exception e) {
                     log.error("Failed to send prescription email to pharmacist {}: {}", pharmacistId, e.getMessage());
@@ -213,18 +210,16 @@ public class NotificationService {
             // Send email notification
             try {
                 userRepository.findById(pharmacistId).ifPresent(user -> {
-                    if (user instanceof PharmacistUser pharmacist) {
-                        String orderCode = "ORD-" + orderId;
-                        emailService.sendOrderConfirmedEmail(
-                                pharmacist.getEmail(),
-                                pharmacist.getFullName() != null ? pharmacist.getFullName() : pharmacist.getUsername(),
-                                customerName,
-                                orderId,
-                                orderCode,
-                                pharmacyId,
-                                savedNotification.getId()
-                        );
-                    }
+                    String orderCode = "ORD-" + orderId;
+                    emailService.sendOrderConfirmedEmail(
+                            user.getEmail(),
+                            user.getFullName() != null ? user.getFullName() : user.getUsername(),
+                            customerName,
+                            orderId,
+                            orderCode,
+                            pharmacyId,
+                            savedNotification.getId()
+                    );
                 });
             } catch (Exception e) {
                 log.error("Failed to send order confirmed email to pharmacist {}: {}", pharmacistId, e.getMessage());
@@ -267,19 +262,17 @@ public class NotificationService {
             // Send email notification
             try {
                 userRepository.findById(pharmacistId).ifPresent(user -> {
-                    if (user instanceof PharmacistUser pharmacist) {
-                        String orderCode = "ORD-" + orderId;
-                        emailService.sendOrderDeclinedEmail(
-                                pharmacist.getEmail(),
-                                pharmacist.getFullName() != null ? pharmacist.getFullName() : pharmacist.getUsername(),
-                                customerName,
-                                orderId,
-                                orderCode,
-                                reason,
-                                pharmacyId,
-                                savedNotification.getId()
-                        );
-                    }
+                    String orderCode = "ORD-" + orderId;
+                    emailService.sendOrderDeclinedEmail(
+                            user.getEmail(),
+                            user.getFullName() != null ? user.getFullName() : user.getUsername(),
+                            customerName,
+                            orderId,
+                            orderCode,
+                            reason,
+                            pharmacyId,
+                            savedNotification.getId()
+                    );
                 });
             } catch (Exception e) {
                 log.error("Failed to send order declined email to pharmacist {}: {}", pharmacistId, e.getMessage());
@@ -330,6 +323,174 @@ public class NotificationService {
             });
         } catch (Exception e) {
             log.error("Failed to send order ready email to customer {}: {}", customerId, e.getMessage());
+        }
+    }
+    
+    /**
+     * Create notification for order status changed to PREPARING
+     * Notifies customer that pharmacist has started preparing their order
+     */
+    @Transactional
+    public void createOrderPreparingNotification(
+            Long orderId,
+            Long customerId,
+            String pharmacyName) {
+        
+        // Check for duplicates
+        List<Notification> existing = notificationRepository
+                .findByOrderIdAndRecipientIdAndRecipientType(
+                        orderId, customerId, "CUSTOMER");
+        
+        // Check if PREPARING notification already exists
+        boolean preparingExists = existing.stream()
+                .anyMatch(n -> n.getTitle().equals("Order Being Prepared"));
+        
+        if (!preparingExists) {
+            Notification notification = new Notification();
+            notification.setTitle("Order Being Prepared");
+            notification.setMessage(String.format(
+                    "Your order from %s is now being prepared.", pharmacyName));
+            notification.setType(NotificationType.INFO);
+            notification.setRecipientId(customerId);
+            notification.setRecipientType("CUSTOMER");
+            notification.setOrderId(orderId);
+            notification.setLink(String.format("/customer/orders/%d", orderId));
+            notification.setCreatedAt(LocalDateTime.now());
+            
+            Notification savedNotification = notificationRepository.save(notification);
+            log.info("Created order preparing notification for customer {}", customerId);
+            
+            // Send email notification
+            try {
+                userRepository.findById(customerId).ifPresent(user -> {
+                    String orderCode = "ORD-" + orderId;
+                    emailService.sendOrderPreparingEmail(
+                            user.getEmail(),
+                            user.getFullName() != null ? user.getFullName() : user.getUsername(),
+                            pharmacyName,
+                            orderId,
+                            orderCode,
+                            customerId,
+                            savedNotification.getId()
+                    );
+                });
+            } catch (Exception e) {
+                log.error("Failed to send order preparing email to customer {}: {}", customerId, e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Create notification for order status changed to HANDED_OVER
+     * Notifies customer that order has been collected/delivered
+     */
+    @Transactional
+    public void createOrderHandedOverNotification(
+            Long orderId,
+            Long customerId,
+            String pharmacyName,
+            LocalDateTime handoverTime) {
+        
+        // Check for duplicates
+        List<Notification> existing = notificationRepository
+                .findByOrderIdAndRecipientIdAndRecipientType(
+                        orderId, customerId, "CUSTOMER");
+        
+        // Check if HANDED_OVER notification already exists
+        boolean handedOverExists = existing.stream()
+                .anyMatch(n -> n.getTitle().equals("Order Collected"));
+        
+        if (!handedOverExists) {
+            Notification notification = new Notification();
+            notification.setTitle("Order Collected");
+            notification.setMessage(String.format(
+                    "Your order from %s has been successfully collected. Thank you for choosing us!", pharmacyName));
+            notification.setType(NotificationType.SUCCESS);
+            notification.setRecipientId(customerId);
+            notification.setRecipientType("CUSTOMER");
+            notification.setOrderId(orderId);
+            notification.setLink(String.format("/customer/orders/%d", orderId));
+            notification.setCreatedAt(LocalDateTime.now());
+            
+            Notification savedNotification = notificationRepository.save(notification);
+            log.info("Created order handed over notification for customer {}", customerId);
+            
+            // Send email notification
+            try {
+                userRepository.findById(customerId).ifPresent(user -> {
+                    String orderCode = "ORD-" + orderId;
+                    emailService.sendOrderHandedOverEmail(
+                            user.getEmail(),
+                            user.getFullName() != null ? user.getFullName() : user.getUsername(),
+                            pharmacyName,
+                            orderId,
+                            orderCode,
+                            handoverTime,
+                            customerId,
+                            savedNotification.getId()
+                    );
+                });
+            } catch (Exception e) {
+                log.error("Failed to send order handed over email to customer {}: {}", customerId, e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Create notification for order cancelled by pharmacist
+     * Notifies customer that pharmacist has cancelled their order
+     */
+    @Transactional
+    public void createOrderCancelledByPharmacistNotification(
+            Long orderId,
+            Long customerId,
+            String pharmacyName,
+            String reason) {
+        
+        // Check for duplicates
+        List<Notification> existing = notificationRepository
+                .findByOrderIdAndRecipientIdAndRecipientType(orderId, customerId, "CUSTOMER");
+        
+        boolean alreadyNotified = existing.stream()
+                .anyMatch(n -> "Order Cancelled".equals(n.getTitle()));
+        
+        if (!alreadyNotified) {
+            Notification notification = new Notification();
+            notification.setTitle("Order Cancelled");
+            String message = String.format(
+                    "Your order from %s has been cancelled by the pharmacy.", pharmacyName);
+            if (reason != null && !reason.isEmpty()) {
+                message += " Reason: " + reason;
+            }
+            notification.setMessage(message);
+            notification.setType(NotificationType.WARNING);
+            notification.setRecipientId(customerId);
+            notification.setRecipientType("CUSTOMER");
+            notification.setOrderId(orderId);
+            notification.setLink(String.format("/customer/orders/%d", orderId));
+            notification.setCreatedAt(LocalDateTime.now());
+            
+            Notification savedNotification = notificationRepository.save(notification);
+            log.info("Created order cancelled notification for customer {}", customerId);
+            
+            // Send email notification
+            try {
+                userRepository.findById(customerId).ifPresent(user -> {
+                    String orderCode = "ORD-" + orderId;
+                    emailService.sendOrderCancelledEmail(
+                            user.getEmail(),
+                            user.getFullName() != null ? user.getFullName() : user.getUsername(),
+                            pharmacyName,
+                            orderId,
+                            orderCode,
+                            reason,
+                            customerId,
+                            savedNotification.getId()
+                    );
+                });
+            } catch (Exception e) {
+                log.error("Failed to send order cancelled email to customer {}: {}", customerId, e.getMessage());
+            }
         }
     }
     

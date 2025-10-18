@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -293,19 +294,54 @@ public class OrderServiceImpl implements OrderService {
         // 1) Update slice and persist (ensures updatedAt for completedDate)
         po.setStatus(status);
         
-        // NOTIFICATION: Notify customer when order is ready for pickup (Scenario 4)
-        if (status == PharmacyOrderStatus.READY_FOR_PICKUP) {
-            CustomerOrder customerOrder = po.getCustomerOrder();
-            if (customerOrder != null && customerOrder.getCustomer() != null) {
-                try {
+        // Get customer and pharmacy info for notifications
+        CustomerOrder customerOrder = po.getCustomerOrder();
+        Long customerId = (customerOrder != null && customerOrder.getCustomer() != null) 
+                ? customerOrder.getCustomer().getId() : null;
+        String pharmacyName = po.getPharmacy() != null ? po.getPharmacy().getName() : "Pharmacy";
+        
+        // NOTIFICATION: Notify customer when order status changes
+        if (customerId != null) {
+            try {
+                // Scenario: Order status changed to PREPARING
+                if (status == PharmacyOrderStatus.PREPARING) {
+                    notificationService.createOrderPreparingNotification(
+                        po.getId(),
+                        customerId,
+                        pharmacyName
+                    );
+                }
+                
+                // Scenario 4: Order ready for pickup
+                else if (status == PharmacyOrderStatus.READY_FOR_PICKUP) {
                     notificationService.createOrderReadyNotification(
                         po.getId(),
-                        customerOrder.getCustomer().getId(),
-                        po.getPharmacy().getName()
+                        customerId,
+                        pharmacyName
                     );
-                } catch (Exception e) {
-                    log.error("Failed to send order ready notification: {}", e.getMessage());
                 }
+                
+                // Scenario: Order handed over to customer
+                else if (status == PharmacyOrderStatus.HANDED_OVER) {
+                    notificationService.createOrderHandedOverNotification(
+                        po.getId(),
+                        customerId,
+                        pharmacyName,
+                        LocalDateTime.now()
+                    );
+                }
+                
+                // Scenario: Order cancelled by pharmacist
+                else if (status == PharmacyOrderStatus.CANCELLED) {
+                    notificationService.createOrderCancelledByPharmacistNotification(
+                        po.getId(),
+                        customerId,
+                        pharmacyName,
+                        "The pharmacy was unable to fulfill this order"  // Default reason
+                    );
+                }
+            } catch (Exception e) {
+                log.error("Failed to send order status notification: {}", e.getMessage());
             }
         }
         

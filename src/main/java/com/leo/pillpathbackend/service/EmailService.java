@@ -216,6 +216,107 @@ public class EmailService {
     }
     
     /**
+     * Send email for order status changed to PREPARING
+     */
+    @Transactional
+    public void sendOrderPreparingEmail(
+            String customerEmail,
+            String customerName,
+            String pharmacyName,
+            Long orderId,
+            String orderCode,
+            Long customerId,
+            Long notificationId) {
+        
+        if (!emailEnabled) {
+            log.info("Email disabled - skipping order preparing email");
+            return;
+        }
+        
+        // Check for duplicates
+        if (isDuplicate(customerEmail, "ORDER_PREPARING", null, orderId)) {
+            log.info("Duplicate email prevented for customer {} - order {}", customerEmail, orderId);
+            return;
+        }
+        
+        String subject = "Your Order is Being Prepared";
+        String preheader = String.format("%s is now preparing your order", pharmacyName);
+        String htmlContent = buildOrderPreparingEmail(
+                customerName, pharmacyName, orderCode, orderId);
+        
+        sendEmailWithLogging(customerEmail, customerName, subject, preheader, htmlContent,
+                "ORDER_PREPARING", null, orderId, null, customerId, null, notificationId);
+    }
+    
+    /**
+     * Send email for order status changed to HANDED_OVER
+     */
+    @Transactional
+    public void sendOrderHandedOverEmail(
+            String customerEmail,
+            String customerName,
+            String pharmacyName,
+            Long orderId,
+            String orderCode,
+            LocalDateTime handoverTime,
+            Long customerId,
+            Long notificationId) {
+        
+        if (!emailEnabled) {
+            log.info("Email disabled - skipping order handed over email");
+            return;
+        }
+        
+        // Check for duplicates
+        if (isDuplicate(customerEmail, "ORDER_HANDED_OVER", null, orderId)) {
+            log.info("Duplicate email prevented for customer {} - order {}", customerEmail, orderId);
+            return;
+        }
+        
+        String subject = "Order Collected - Thank You!";
+        String preheader = String.format("Your order from %s has been successfully collected", pharmacyName);
+        String htmlContent = buildOrderHandedOverEmail(
+                customerName, pharmacyName, orderCode, handoverTime, orderId);
+        
+        sendEmailWithLogging(customerEmail, customerName, subject, preheader, htmlContent,
+                "ORDER_HANDED_OVER", null, orderId, null, customerId, null, notificationId);
+    }
+    
+    /**
+     * Send email for order cancelled by pharmacist
+     */
+    @Transactional
+    public void sendOrderCancelledEmail(
+            String customerEmail,
+            String customerName,
+            String pharmacyName,
+            Long orderId,
+            String orderCode,
+            String reason,
+            Long customerId,
+            Long notificationId) {
+        
+        if (!emailEnabled) {
+            log.info("Email disabled - skipping order cancelled email");
+            return;
+        }
+        
+        // Check for duplicates
+        if (isDuplicate(customerEmail, "ORDER_CANCELLED", null, orderId)) {
+            log.info("Duplicate email prevented for customer {} - order {}", customerEmail, orderId);
+            return;
+        }
+        
+        String subject = "Order Cancelled - " + pharmacyName;
+        String preheader = String.format("Your order from %s has been cancelled", pharmacyName);
+        String htmlContent = buildOrderCancelledEmail(
+                customerName, pharmacyName, orderCode, reason, orderId);
+        
+        sendEmailWithLogging(customerEmail, customerName, subject, preheader, htmlContent,
+                "ORDER_CANCELLED", null, orderId, null, customerId, null, notificationId);
+    }
+    
+    /**
      * Check if email was already sent (duplicate prevention)
      */
     private boolean isDuplicate(String recipientEmail, String emailType, Long prescriptionId, Long orderId) {
@@ -410,6 +511,67 @@ public class EmailService {
                 orderUrl,
                 "View Pickup Details",
                 "#48bb78"
+        );
+    }
+    
+    private String buildOrderPreparingEmail(String customerName, String pharmacyName,
+                                             String orderCode, Long orderId) {
+        String orderUrl = frontendUrl + "/customer/orders/" + orderId;
+        
+        return buildNotificationEmailTemplate(
+                customerName,
+                "Your Order is Being Prepared",
+                String.format("%s has started preparing your order (Ref: <strong>%s</strong>).",
+                        pharmacyName, orderCode),
+                "Your order will be ready for pickup soon. We'll notify you when it's ready.",
+                orderUrl,
+                "View Order Status",
+                "#4299e1"
+        );
+    }
+    
+    private String buildOrderHandedOverEmail(String customerName, String pharmacyName, String orderCode,
+                                              LocalDateTime handoverTime, Long orderId) {
+        String orderUrl = frontendUrl + "/customer/orders/" + orderId;
+        String handoverInfo = String.format(
+                "Collected: <strong>%s</strong><br><br>Thank you for choosing %s. We hope to serve you again soon!",
+                handoverTime.format(DATE_FORMATTER), pharmacyName);
+        
+        return buildNotificationEmailTemplate(
+                customerName,
+                "Order Collected - Thank You!",
+                String.format("Your order from %s (Ref: <strong>%s</strong>) has been successfully collected.",
+                        pharmacyName, orderCode),
+                handoverInfo,
+                orderUrl,
+                "View Order Details",
+                "#48bb78"
+        );
+    }
+    
+    /**
+     * Build email template for order cancelled by pharmacist
+     */
+    private String buildOrderCancelledEmail(String customerName, String pharmacyName, String orderCode,
+                                             String reason, Long orderId) {
+        String orderUrl = frontendUrl + "/customer/orders/" + orderId;
+        String reasonInfo = "";
+        if (reason != null && !reason.isEmpty()) {
+            reasonInfo = String.format("<br><br>Reason: <strong>%s</strong>", reason);
+        }
+        String additionalInfo = String.format(
+                "We apologize for any inconvenience. Please contact %s if you have any questions.%s",
+                pharmacyName, reasonInfo);
+        
+        return buildNotificationEmailTemplate(
+                customerName,
+                "Order Cancelled",
+                String.format("Your order from %s (Ref: <strong>%s</strong>) has been cancelled by the pharmacy.",
+                        pharmacyName, orderCode),
+                additionalInfo,
+                orderUrl,
+                "View Order Details",
+                "#f56565"  // Red color for cancellation
         );
     }
     
