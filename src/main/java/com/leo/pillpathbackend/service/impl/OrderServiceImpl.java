@@ -490,6 +490,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private PharmacyOrderDTO toPharmacyDTO(PharmacyOrder po, boolean includeItems) {
+        // Always count items, even if not including full details
+        int itemCount = Optional.ofNullable(po.getItems()).map(List::size).orElse(0);
+        
         List<PharmacyOrderItemDTO> items = includeItems ?
                 (Optional.ofNullable(po.getItems()).orElse(Collections.emptyList())).stream().map(it -> PharmacyOrderItemDTO.builder()
                         .itemId(it.getId())
@@ -536,6 +539,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderCode(po.getOrderCode() != null ? po.getOrderCode() : (parent != null ? parent.getOrderCode() : null))
                 .payment(payment)
                 .items(items)
+                .itemCount(itemCount)
                 .totals(OrderTotalsDTO.builder()
                         .subtotal(po.getSubtotal())
                         .discount(po.getDiscount())
@@ -566,8 +570,18 @@ public class OrderServiceImpl implements OrderService {
 
     // generate a unique pharmacy-specific order code
     private String generatePharmacyOrderCode(Long pharmacyId) {
-        return "PORD-" + pharmacyId + "-" + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-                + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        LocalDateTime now = LocalDateTime.now();
+        String dateStr = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        
+        // Get start and end of today
+        LocalDateTime startOfDay = now.toLocalDate().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1);
+        
+        // Count existing orders for today and increment by 1
+        long todayCount = pharmacyOrderRepository.countByCreatedAtBetween(startOfDay, endOfDay);
+        long sequenceNumber = todayCount + 1;
+        
+        return String.format("ORD-%s-%d", dateStr, sequenceNumber);
     }
 
     private Customer resolveCustomer(User user) {

@@ -33,5 +33,6 @@ public class PharmacyOrderDTO {
     private String prescriptionCode;
     private String prescriptionImageUrl;
     private List<PharmacyOrderItemDTO> items;
+    private Integer itemCount; // Total number of items in the order
     private OrderTotalsDTO totals;
 }
