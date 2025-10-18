@@ -14,6 +14,10 @@ public interface OtcRepository extends JpaRepository<Otc, Long> {
     
     @Query("SELECT o FROM Otc o WHERE o.pharmacy.id = :pharmacyId AND o.addedToStore = true")
     List<Otc> findByPharmacyIdAndAddedToStoreTrue(@Param("pharmacyId") Long pharmacyId);
+
+        // Find products by name (partial match, case-insensitive)
+    @Query("SELECT o FROM Otc o WHERE LOWER(o.name) LIKE LOWER(CONCAT('%', :productName, '%'))")
+    List<Otc> findByNameContainingIgnoreCase(@Param("productName") String productName);
 }
 
 

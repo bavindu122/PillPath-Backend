@@ -1,6 +1,8 @@
 package com.leo.pillpathbackend.service;
 
 import com.leo.pillpathbackend.dto.OtcDTO;
+import com.leo.pillpathbackend.dto.PharmacyWithProductDTO;
+
 import java.util.List;
 
 public interface OtcService {
@@ -16,6 +18,8 @@ public interface OtcService {
     OtcDTO updateOtc(Long otcId, OtcDTO otcDTO);
 
     void deleteOtc(Long otcId);
+
+    List<PharmacyWithProductDTO> getPharmaciesByProductName(String productName);
 }
 
 
