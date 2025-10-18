@@ -1,6 +1,7 @@
 package com.leo.pillpathbackend.service;
 
 import com.leo.pillpathbackend.dto.*;
+import com.leo.pillpathbackend.dto.request.SocialLoginRequest;
 import com.leo.pillpathbackend.entity.Customer;
 
 import java.util.List;
@@ -8,6 +9,10 @@ import java.util.List;
 public interface CustomerService {
     CustomerRegistrationResponse registerCustomer(CustomerRegistrationRequest request);
     CustomerLoginResponse loginCustomer(CustomerLoginRequest request);
+
+
+    // NEW: Google signup/signin for customers
+    CustomerLoginResponse loginWithGoogle(SocialLoginRequest request);
 
     CustomerDTO saveCustomer(CustomerDTO customerDTO);
     CustomerDTO getCustomerById(Long id);

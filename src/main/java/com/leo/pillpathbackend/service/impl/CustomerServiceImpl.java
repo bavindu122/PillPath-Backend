@@ -1,11 +1,20 @@
+// java
 package com.leo.pillpathbackend.service.impl;
 
 import com.leo.pillpathbackend.dto.*;
+import com.leo.pillpathbackend.dto.request.SocialLoginRequest;
 import com.leo.pillpathbackend.entity.Customer;
+import com.leo.pillpathbackend.entity.OAuthAccount;
+import com.leo.pillpathbackend.entity.User;
+import com.leo.pillpathbackend.entity.enums.OAuthProvider;
 import com.leo.pillpathbackend.repository.CustomerRepository;
+import com.leo.pillpathbackend.repository.OAuthAccountRepository;
+import com.leo.pillpathbackend.repository.UserRepository;
+import com.leo.pillpathbackend.security.google.GoogleProfile;
+import com.leo.pillpathbackend.security.google.GoogleTokenVerifier;
 import com.leo.pillpathbackend.service.CustomerService;
-import com.leo.pillpathbackend.util.Mapper;
 import com.leo.pillpathbackend.util.JwtService;
+import com.leo.pillpathbackend.util.Mapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -13,35 +22,145 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class CustomerServiceImpl implements CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final UserRepository userRepository;
+    private final OAuthAccountRepository oauthAccountRepository;
     private final Mapper mapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final GoogleTokenVerifier googleTokenVerifier;
+
+    @Override
+    public CustomerLoginResponse loginWithGoogle(SocialLoginRequest request) {
+        if (request == null || request.getIdToken() == null || request.getIdToken().isBlank()) {
+            return createLoginErrorResponse("idToken is required");
+        }
+        if (!"google".equalsIgnoreCase(request.getProvider())) {
+            return createLoginErrorResponse("Unsupported provider");
+        }
+
+        GoogleProfile profile;
+        try {
+            profile = googleTokenVerifier.verify(request.getIdToken());
+        } catch (IllegalArgumentException ex) {
+            return createLoginErrorResponse(ex.getMessage());
+        }
+
+        if (profile.email() == null || profile.email().isBlank()) {
+            return createLoginErrorResponse("Google account has no email");
+        }
+        if (!profile.emailVerified()) {
+            return createLoginErrorResponse("Email is not verified by Google");
+        }
+
+        Optional<OAuthAccount> linkOpt =
+                oauthAccountRepository.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, profile.sub());
+
+        Customer customer;
+        if (linkOpt.isPresent()) {
+            OAuthAccount link = linkOpt.get();
+            User linked = link.getUser();
+            if (linked instanceof Customer) {
+                customer = (Customer) linked;
+            } else {
+                // If the existing link points to a non-customer user, re-link it to a Customer account
+                // 1) try to find existing customer by email
+                Optional<Customer> byEmail = customerRepository.findByEmail(profile.email().trim().toLowerCase());
+                if (byEmail.isPresent()) {
+                    customer = byEmail.get();
+                } else {
+                    // 2) create new customer
+                    customer = new Customer();
+                    String email = profile.email().trim().toLowerCase();
+                    customer.setEmail(email);
+                    customer.setUsername(generateUniqueUsername(email));
+                    customer.setFullName(profile.name());
+                    customer.setPassword(passwordEncoder.encode("GOOGLE:" + UUID.randomUUID()));
+                    customer.setEmailVerified(true);
+                    customer.setIsActive(true);
+                    customer.setCreatedAt(LocalDateTime.now());
+                    customer.setUpdatedAt(LocalDateTime.now());
+                    customer = customerRepository.save(customer);
+                }
+                // 3) reassign the oauth link to the customer
+                link.setUser(customer);
+                oauthAccountRepository.save(link);
+            }
+        } else {
+            Optional<Customer> byEmail = customerRepository.findByEmail(profile.email().trim().toLowerCase());
+            if (byEmail.isPresent()) {
+                customer = byEmail.get();
+            } else {
+                customer = new Customer();
+                String email = profile.email().trim().toLowerCase();
+                customer.setEmail(email);
+                customer.setUsername(generateUniqueUsername(email));
+                customer.setFullName(profile.name());
+                customer.setPassword(passwordEncoder.encode("GOOGLE:" + UUID.randomUUID()));
+                customer.setEmailVerified(true);
+                customer.setIsActive(true);
+                customer.setCreatedAt(LocalDateTime.now());
+                customer.setUpdatedAt(LocalDateTime.now());
+                customer = customerRepository.save(customer);
+            }
+
+            OAuthAccount link = OAuthAccount.builder()
+                    .provider(OAuthProvider.GOOGLE)
+                    .providerSubject(profile.sub())
+                    .email(profile.email().trim().toLowerCase())
+                    .user(customer)
+                    .build();
+            oauthAccountRepository.save(link);
+        }
+
+        CustomerLoginResponse resp = mapper.convertToLoginResponse(customer);
+        resp.setToken(jwtService.generateToken(customer.getId(), "CUSTOMER"));
+        resp.setSuccess(true);
+        resp.setMessage("Login successful");
+        return resp;
+    }
+
+    private String generateUniqueUsername(String email) {
+        String base = email.substring(0, email.indexOf('@')).replaceAll("[^a-zA-Z0-9._-]", "");
+        if (base.isBlank()) base = "user";
+        String candidate = base;
+        int i = 1;
+        while (customerRepository.existsByUsername(candidate)) {
+            candidate = base + i;
+            i++;
+        }
+        return candidate;
+    }
+
+    private CustomerLoginResponse createLoginErrorResponse(String message) {
+        CustomerLoginResponse response = new CustomerLoginResponse();
+        response.setSuccess(false);
+        response.setMessage(message);
+        return response;
+    }
 
     @Override
     public CustomerRegistrationResponse registerCustomer(CustomerRegistrationRequest request) {
-        // Validate input
         if (!isValidRegistrationRequest(request)) {
             return createErrorResponse("Invalid registration data");
         }
 
-        // Check if email already exists
         if (existsByEmail(request.getEmail())) {
             return createErrorResponse("Email already exists");
         }
 
-        // Check if terms are accepted
         if (!request.isTermsAccepted()) {
             return createErrorResponse("Terms and conditions must be accepted");
         }
 
         try {
-            Customer customer = mapper.convertRegistrationRequestToEntity(request); // Remove "CustomerRegistrationRequest"
+            Customer customer = mapper.convertRegistrationRequestToEntity(request);
             customer.setCreatedAt(LocalDateTime.now());
             customer.setUpdatedAt(LocalDateTime.now());
 
@@ -63,7 +182,6 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     public CustomerLoginResponse loginCustomer(CustomerLoginRequest request) {
         try {
-            // Validate input
             if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
                 return createLoginErrorResponse("Email is required");
             }
@@ -72,7 +190,6 @@ public class CustomerServiceImpl implements CustomerService {
                 return createLoginErrorResponse("Password is required");
             }
 
-            // Find customer by email
             Optional<Customer> customerOpt = customerRepository.findByEmail(request.getEmail().trim().toLowerCase());
 
             if (customerOpt.isEmpty()) {
@@ -81,17 +198,14 @@ public class CustomerServiceImpl implements CustomerService {
 
             Customer customer = customerOpt.get();
 
-            // Check if customer is active
             if (!customer.getIsActive()) {
                 return createLoginErrorResponse("Account is deactivated");
             }
 
-            // Verify password
             if (!passwordEncoder.matches(request.getPassword(), customer.getPassword())) {
                 return createLoginErrorResponse("Invalid email or password");
             }
 
-            // Build response and attach JWT
             CustomerLoginResponse resp = mapper.convertToLoginResponse(customer);
             resp.setToken(jwtService.generateToken(customer.getId(), "CUSTOMER"));
             return resp;
@@ -99,13 +213,6 @@ public class CustomerServiceImpl implements CustomerService {
         } catch (Exception e) {
             return createLoginErrorResponse("Login failed: " + e.getMessage());
         }
-    }
-
-    private CustomerLoginResponse createLoginErrorResponse(String message) {
-        CustomerLoginResponse response = new CustomerLoginResponse();
-        response.setSuccess(false);
-        response.setMessage(message);
-        return response;
     }
 
     private CustomerRegistrationResponse createErrorResponse(String message) {
@@ -121,7 +228,6 @@ public class CustomerServiceImpl implements CustomerService {
             Customer customer = customerRepository.findById(customerId)
                     .orElseThrow(() -> new RuntimeException("Customer not found with id: " + customerId));
 
-            // Check if customer is active
             if (!customer.getIsActive()) {
                 throw new RuntimeException("Customer account is deactivated");
             }
@@ -150,7 +256,6 @@ public class CustomerServiceImpl implements CustomerService {
         }
     }
 
-
     @Override
     public CustomerProfileDTO getCustomerProfileByEmail(String email) {
         try {
@@ -167,6 +272,7 @@ public class CustomerServiceImpl implements CustomerService {
             throw new RuntimeException("Failed to load customer profile: " + e.getMessage());
         }
     }
+
     @Override
     public Customer findByEmail(String email) {
         return customerRepository.findByEmail(email)
@@ -184,7 +290,6 @@ public class CustomerServiceImpl implements CustomerService {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
 
-        // Update fields from DTO
         customer.setFullName(profileDTO.getFullName());
         customer.setPhoneNumber(profileDTO.getPhoneNumber());
         customer.setDateOfBirth(profileDTO.getDateOfBirth());
@@ -230,7 +335,6 @@ public class CustomerServiceImpl implements CustomerService {
         return customerRepository.existsByEmail(email);
     }
 
-    // ... rest of your existing methods remain the same
     @Override
     public CustomerDTO saveCustomer(CustomerDTO customerDTO) {
         Customer customer = mapper.convertToCustomerEntity(customerDTO);
