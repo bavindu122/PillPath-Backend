@@ -3,16 +3,27 @@ package com.leo.pillpathbackend.controller;
 import com.leo.pillpathbackend.dto.PharmacistCreateRequestDTO;
 import com.leo.pillpathbackend.dto.PharmacistUpdateRequestDTO;
 import com.leo.pillpathbackend.dto.PharmacistResponseDTO;
+import com.leo.pillpathbackend.dto.order.PharmacyOrderItemDTO;
+import com.leo.pillpathbackend.dto.order.OrderTotalsDTO;
+import com.leo.pillpathbackend.dto.order.PaymentDTO;
+import com.leo.pillpathbackend.entity.*;
+import com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus;
+import com.leo.pillpathbackend.repository.PharmacyOrderRepository;
+import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.PharmacistService;
+import com.leo.pillpathbackend.service.WalletSettingsService;
+import com.leo.pillpathbackend.util.AuthenticationHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import java.util.List;
-import java.util.Map;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/v1/pharmacy-admin")
@@ -22,6 +33,76 @@ import java.util.Map;
 public class PharmacyAdminController {
 
     private final PharmacistService pharmacistService;
+
+    private final AuthenticationHelper auth;
+    private final UserRepository userRepository;
+    private final PharmacyOrderRepository pharmacyOrderRepository;
+    private final WalletSettingsService walletSettingsService;
+
+    private static final RoundingMode RM = RoundingMode.HALF_UP;
+
+    private Map<String, Object> toAdminOrderDTO(PharmacyOrder po) {
+        CustomerOrder parent = po.getCustomerOrder();
+        Customer cust = parent != null ? parent.getCustomer() : null;
+        BigDecimal total = Optional.ofNullable(po.getTotal()).orElseGet(() -> Optional.ofNullable(po.getItems()).orElse(List.of()).stream()
+                .map(PharmacyOrderItem::getTotalPrice).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add));
+        BigDecimal commissionPercent = walletSettingsService.resolveCommissionPercent(po.getPharmacy().getId());
+        if (commissionPercent == null) commissionPercent = BigDecimal.ZERO;
+        BigDecimal commissionAmount = total.multiply(commissionPercent).divide(new BigDecimal("100"), 2, RM);
+        BigDecimal convenienceFee = Optional.ofNullable(walletSettingsService.getSettings().getConvenienceFee()).orElse(BigDecimal.ZERO).setScale(2, RM);
+        BigDecimal netAfterCommission = total.subtract(commissionAmount).setScale(2, RM);
+
+        List<PharmacyOrderItemDTO> itemDTOs = Optional.ofNullable(po.getItems()).orElse(List.of()).stream().map(it -> PharmacyOrderItemDTO.builder()
+                .itemId(it.getId())
+                .previewItemId(it.getSubmissionItem() != null ? it.getSubmissionItem().getId() : null)
+                .medicineName(it.getMedicineName())
+                .genericName(it.getGenericName())
+                .dosage(it.getDosage())
+                .quantity(it.getQuantity())
+                .unitPrice(it.getUnitPrice())
+                .totalPrice(it.getTotalPrice())
+                .notes(it.getSubmissionItem() != null ? it.getSubmissionItem().getNotes() : null)
+                .build()).toList();
+
+        Map<String, Object> fees = new LinkedHashMap<>();
+        fees.put("platformCommissionPercent", commissionPercent);
+        fees.put("platformCommissionAmount", commissionAmount);
+        fees.put("convenienceFee", convenienceFee);
+        fees.put("netAfterCommission", netAfterCommission);
+
+        Map<String, Object> dto = new LinkedHashMap<>();
+        dto.put("pharmacyOrderId", po.getId());
+        dto.put("orderCode", po.getOrderCode());
+        dto.put("status", po.getStatus());
+        dto.put("createdAt", po.getCreatedAt());
+        dto.put("updatedAt", po.getUpdatedAt());
+        dto.put("completedDate", (po.getStatus() == PharmacyOrderStatus.HANDED_OVER && po.getUpdatedAt() != null) ? po.getUpdatedAt() : null);
+        dto.put("pharmacyId", po.getPharmacy().getId());
+        dto.put("pharmacyName", po.getPharmacy().getName());
+        dto.put("pickupLocation", po.getPickupLocation());
+        dto.put("pickupCode", po.getPickupCode());
+        dto.put("payment", PaymentDTO.builder()
+                .method(parent != null ? parent.getPaymentMethod() : null)
+                .status(parent != null ? parent.getPaymentStatus() : null)
+                .amount(total)
+                .currency(parent != null ? parent.getCurrency() : "LKR")
+                .reference(parent != null ? parent.getPaymentReference() : null)
+                .build());
+        dto.put("totals", OrderTotalsDTO.builder()
+                .subtotal(po.getSubtotal())
+                .discount(po.getDiscount())
+                .tax(po.getTax())
+                .shipping(po.getShipping())
+                .total(total)
+                .currency(parent != null ? parent.getCurrency() : "LKR")
+                .build());
+        dto.put("customerName", cust != null ? cust.getFullName() : null);
+        dto.put("customerEmail", cust != null ? cust.getEmail() : null);
+        dto.put("customerPhone", cust != null ? cust.getPhoneNumber() : null);
+        dto.put("items", itemDTOs);
+        dto.put("fees", fees);
+        return dto;
+    }
 
     /**
      * Get all staff members for a pharmacy
@@ -185,6 +266,66 @@ public class PharmacyAdminController {
             log.error("Error verifying staff membership: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to verify staff membership: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * List pharmacy orders for admin
+     */
+    @GetMapping("/pharmacies/{pharmacyId}/orders")
+    public ResponseEntity<?> listPharmacyOrdersAdmin(@PathVariable Long pharmacyId,
+                                                     @RequestParam(name = "status", required = false) PharmacyOrderStatus status,
+                                                     HttpServletRequest request) {
+        try {
+            String token = auth.extractAndValidateToken(request);
+            if (token == null) throw new IllegalArgumentException("Missing or invalid authorization header");
+            Long adminId = auth.extractPharmacyAdminIdFromToken(token);
+            PharmacyAdmin admin = (PharmacyAdmin) userRepository.findById(adminId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pharmacy admin not found"));
+            if (admin.getPharmacy() == null || !admin.getPharmacy().getId().equals(pharmacyId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Not authorized for this pharmacy"));
+            }
+            List<PharmacyOrder> list = (status == null)
+                    ? pharmacyOrderRepository.findByPharmacyIdOrderByCreatedAtDesc(pharmacyId)
+                    : pharmacyOrderRepository.findByPharmacyIdAndStatusOrderByCreatedAtDesc(pharmacyId, status);
+            // If you want only received/completed/cancelled by default, filter when status == null
+            // list = list.stream().filter(po -> po.getStatus() == PharmacyOrderStatus.RECEIVED || po.getStatus() == PharmacyOrderStatus.HANDED_OVER || po.getStatus() == PharmacyOrderStatus.CANCELLED).toList();
+            List<Map<String, Object>> dtos = list.stream().map(this::toAdminOrderDTO).toList();
+            return ResponseEntity.ok(dtos);
+        } catch (IllegalArgumentException e) {
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Unauthorized" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", msg));
+        } catch (Exception e) {
+            log.error("Error listing pharmacy orders for admin", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Get pharmacy order details for admin
+     */
+    @GetMapping("/pharmacies/{pharmacyId}/orders/{orderId}")
+    public ResponseEntity<?> getPharmacyOrderAdmin(@PathVariable Long pharmacyId,
+                                                   @PathVariable Long orderId,
+                                                   HttpServletRequest request) {
+        try {
+            String token = auth.extractAndValidateToken(request);
+            if (token == null) throw new IllegalArgumentException("Missing or invalid authorization header");
+            Long adminId = auth.extractPharmacyAdminIdFromToken(token);
+            PharmacyAdmin admin = (PharmacyAdmin) userRepository.findById(adminId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pharmacy admin not found"));
+            if (admin.getPharmacy() == null || !admin.getPharmacy().getId().equals(pharmacyId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Not authorized for this pharmacy"));
+            }
+            PharmacyOrder po = pharmacyOrderRepository.findByIdAndPharmacyId(orderId, pharmacyId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pharmacy order not found"));
+            return ResponseEntity.ok(toAdminOrderDTO(po));
+        } catch (IllegalArgumentException e) {
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Unauthorized" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", msg));
+        } catch (Exception e) {
+            log.error("Error fetching pharmacy order for admin", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 }
