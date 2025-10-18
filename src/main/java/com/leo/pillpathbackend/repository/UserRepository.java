@@ -24,16 +24,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByAdminLevel(@Param("adminLevel") AdminLevel adminLevel);
 
     // Dashboard specific queries
-    @Query("SELECT COUNT(u) FROM User u WHERE u.class = Customer")
+    @Query("SELECT COUNT(c) FROM Customer c")
     Long countCustomers();
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.class = PharmacyAdmin")
+    @Query("SELECT COUNT(p) FROM PharmacyAdmin p")
     Long countPharmacyAdmins();
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.class = Admin")
+    @Query("SELECT COUNT(a) FROM Admin a")
     Long countSystemAdmins();
 
-    @Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
     List<User> findTop5ByOrderByCreatedAtDesc();
 
     @Query(value = """

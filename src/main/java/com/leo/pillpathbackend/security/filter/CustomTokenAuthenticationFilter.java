@@ -27,6 +27,26 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
     private JwtService jwtService;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+
+        // Skip filter for public endpoints
+        return path.startsWith("/api/v1/users/") ||
+                path.startsWith("/api/v1/customers/register") ||
+                path.startsWith("/api/v1/customers/check-email/") ||
+                path.startsWith("/api/v1/pharmacies/register") ||
+                path.startsWith("/api/v1/pharmacy-admins/register") ||
+                path.startsWith("/api/v1/admin/") ||
+                path.startsWith("/api/v1/pharmacies/") ||
+                path.startsWith("/api/v1/pharmacy-admin/") ||
+                path.startsWith("/api/pharmacy-admin/") ||
+                path.startsWith("/api/v1/prescriptions/") ||
+                path.startsWith("/api/v1/medicines/") ||
+                path.startsWith("/api/v1/orders/");
+                // Removed chat endpoints - they should accept authentication
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
