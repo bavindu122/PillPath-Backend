@@ -103,5 +103,5 @@ public class Pharmacy {
 //    private List<Pharmacist> pharmacists = new ArrayList<>();
 
     @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Order> orders = new ArrayList<>();
+    private List<PharmacyOrder> pharmacyOrders = new ArrayList<>();
 }
