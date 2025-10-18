@@ -19,4 +19,10 @@ public interface PharmacyOrderRepository extends JpaRepository<PharmacyOrder, Lo
 
     // New: fetch all slices for a parent customer order id
     List<PharmacyOrder> findByCustomerOrderId(Long customerOrderId);
+
+    // New: resolve pharmacy order by public code
+    Optional<PharmacyOrder> findByOrderCode(String orderCode);
+
+    // New: resolve by code scoped to a customer
+    Optional<PharmacyOrder> findByOrderCodeAndCustomerOrder_Customer_Id(String orderCode, Long customerId);
 }

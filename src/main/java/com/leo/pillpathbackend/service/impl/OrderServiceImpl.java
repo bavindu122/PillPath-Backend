@@ -6,6 +6,7 @@ import com.leo.pillpathbackend.entity.enums.*;
 import com.leo.pillpathbackend.repository.*;
 import com.leo.pillpathbackend.service.NotificationService;
 import com.leo.pillpathbackend.service.OrderService;
+import com.leo.pillpathbackend.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -28,6 +29,7 @@ public class OrderServiceImpl implements OrderService {
     private final PharmacyOrderRepository pharmacyOrderRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final WalletService walletService;
 
     @Override
     public CustomerOrderDTO placeOrder(Long customerId, PlaceOrderRequestDTO request) {
@@ -390,6 +392,33 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        // Wallet events per PharmacyOrder
+        if (order.getPharmacyOrders() != null) {
+            for (PharmacyOrder po : order.getPharmacyOrders()) {
+                BigDecimal amount = po.getTotal();
+                if (amount == null) {
+                    // fallback compute from items
+                    amount = Optional.ofNullable(po.getItems()).orElse(Collections.emptyList()).stream()
+                            .map(PharmacyOrderItem::getTotalPrice)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                }
+                if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) continue;
+                String poCode = po.getOrderCode() != null ? po.getOrderCode() : order.getOrderCode();
+                Long presId = order.getPrescription() != null ? order.getPrescription().getId() : null;
+                Long pharmacyId = po.getPharmacy() != null ? po.getPharmacy().getId() : null;
+                try {
+                    if (order.getPaymentMethod() == PaymentMethod.CASH) {
+                        walletService.postCustomerCashCollected(poCode, po.getId(), presId, pharmacyId, amount, "cash_" + po.getId());
+                    } else {
+                        walletService.postCustomerCardCaptured(poCode, po.getId(), presId, pharmacyId, amount, order.getPaymentReference(), "card_" + po.getId());
+                    }
+                } catch (Exception ignore) {
+                    // don't block order on wallet errors in MVP
+                }
+            }
+        }
+
         // Nudge prescription to IN_PROGRESS if still pending/review
         Prescription prescription = order.getPrescription();
         if (prescription != null) {
@@ -409,6 +438,15 @@ public class OrderServiceImpl implements OrderService {
     public List<CustomerOrderDTO> listCustomerOrders(Long customerId, boolean includeItems) {
         List<CustomerOrder> orders = customerOrderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId);
         return orders.stream().map(o -> toCustomerDTO(o, includeItems)).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PharmacyOrderDTO getCustomerPharmacyOrderByCode(Long customerId, String pharmacyOrderCode) {
+        PharmacyOrder po = pharmacyOrderRepository
+                .findByOrderCodeAndCustomerOrder_Customer_Id(pharmacyOrderCode, customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacy order not found"));
+        return toPharmacyDTO(po, true);
     }
 
     private boolean isValidTransition(PharmacyOrderStatus from, PharmacyOrderStatus to) {
@@ -470,7 +508,7 @@ public class OrderServiceImpl implements OrderService {
 
         CustomerOrder parent = po.getCustomerOrder();
         Prescription pres = parent != null ? parent.getPrescription() : null;
-        Customer cust = (parent != null && parent.getCustomer() instanceof Customer c) ? c : null;
+        Customer cust = parent != null ? parent.getCustomer() : null;
 
         String completedAt = (po.getStatus() == PharmacyOrderStatus.HANDED_OVER && po.getUpdatedAt() != null)
                 ? formatTime(po.getUpdatedAt()) : null;

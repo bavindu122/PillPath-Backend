@@ -40,6 +40,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @EnableWebSecurity
@@ -56,10 +57,11 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/v1/users/**").permitAll()  // Unified login
                         .requestMatchers("/api/v1/users/admin/login").permitAll()  // Admin login
                         .requestMatchers("/api/v1/users/change-password").permitAll()
-                        .requestMatchers("/api/v1/password-reset/**").permitAll()  // Password reset endpoints
                         .requestMatchers("/api/v1/customers/register").permitAll()
                         .requestMatchers("/api/v1/customers/login").permitAll()
                         .requestMatchers("/api/v1/customers/check-email/**").permitAll()
@@ -75,6 +77,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/orders/**").permitAll()
                         .requestMatchers("/api/v1/notifications/**").permitAll()
 
+                        .requestMatchers("/api/v1/wallets/**").permitAll()
                         .anyRequest().authenticated()
                 );
 
