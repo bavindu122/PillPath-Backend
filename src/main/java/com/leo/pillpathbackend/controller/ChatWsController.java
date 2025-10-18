@@ -18,7 +18,6 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import java.security.Principal;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 @Controller
 @RequiredArgsConstructor
@@ -46,10 +45,13 @@ public class ChatWsController {
     public void watch(@Payload Map<String, Object> body, SimpMessageHeaderAccessor headers) {
         Principal principal = headers.getUser();
         if (!(principal instanceof WsUserPrincipal p)) { sendError(headers, "unauthorized"); return; }
-        if (!"admin".equalsIgnoreCase(p.getRole())) { sendError(headers, "only admin can watch"); return; }
+        if (!("admin".equalsIgnoreCase(p.getRole()) || "pharmacy_admin".equalsIgnoreCase(p.getRole()) || "pharmacist".equalsIgnoreCase(p.getRole()))) {
+            sendError(headers, "not allowed to watch");
+            return;
+        }
         Long customerId = toLong(body.get("customerId"));
         if (customerId == null) { sendError(headers, "customerId required"); return; }
-        watchRegistry.watch(p.getUserId(), customerId);
+    watchRegistry.watch(p.getRole(), p.getUserId(), customerId);
         messagingTemplate.convertAndSendToUser(p.getName(), "/queue/ack", Map.of("ok", true, "type", "watch", "customerId", customerId));
     }
 
@@ -79,10 +81,13 @@ public class ChatWsController {
         messagingTemplate.convertAndSendToUser(customerUser, "/queue/chat", payload);
 
         // Deliver to watching admins
-        Set<Long> admins = watchRegistry.getAdmins(customerId);
-        for (Long adminId : admins) {
-            String adminUser = "admin:" + adminId;
-            messagingTemplate.convertAndSendToUser(adminUser, "/queue/chat", payload);
+        var admins = watchRegistry.getWatchers(customerId);
+        for (var w : admins) {
+            // deliver to any admin-like watcher by using their actual role prefix
+            if ("admin".equalsIgnoreCase(w.role()) || "pharmacy_admin".equalsIgnoreCase(w.role()) || "pharmacist".equalsIgnoreCase(w.role())) {
+                String targetUser = w.role().toLowerCase() + ":" + w.userId();
+                messagingTemplate.convertAndSendToUser(targetUser, "/queue/chat", payload);
+            }
         }
     }
 

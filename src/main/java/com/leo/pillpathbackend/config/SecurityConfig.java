@@ -38,6 +38,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(customTokenFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(authz -> authz
+            .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/ws/health").permitAll()
                         .requestMatchers("/ws/chat/**").permitAll()
@@ -59,6 +60,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/orders/**").permitAll()
                         .requestMatchers("/api/chats/**").permitAll()  // Chat endpoints
                         .requestMatchers("/api/v1/chats/**").permitAll()  // Chat endpoints with v1
+                        .requestMatchers("/api/v1/v1/chats/**").permitAll()  // Temporary alias path used by frontend
+                        .requestMatchers("/api/v1/v1/chats/threads").permitAll()  // Explicit path
                         // For local development: explicitly allow anonymous GET to messages path
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/chats/*/messages").permitAll()
             // For local development: allow anonymous GET to unread-count

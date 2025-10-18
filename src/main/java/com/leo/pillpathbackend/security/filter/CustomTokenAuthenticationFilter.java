@@ -43,7 +43,6 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
                 path.startsWith("/api/v1/prescriptions/") ||
                 path.startsWith("/api/v1/medicines/") ||
                 path.startsWith("/api/v1/orders/");
-                // Removed chat endpoints - they should accept authentication
     }
 
     @Override
@@ -51,11 +50,17 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
+            String path = request.getRequestURI();
+            System.out.println("CustomTokenAuthenticationFilter processing: " + request.getMethod() + " " + path);
+            
             String token = authHelper.extractAndValidateToken(request);
             if (token != null) {
+                System.out.println("Valid token found");
                 // Extract user information from JWT token
                 Long userId = jwtService.getUserId(token);
                 String role = jwtService.getRole(token);
+                
+                System.out.println("Token - UserId: " + userId + ", Role: " + role);
 
                 List<SimpleGrantedAuthority> authorities = new ArrayList<>();
 
@@ -74,11 +79,17 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
                     UsernamePasswordAuthenticationToken auth =
                             new UsernamePasswordAuthenticationToken(userId, null, authorities);
                     SecurityContextHolder.getContext().setAuthentication(auth);
+                    System.out.println("Authentication set successfully");
+                } else {
+                    System.out.println("Failed to set authentication - userId: " + userId + ", authorities: " + authorities.size());
                 }
+            } else {
+                System.out.println("No valid token found");
             }
         } catch (Exception e) {
             // Log and continue without authentication
             System.err.println("Token authentication failed: " + e.getMessage());
+            e.printStackTrace();
         }
 
         filterChain.doFilter(request, response);

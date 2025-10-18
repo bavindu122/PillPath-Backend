@@ -9,6 +9,7 @@ import com.leo.pillpathbackend.repository.ChatRoomRepository;
 import com.leo.pillpathbackend.repository.CustomerRepository;
 import com.leo.pillpathbackend.repository.MessageRepository;
 import com.leo.pillpathbackend.repository.PharmacyRepository;
+import com.leo.pillpathbackend.repository.PharmacyAdminRepository;
 import com.leo.pillpathbackend.service.ChatService;
 import com.leo.pillpathbackend.ws.WatchRegistry;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class ChatServiceImpl implements ChatService {
     private final MessageRepository messageRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final WatchRegistry watchRegistry;
+    private final PharmacyAdminRepository pharmacyAdminRepository;
 
     @Override
     @Transactional
@@ -87,6 +89,15 @@ public class ChatServiceImpl implements ChatService {
             chatRooms = chatRoomRepository.findByCustomerId(userId);
         } else if ("PHARMACIST".equalsIgnoreCase(userType)) {
             chatRooms = chatRoomRepository.findByPharmacistId(userId);
+        } else if ("ADMIN".equalsIgnoreCase(userType)) {
+            // Treat ADMIN here as Pharmacy Admin listing their pharmacy chats
+            PharmacyAdmin admin = pharmacyAdminRepository.findById(userId)
+                    .orElse(null);
+            if (admin != null && admin.getPharmacy() != null) {
+                chatRooms = chatRoomRepository.findByPharmacyId(admin.getPharmacy().getId());
+            } else {
+                chatRooms = java.util.Collections.emptyList();
+            }
         } else {
             throw new RuntimeException("Invalid user type");
         }
@@ -194,10 +205,13 @@ public class ChatServiceImpl implements ChatService {
         String customerUserName = "customer:" + chatRoom.getCustomer().getId();
         messagingTemplate.convertAndSendToUser(customerUserName, "/queue/chat", payload);
 
-        // Deliver to watching admins
-        java.util.Set<Long> admins = watchRegistry.getAdmins(chatRoom.getCustomer().getId());
-        for (Long adminId : admins) {
-            messagingTemplate.convertAndSendToUser("admin:" + adminId, "/queue/chat", payload);
+        // Deliver to watching staff (admin, pharmacy_admin, pharmacist)
+        for (var w : watchRegistry.getWatchers(chatRoom.getCustomer().getId())) {
+            String role = w.role();
+            if ("admin".equalsIgnoreCase(role) || "pharmacy_admin".equalsIgnoreCase(role) || "pharmacist".equalsIgnoreCase(role)) {
+                String target = role.toLowerCase() + ":" + w.userId();
+                messagingTemplate.convertAndSendToUser(target, "/queue/chat", payload);
+            }
         }
     }
 
@@ -219,8 +233,9 @@ public class ChatServiceImpl implements ChatService {
                 .customerName(customer.getFullName())
                 .customerProfilePicture(customer.getProfilePictureUrl())
                 .pharmacistId(pharmacist != null ? pharmacist.getId() : null)
-                .pharmacistName(pharmacist != null ? pharmacist.getFullName() : null)
-                .pharmacistProfilePicture(pharmacist != null ? pharmacist.getProfilePictureUrl() : null)
+                // Fallback to pharmacy name/logo when pharmacist is not assigned to avoid 'unknown user'
+                .pharmacistName(pharmacist != null ? pharmacist.getFullName() : (pharmacy != null ? pharmacy.getName() : null))
+                .pharmacistProfilePicture(pharmacist != null ? pharmacist.getProfilePictureUrl() : (pharmacy != null ? pharmacy.getLogoUrl() : null))
                 .pharmacyId(pharmacy.getId())
                 .pharmacyName(pharmacy.getName())
                 .pharmacyLogoUrl(pharmacy.getLogoUrl())
