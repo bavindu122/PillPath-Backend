@@ -70,6 +70,5 @@ public class CustomerOrder {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "customerOrder", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
     private List<PharmacyOrder> pharmacyOrders = new ArrayList<>();
 }

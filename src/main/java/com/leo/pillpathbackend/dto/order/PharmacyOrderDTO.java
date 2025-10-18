@@ -22,8 +22,16 @@ public class PharmacyOrderDTO {
     private String pharmacistNote;
     private String createdAt;
     private String updatedAt;
+    private String completedDate;
+    private String orderCode;
+    private PaymentDTO payment;
+    private String customerName;
+    private String patientEmail;
+    private String patientPhone;
+    private String patientAddress;
+    private Long prescriptionId;
+    private String prescriptionCode;
+    private String prescriptionImageUrl;
     private List<PharmacyOrderItemDTO> items;
     private OrderTotalsDTO totals;
-    private String customerName;
-    private String prescriptionCode;
 }

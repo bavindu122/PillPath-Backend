@@ -43,4 +43,10 @@ public interface PrescriptionService {
 
     // Customer: fetch a single order preview (submission) by prescription code and pharmacyId
     com.leo.pillpathbackend.dto.orderpreview.OrderPreviewDTO getCustomerOrderPreview(Long customerId, String code, Long pharmacyId);
+
+    // Pharmacist: update submission status directly from queue
+    void updateSubmissionStatus(Long pharmacistId, Long submissionId, PrescriptionStatus status);
+
+    // Pharmacist: delete a submission (only if no active order references it)
+    void deleteSubmission(Long pharmacistId, Long submissionId);
 }

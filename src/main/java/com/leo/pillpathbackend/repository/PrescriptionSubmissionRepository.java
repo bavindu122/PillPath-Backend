@@ -29,6 +29,18 @@ public interface PrescriptionSubmissionRepository extends JpaRepository<Prescrip
     @EntityGraph(attributePaths = {"prescription"})
     List<PrescriptionSubmission> findByPharmacyIdAndAssignedPharmacistIdAndStatusOrderByCreatedAtAsc(Long pharmacyId, Long pharmacistId, PrescriptionStatus status);
 
+    // New: resolve submission by prescription and pharmacy
+    Optional<PrescriptionSubmission> findByPrescriptionIdAndPharmacyId(Long prescriptionId, Long pharmacyId);
+
+    // New: queue excluding closed statuses (COMPLETED/REJECTED/CANCELLED)
+    @EntityGraph(attributePaths = {"prescription"})
+    @Query("select s from PrescriptionSubmission s where s.pharmacy.id = :pharmacyId and s.assignedPharmacist is null and s.status not in :exclude order by s.createdAt asc")
+    List<PrescriptionSubmission> findQueueUnassignedExcluding(@Param("pharmacyId") Long pharmacyId, @Param("exclude") List<PrescriptionStatus> exclude);
+
+    @EntityGraph(attributePaths = {"prescription"})
+    @Query("select s from PrescriptionSubmission s where s.pharmacy.id = :pharmacyId and s.assignedPharmacist.id = :pharmacistId and s.status not in :exclude order by s.createdAt asc")
+    List<PrescriptionSubmission> findQueueAssignedToPharmacistExcluding(@Param("pharmacyId") Long pharmacyId, @Param("pharmacistId") Long pharmacistId, @Param("exclude") List<PrescriptionStatus> exclude);
+
     // Atomic claim; returns number of rows updated
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update PrescriptionSubmission s set s.assignedPharmacist.id = :pharmacistId, s.status = com.leo.pillpathbackend.entity.enums.PrescriptionStatus.IN_PROGRESS where s.id = :id and s.status = com.leo.pillpathbackend.entity.enums.PrescriptionStatus.PENDING_REVIEW and s.assignedPharmacist is null")
