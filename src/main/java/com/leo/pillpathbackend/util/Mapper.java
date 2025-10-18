@@ -244,8 +244,10 @@ public class Mapper {
         pharmacy.setEmail(request.getEmail());
         pharmacy.setLicenseNumber(request.getLicenseNumber());
         pharmacy.setLicenseExpiryDate(request.getLicenseExpiryDate());
-        pharmacy.setOperatingHours(request.getOperatingHours());
-        pharmacy.setServices(request.getServices());
+        // Ensure operatingHours is never null - use empty map if null
+        pharmacy.setOperatingHours(request.getOperatingHours() != null ? request.getOperatingHours() : new java.util.HashMap<>());
+        // Ensure services is never null - use empty list if null
+        pharmacy.setServices(request.getServices() != null ? request.getServices() : new java.util.ArrayList<>());
         pharmacy.setDeliveryAvailable(request.getDeliveryAvailable());
         pharmacy.setDeliveryRadius(request.getDeliveryRadius());
         pharmacy.setIsVerified(false);
@@ -354,6 +356,16 @@ public class Mapper {
 
     public PharmacyDTO convertToPharmacyDTO(Pharmacy pharmacy) {
         PharmacyDTO dto = modelMapper.map(pharmacy, PharmacyDTO.class);
+
+        // Ensure operatingHours is never null
+        if (dto.getOperatingHours() == null) {
+            dto.setOperatingHours(new java.util.HashMap<>());
+        }
+        
+        // Ensure services is never null
+        if (dto.getServices() == null) {
+            dto.setServices(new java.util.ArrayList<>());
+        }
 
         // Set derived status field
         if (pharmacy.getIsActive() && pharmacy.getIsVerified()) {

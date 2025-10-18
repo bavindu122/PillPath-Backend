@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/users/**").permitAll()  // Unified login
                         .requestMatchers("/api/v1/users/admin/login").permitAll()  // Admin login
                         .requestMatchers("/api/v1/users/change-password").permitAll()
+                        .requestMatchers("/api/v1/password-reset/**").permitAll()  // Password reset endpoints
                         .requestMatchers("/api/v1/customers/register").permitAll()
                         .requestMatchers("/api/v1/customers/login").permitAll()
                         .requestMatchers("/api/v1/customers/check-email/**").permitAll()
@@ -72,6 +73,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/prescriptions/**").permitAll()
                         .requestMatchers("/api/v1/medicines/**").permitAll()
                         .requestMatchers("/api/v1/orders/**").permitAll()
+                        .requestMatchers("/api/v1/notifications/**").permitAll()
 
                         .anyRequest().authenticated()
                 );

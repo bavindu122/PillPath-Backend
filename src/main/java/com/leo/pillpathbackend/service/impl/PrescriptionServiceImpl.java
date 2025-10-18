@@ -11,9 +11,11 @@ import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
 import com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus;
 import com.leo.pillpathbackend.repository.*;
 import com.leo.pillpathbackend.service.CloudinaryService;
+import com.leo.pillpathbackend.service.NotificationService;
 import com.leo.pillpathbackend.service.PrescriptionService;
 import com.leo.pillpathbackend.util.Mapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional
 public class PrescriptionServiceImpl implements PrescriptionService {
 
@@ -44,6 +47,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final UserRepository userRepository;
     private final PrescriptionSubmissionItemRepository prescriptionSubmissionItemRepository;
     private final PharmacyOrderRepository pharmacyOrderRepository;
+    private final NotificationService notificationService;
 
     private static final DateTimeFormatter ISO_SECOND_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
@@ -98,6 +102,27 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                     .totalPrice(null)
                     .build();
             prescriptionSubmissionRepository.save(submission);
+        }
+
+        // NOTIFICATION: Notify pharmacists about new prescription (Scenario 1)
+        for (Long pid : targetPharmacyIds) {
+            Pharmacy pharmacy = pharmacyRepository.findById(pid).orElse(null);
+            if (pharmacy != null) {
+                // Get all pharmacists for this pharmacy
+                List<Long> pharmacistIds = userRepository.findPharmacistIdsByPharmacyId(pid);
+                if (!pharmacistIds.isEmpty()) {
+                    try {
+                        notificationService.createPrescriptionSentNotification(
+                            saved.getId(),
+                            pid,
+                            pharmacistIds,
+                            customer.getFullName()
+                        );
+                    } catch (Exception e) {
+                        log.error("Failed to send prescription notification for pharmacy {}: {}", pid, e.getMessage());
+                    }
+                }
+            }
         }
 
         return mapper.toPrescriptionDTO(saved);
@@ -378,6 +403,25 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         submission.getItems().add(item);
         recalcSubmissionTotals(submission);
         prescriptionSubmissionRepository.save(submission);
+        
+        // NOTIFICATION: Notify customer when order preview is ready (Scenario 2)
+        // Send notification if this is the first item or if submission now has items with total > 0
+        if (submission.getTotalPrice() != null && submission.getTotalPrice().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            Prescription prescription = submission.getPrescription();
+            if (prescription != null && prescription.getCustomer() != null) {
+                try {
+                    notificationService.createOrderPreviewReadyNotification(
+                        submission.getId(),
+                        prescription.getId(),
+                        prescription.getCustomer().getId(),
+                        submission.getPharmacy().getName()
+                    );
+                } catch (Exception e) {
+                    log.error("Failed to send order preview notification: {}", e.getMessage());
+                }
+            }
+        }
+        
         return buildSubmissionItemsDTO(submission, pharmacistId);
     }
 
