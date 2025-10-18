@@ -4,8 +4,10 @@ import com.leo.pillpathbackend.dto.order.*;
 import com.leo.pillpathbackend.entity.*;
 import com.leo.pillpathbackend.entity.enums.*;
 import com.leo.pillpathbackend.repository.*;
+import com.leo.pillpathbackend.service.NotificationService;
 import com.leo.pillpathbackend.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional
 public class OrderServiceImpl implements OrderService {
     private final PrescriptionRepository prescriptionRepository;
@@ -24,6 +27,7 @@ public class OrderServiceImpl implements OrderService {
     private final CustomerOrderRepository customerOrderRepository;
     private final PharmacyOrderRepository pharmacyOrderRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Override
     public CustomerOrderDTO placeOrder(Long customerId, PlaceOrderRequestDTO request) {
@@ -153,18 +157,41 @@ public class OrderServiceImpl implements OrderService {
         Set<Long> selectedPharmacyIds = request.getPharmacies().stream()
                 .map(PharmacyOrderSelectionDTO::getPharmacyId)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        List<PrescriptionSubmission> toDelete = new ArrayList<>();
+                .collect(java.util.stream.Collectors.toSet());
+        java.util.List<PrescriptionSubmission> toDelete = new java.util.ArrayList<>();
+        java.util.List<PrescriptionSubmission> toNotifyDecline = new java.util.ArrayList<>();
         for (PrescriptionSubmission sub : allSubs) {
             Long pid = sub.getPharmacy().getId();
             if (!selectedPharmacyIds.contains(pid)) {
                 if (sub.getItems() == null || sub.getItems().isEmpty()) {
                     toDelete.add(sub);
+                } else {
+                    // Pharmacy sent a preview but customer didn't select it (declined)
+                    toNotifyDecline.add(sub);
                 }
             }
         }
         if (!toDelete.isEmpty()) {
             submissionRepository.deleteAll(toDelete);
+        }
+        
+        // NOTIFICATION: Notify pharmacists when customer declines their order preview (Scenario 3 - decline)
+        for (PrescriptionSubmission declinedSub : toNotifyDecline) {
+            Long pharmacyId = declinedSub.getPharmacy().getId();
+            try {
+                List<Long> pharmacistIds = userRepository.findPharmacistIdsByPharmacyId(pharmacyId);
+                if (!pharmacistIds.isEmpty()) {
+                    notificationService.createOrderDeclinedNotification(
+                        declinedSub.getId(),
+                        pharmacyId,
+                        pharmacistIds,
+                        cust.getFullName(),
+                        "Customer chose another pharmacy's offer"
+                    );
+                }
+            } catch (Exception e) {
+                log.error("Failed to send order declined notification for pharmacy {}: {}", pharmacyId, e.getMessage());
+            }
         }
 
         // After attaching all PharmacyOrders, mark their submissions as ORDER_PLACED
@@ -190,6 +217,26 @@ public class OrderServiceImpl implements OrderService {
         order.setTotal(overallSubtotal);
 
         CustomerOrder saved = customerOrderRepository.save(order);
+        
+        // NOTIFICATION: Notify pharmacists when customer confirms order (Scenario 3)
+        Customer customer = cust;
+        for (PharmacyOrder pOrder : saved.getPharmacyOrders()) {
+            Long pharmacyId = pOrder.getPharmacy().getId();
+            try {
+                List<Long> pharmacistIds = userRepository.findPharmacistIdsByPharmacyId(pharmacyId);
+                if (!pharmacistIds.isEmpty()) {
+                    notificationService.createOrderConfirmedNotification(
+                        pOrder.getId(),
+                        pharmacyId,
+                        pharmacistIds,
+                        customer.getFullName()
+                    );
+                }
+            } catch (Exception e) {
+                log.error("Failed to send order confirmed notification for pharmacy {}: {}", pharmacyId, e.getMessage());
+            }
+        }
+        
         return toCustomerDTO(saved, true);
     }
 
@@ -245,6 +292,23 @@ public class OrderServiceImpl implements OrderService {
 
         // 1) Update slice and persist (ensures updatedAt for completedDate)
         po.setStatus(status);
+        
+        // NOTIFICATION: Notify customer when order is ready for pickup (Scenario 4)
+        if (status == PharmacyOrderStatus.READY_FOR_PICKUP) {
+            CustomerOrder customerOrder = po.getCustomerOrder();
+            if (customerOrder != null && customerOrder.getCustomer() != null) {
+                try {
+                    notificationService.createOrderReadyNotification(
+                        po.getId(),
+                        customerOrder.getCustomer().getId(),
+                        po.getPharmacy().getName()
+                    );
+                } catch (Exception e) {
+                    log.error("Failed to send order ready notification: {}", e.getMessage());
+                }
+            }
+        }
+        
         po = pharmacyOrderRepository.save(po);
 
         // 2) Update linked submission status (resolve if missing) - restrict to statuses allowed by DB constraint
