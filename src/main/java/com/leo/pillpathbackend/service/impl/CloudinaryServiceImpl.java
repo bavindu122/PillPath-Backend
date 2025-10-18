@@ -123,4 +123,17 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             return null;
         }
     }
+
+    // Add this method to your existing CloudinaryServiceImpl class
+
+    @Override
+    public Map<String, Object> uploadOtcProductImage(MultipartFile file, Long pharmacyId) throws IOException {
+            String publicId = "pillpath/otc-products/" + pharmacyId + "-" + UUID.randomUUID();
+            Transformation transformation = new Transformation()
+                    .width(800).height(800).crop("fill").gravity("auto")
+                    .quality("auto").fetchFormat("auto");
+
+    // 5MB limit for OTC product images
+    return uploadImageWithValidation(file, publicId, transformation, 5 * 1024 * 1024);
+}
 }

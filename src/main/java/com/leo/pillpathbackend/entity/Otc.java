@@ -3,6 +3,7 @@ package com.leo.pillpathbackend.entity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -13,6 +14,7 @@ import java.time.LocalDateTime;
 @Table(name="otc")
 @Getter
 @Setter
+@NoArgsConstructor
 @AllArgsConstructor
 public class Otc {
     @Id
@@ -28,11 +30,15 @@ public class Otc {
     @Column(nullable = false)
     private Double price;
 
+    @Setter(lombok.AccessLevel.NONE)
     @Column(nullable = false)
     private Integer stock;
 
-    @Column(nullable = true, columnDefinition = "LONGTEXT")
+    @Column(nullable = true, columnDefinition = "TEXT")
     private String imageUrl;
+
+    @Column(name = "image_public_id")
+    private String imagePublicId;
 
     @Column(length = 50)
     private String status;
@@ -52,8 +58,6 @@ public class Otc {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    public Otc() {}
 
     // Constructor with parameters
     public Otc(String name, String description, Double price, Integer stock, String imageUrl, Pharmacy pharmacy) {
@@ -80,7 +84,7 @@ public class Otc {
 
     // Method to automatically calculate status based on stock
     private String calculateStatus(Integer stock) {
-        if (stock == 0) {
+        if (stock == null || stock == 0) {
             return "Out of Stock";
         } else if (stock <= 10) {
             return "Low Stock";

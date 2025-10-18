@@ -32,7 +32,7 @@ public class OtcServiceImpl implements OtcService {
         otc.setPrice(otcDTO.getPrice());
         otc.setStock(otcDTO.getStock());
         otc.setImageUrl(otcDTO.getImageUrl());
-        
+        otc.setImagePublicId(otcDTO.getImagePublicId()); // Add this line
         otc.setPharmacy(pharmacy); // Set both pharmacyId and pharmacy relationship
         otc.setAddedToStore(true);
         otc.setStatus(calculateStatus(otcDTO.getStock()));
@@ -71,7 +71,14 @@ public class OtcServiceImpl implements OtcService {
         existingOtc.setDescription(updatedOtcDto.getDescription());
         existingOtc.setPrice(updatedOtcDto.getPrice());
         existingOtc.setStock(updatedOtcDto.getStock());
+        // existingOtc.setImageUrl(updatedOtcDto.getImageUrl());
+            // Update image fields if provided
+    if (updatedOtcDto.getImageUrl() != null) {
         existingOtc.setImageUrl(updatedOtcDto.getImageUrl());
+        existingOtc.setImagePublicId(updatedOtcDto.getImagePublicId());
+    }
+
+
         existingOtc.setStatus(calculateStatus(updatedOtcDto.getStock()));
 
         Otc updatedOtc = otcRepository.save(existingOtc);
@@ -94,7 +101,9 @@ public class OtcServiceImpl implements OtcService {
         otcDto.setPrice(otc.getPrice());
         otcDto.setStock(otc.getStock());
         otcDto.setImageUrl(otc.getImageUrl());
+        otcDto.setImagePublicId(otc.getImagePublicId()); // Add this line
         otcDto.setStatus(otc.getStatus());
+        otcDto.setPharmacyId(otc.getPharmacyId());
                 return otcDto;
     }
 

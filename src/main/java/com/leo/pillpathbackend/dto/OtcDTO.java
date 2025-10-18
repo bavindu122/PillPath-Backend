@@ -29,5 +29,9 @@ public class OtcDTO {
 
     private String imageUrl;
 
+    private String imagePublicId; // Add this field
+
     private String status;
+
+    private Long pharmacyId;
 }
