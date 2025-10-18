@@ -1,13 +1,13 @@
 package com.leo.pillpathbackend.service.impl;
 
 import com.leo.pillpathbackend.dto.*;
+import com.leo.pillpathbackend.entity.Prescription;
 import com.leo.pillpathbackend.entity.User;
 import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.AdminService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.leo.pillpathbackend.entity.Prescription;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,10 +16,10 @@ import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
 import com.leo.pillpathbackend.entity.Announcement;
 import com.leo.pillpathbackend.repository.AnnouncementRepository;
 import com.leo.pillpathbackend.service.AdminService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.leo.pillpathbackend.repository.PrescriptionRepository;
 import com.leo.pillpathbackend.repository.CustomerOrderRepository;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +29,7 @@ public class AdminServiceImpl implements AdminService {
     private final AnnouncementRepository announcementRepository;
     private final PrescriptionRepository prescriptionRepository;
     private final CustomerOrderRepository customerOrderRepository;
+
     // You can inject other repositories here as needed:
     // private final PharmacyRepository pharmacyRepository;
     // private final OrderRepository orderRepository;
@@ -241,5 +242,24 @@ public class AdminServiceImpl implements AdminService {
         user.setIsActive(true);
 
         userRepository.save(user);
+    }
+
+    @Override
+    public List<AdminPrescriptionDTO> getAllPrescriptionsForAdmin() {
+        List<Prescription> prescriptions = prescriptionRepository.findAll();
+        List<AdminPrescriptionDTO> dtos = new ArrayList<>();
+        for (Prescription p : prescriptions) {
+            AdminPrescriptionDTO dto = new AdminPrescriptionDTO();
+            dto.setId(p.getCode()); // or p.getId().toString()
+            dto.setPatient(p.getCustomer().getFullName());
+            dto.setPharmacy(p.getPharmacy().getName());
+            dto.setStatus(p.getStatus().name());
+            dto.setSubmitted(p.getCreatedAt().toLocalDate().toString());
+            dto.setTotalPrice(String.valueOf(p.getTotalPrice()));
+            dto.setPatientImage(p.getCustomer().getProfilePictureUrl());
+            dto.setPharmacyImage(p.getPharmacy().getImageUrl());
+            dtos.add(dto);
+        }
+        return dtos;
     }
 }

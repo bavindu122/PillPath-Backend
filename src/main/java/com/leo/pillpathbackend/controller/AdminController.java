@@ -1,17 +1,13 @@
 package com.leo.pillpathbackend.controller;
 
-import com.leo.pillpathbackend.dto.AdminDashboardResponseDTO;
-import com.leo.pillpathbackend.dto.CustomerDTO;
+import com.leo.pillpathbackend.dto.*;
 import com.leo.pillpathbackend.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
-import com.leo.pillpathbackend.dto.AddAnnouncementResponse;
 import com.leo.pillpathbackend.entity.Announcement;
 import com.leo.pillpathbackend.service.AdminService;
-import com.leo.pillpathbackend.dto.SuspendCustomerRequest;
 import jakarta.validation.Valid;
 
 import java.util.List;
@@ -106,6 +102,11 @@ public class AdminController {
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @GetMapping("/prescriptions")
+    public ResponseEntity<List<AdminPrescriptionDTO>> getPrescriptionsForAdmin() {
+        return ResponseEntity.ok(adminService.getAllPrescriptionsForAdmin());
     }
 
     // Future admin endpoints:
