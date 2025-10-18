@@ -50,3 +50,4 @@ public interface PrescriptionService {
     // Pharmacist: delete a submission (only if no active order references it)
     void deleteSubmission(Long pharmacistId, Long submissionId);
 }
+

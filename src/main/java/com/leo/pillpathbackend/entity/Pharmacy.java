@@ -61,6 +61,9 @@ public class Pharmacy {
     @Column(name = "banner_public_id")
     private String bannerPublicId;
 
+    @Getter
+    private String imageUrl;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "operating_hours", columnDefinition = "jsonb")
     private Map<String, String> operatingHours;

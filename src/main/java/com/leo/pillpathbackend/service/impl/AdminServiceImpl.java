@@ -1,11 +1,12 @@
 package com.leo.pillpathbackend.service.impl;
 
 import com.leo.pillpathbackend.dto.*;
+import com.leo.pillpathbackend.entity.Prescription;
 import com.leo.pillpathbackend.entity.User;
 import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.AdminService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.leo.pillpathbackend.entity.Prescription;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -15,8 +16,10 @@ import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
 import com.leo.pillpathbackend.entity.Announcement;
 import com.leo.pillpathbackend.repository.AnnouncementRepository;
 import com.leo.pillpathbackend.service.AdminService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.leo.pillpathbackend.repository.PrescriptionRepository;
+import com.leo.pillpathbackend.repository.CustomerOrderRepository;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +27,9 @@ public class AdminServiceImpl implements AdminService {
 
     private final UserRepository userRepository;
     private final AnnouncementRepository announcementRepository;
+    private final PrescriptionRepository prescriptionRepository;
+    private final CustomerOrderRepository customerOrderRepository;
+
     // You can inject other repositories here as needed:
     // private final PharmacyRepository pharmacyRepository;
     // private final OrderRepository orderRepository;
@@ -190,5 +196,70 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new RuntimeException("Announcement not found with id: " + id));
 
         announcementRepository.delete(announcement);
+    }
+
+    @Override
+    public List<CustomerDTO> getAllCustomers() {
+        // Assuming you have a method in UserRepository to fetch all customers
+        List<User> customers = userRepository.findAllCustomers();
+        List<CustomerDTO> dtos = new ArrayList<>();
+        for (User user : customers) {
+            CustomerDTO dto = new CustomerDTO();
+            dto.setId(user.getId());
+            dto.setUsername(user.getFullName());
+            dto.setEmail(user.getEmail());
+            dto.setPassword(user.getPassword());
+            dto.setFullName(user.getFullName());
+            dto.setPhoneNumber(user.getPhoneNumber());
+            dto.setDateOfBirth(user.getDateOfBirth());
+            dto.setAddress(user.getAddress());
+            dto.setProfilePictureUrl(user.getProfilePictureUrl());
+            dto.setIsActive(user.getIsActive());
+            dto.setSuspendReason(user.getSuspendReason());
+            dto.setCreatedAt(user.getCreatedAt());
+            dto.setPrescriptionCount((int) prescriptionRepository.countByCustomerId(user.getId()));
+            dto.setOrderCount((int) customerOrderRepository.countByCustomerId(user.getId()));
+
+            // Set other fields as needed
+            dtos.add(dto);
+        }
+        return dtos;
+    }
+
+    @Override
+    public void suspendCustomer(Long id, String suspendReason) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        user.setIsActive(false);
+        user.setSuspendReason(suspendReason);
+        userRepository.save(user);
+    }
+
+    @Override
+    public void activateCustomer(Long id) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        user.setIsActive(true);
+
+        userRepository.save(user);
+    }
+
+    @Override
+    public List<AdminPrescriptionDTO> getAllPrescriptionsForAdmin() {
+        List<Prescription> prescriptions = prescriptionRepository.findAll();
+        List<AdminPrescriptionDTO> dtos = new ArrayList<>();
+        for (Prescription p : prescriptions) {
+            AdminPrescriptionDTO dto = new AdminPrescriptionDTO();
+            dto.setId(p.getCode()); // or p.getId().toString()
+            dto.setPatient(p.getCustomer().getFullName());
+            dto.setPharmacy(p.getPharmacy().getName());
+            dto.setStatus(p.getStatus().name());
+            dto.setSubmitted(p.getCreatedAt().toLocalDate().toString());
+            dto.setTotalPrice(String.valueOf(p.getTotalPrice()));
+            dto.setPatientImage(p.getCustomer().getProfilePictureUrl());
+            dto.setPharmacyImage(p.getPharmacy().getImageUrl());
+            dtos.add(dto);
+        }
+        return dtos;
     }
 }
