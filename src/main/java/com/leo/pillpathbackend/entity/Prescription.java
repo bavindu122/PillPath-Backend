@@ -35,11 +35,11 @@ public class Prescription {
     private User customer;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "pharmacy_id")
+    @JoinColumn(name = "pharmacy_id", referencedColumnName = "id")
     private Pharmacy pharmacy;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_pharmacist_id")
+    @JoinColumn(name = "assigned_pharmacist_id", referencedColumnName = "id")
     private User assignedPharmacist;
 
     @Enumerated(EnumType.STRING)
