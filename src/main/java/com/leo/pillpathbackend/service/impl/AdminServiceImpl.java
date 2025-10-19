@@ -591,7 +591,7 @@ public class AdminServiceImpl implements AdminService {
     public List<ModeratorListItemDTO> getModerators() {
         List<Admin> admins = userRepository.findAdminsByLevel(AdminLevel.STANDARD);
         return admins.stream().map(a -> ModeratorListItemDTO.builder()
-                .id(formatModeratorId(a.getId()))
+                .id(a.getEmployeeId()) // use emp_id as id
                 .username(a.getUsername())
                 .createdAt(a.getCreatedAt() != null ? a.getCreatedAt().format(CUSTOMER_DATE_FORMAT) : null)
                 .build()).collect(Collectors.toList());
@@ -599,30 +599,15 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public void deleteModerator(String idOrCode) {
-        Long id = null;
-        if (idOrCode == null || idOrCode.trim().isEmpty()) {
-            throw new IllegalArgumentException("Moderator id is required");
+        String empId = (idOrCode == null) ? null : idOrCode.trim();
+        if (empId == null || empId.isEmpty()) {
+            throw new IllegalArgumentException("Moderator id (emp_id) is required");
         }
-        String trimmed = idOrCode.trim();
-        if (trimmed.startsWith("mod_")) {
-            try {
-                id = Long.parseLong(trimmed.substring(4));
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Invalid moderator id format");
-            }
-        } else {
-            try {
-                id = Long.parseLong(trimmed);
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Invalid moderator id format");
-            }
-        }
-        Admin admin = (Admin) userRepository.findById(id)
-                .filter(u -> u instanceof Admin)
+        Admin admin = userRepository.findAdminByEmployeeId(empId)
                 .orElseThrow(() -> new RuntimeException("Moderator not found"));
         if (admin.getAdminLevel() != AdminLevel.STANDARD) {
             throw new RuntimeException("Cannot delete non-moderator admin");
         }
-        userRepository.deleteById(id);
+        userRepository.deleteById(admin.getId());
     }
 }
