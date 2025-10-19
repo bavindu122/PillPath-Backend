@@ -7,6 +7,7 @@ import com.leo.pillpathbackend.repository.*;
 import com.leo.pillpathbackend.service.NotificationService;
 import com.leo.pillpathbackend.service.OrderService;
 import com.leo.pillpathbackend.service.WalletService;
+import com.leo.pillpathbackend.service.WalletSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -30,6 +32,10 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final WalletService walletService;
+    // Added for finance tracking
+    private final CommissionRecordRepository commissionRecordRepository;
+    private final PayoutRecordRepository payoutRecordRepository;
+    private final WalletSettingsService walletSettingsService;
 
     @Override
     public CustomerOrderDTO placeOrder(Long customerId, PlaceOrderRequestDTO request) {
@@ -357,6 +363,70 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        // 4) Finance bookkeeping: on slice completion create commission/payout records if missing
+        if (status == PharmacyOrderStatus.HANDED_OVER) {
+            try {
+                CustomerOrder co = po.getCustomerOrder();
+                Pharmacy ph = po.getPharmacy();
+                final Long pharmacyIdVal = ph != null ? ph.getId() : null;
+                final String pharmacyNameVal = ph != null ? ph.getName() : null;
+                // compute gross without lambda capturing 'po'
+                BigDecimal grossTmp = po.getTotal();
+                if (grossTmp == null) {
+                    BigDecimal computed = BigDecimal.ZERO;
+                    List<PharmacyOrderItem> itms = po.getItems();
+                    if (itms != null) {
+                        for (PharmacyOrderItem it : itms) {
+                            if (it != null && it.getTotalPrice() != null) {
+                                computed = computed.add(it.getTotalPrice());
+                            }
+                        }
+                    }
+                    grossTmp = computed;
+                }
+                final BigDecimal grossVal = grossTmp != null ? grossTmp : BigDecimal.ZERO;
+                final BigDecimal rateVal = walletSettingsService.resolveCommissionPercent(pharmacyIdVal);
+                final BigDecimal commissionVal = grossVal.multiply(rateVal).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+                final String monthVal = java.time.format.DateTimeFormatter.ofPattern("MM/yyyy").format(java.time.LocalDate.now());
+                final Long orderIdVal = po.getId();
+                final String orderCodeVal = po.getOrderCode();
+
+                PaymentMethod pm = co != null ? co.getPaymentMethod() : null;
+                if (pm == PaymentMethod.CASH) {
+                    // On-hand: record commission due (UNPAID)
+                    if (commissionRecordRepository.findByOrderId(orderIdVal).isEmpty()) {
+                        CommissionRecord cr = CommissionRecord.builder()
+                                .orderId(orderIdVal)
+                                .orderCode(orderCodeVal)
+                                .pharmacyId(pharmacyIdVal)
+                                .pharmacyName(pharmacyNameVal)
+                                .amount(commissionVal)
+                                .month(monthVal)
+                                .status(CommissionStatus.UNPAID)
+                                .build();
+                        commissionRecordRepository.save(cr);
+                    }
+                } else {
+                    // Online: record payout due (UNPAID)
+                    final BigDecimal netVal = grossVal.subtract(commissionVal);
+                    if (payoutRecordRepository.findByOrderId(orderIdVal).isEmpty()) {
+                        PayoutRecord pr = PayoutRecord.builder()
+                                .orderId(orderIdVal)
+                                .orderCode(orderCodeVal)
+                                .pharmacyId(pharmacyIdVal)
+                                .pharmacyName(pharmacyNameVal)
+                                .amount(netVal)
+                                .month(monthVal)
+                                .status(PayoutStatus.UNPAID)
+                                .build();
+                        payoutRecordRepository.save(pr);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Finance bookkeeping failed for order {}: {}", pharmacyOrderId, e.getMessage());
+            }
+        }
+
         return toPharmacyDTO(po, true);
     }
 
@@ -413,8 +483,10 @@ public class OrderServiceImpl implements OrderService {
                     } else {
                         walletService.postCustomerCardCaptured(poCode, po.getId(), presId, pharmacyId, amount, order.getPaymentReference(), "card_" + po.getId());
                     }
-                } catch (Exception ignore) {
-                    // don't block order on wallet errors in MVP
+                } catch (Exception ex) {
+                    // don't block order on wallet errors in MVP, but log for troubleshooting
+                    log.warn("Wallet integration failed for PharmacyOrder id={}, orderCode={}, paymentMethod={}, amount={}: {}", 
+                        po.getId(), poCode, order.getPaymentMethod(), amount, ex.getMessage(), ex);
                 }
             }
         }

@@ -76,6 +76,23 @@ public class AuthenticationHelper {
     }
 
     /**
+     * Extract system admin ID from JWT; requires role ADMIN
+     */
+    public Long extractAdminIdFromToken(String token) {
+        if (token == null) {
+            throw new IllegalArgumentException("Missing token");
+        }
+        if (!jwtService.isTokenValid(token)) {
+            throw new IllegalArgumentException("Invalid token");
+        }
+        String role = jwtService.getRole(token);
+        if (role == null || !role.equalsIgnoreCase("ADMIN")) {
+            throw new IllegalArgumentException("Invalid role for this resource");
+        }
+        return jwtService.getUserId(token);
+    }
+
+    /**
      * Extract customer ID from request header via JWT
      */
     public Long extractCustomerIdFromRequest(HttpServletRequest request) {
@@ -104,5 +121,14 @@ public class AuthenticationHelper {
             throw new IllegalArgumentException("Missing or invalid authorization header");
         }
         return extractPharmacistIdFromToken(token);
+    }
+
+    /** Extract system admin ID from request header via JWT */
+    public Long extractAdminIdFromRequest(HttpServletRequest request) {
+        String token = extractAndValidateToken(request);
+        if (token == null) {
+            throw new IllegalArgumentException("Missing or invalid authorization header");
+        }
+        return extractAdminIdFromToken(token);
     }
 }

@@ -4,12 +4,13 @@ import com.leo.pillpathbackend.entity.PharmacyOrder;
 import com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus;
 import com.leo.pillpathbackend.entity.enums.CustomerOrderStatus; // added
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.Collection; // added
 import java.util.List;
 import java.util.Optional;
 
-public interface PharmacyOrderRepository extends JpaRepository<PharmacyOrder, Long> {
+public interface PharmacyOrderRepository extends JpaRepository<PharmacyOrder, Long>, JpaSpecificationExecutor<PharmacyOrder> {
     List<PharmacyOrder> findByPharmacyIdOrderByCreatedAtDesc(Long pharmacyId);
     List<PharmacyOrder> findByPharmacyIdAndStatusOrderByCreatedAtDesc(Long pharmacyId, PharmacyOrderStatus status);
     Optional<PharmacyOrder> findByIdAndPharmacyId(Long id, Long pharmacyId);

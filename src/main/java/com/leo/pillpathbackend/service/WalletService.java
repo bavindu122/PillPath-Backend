@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -172,22 +175,30 @@ public class WalletService {
     @Transactional(readOnly = true)
     public List<WalletTransaction> listRecentTransactionsForPlatform(int pageSize) {
         Wallet platform = getOrCreatePlatformWallet();
-        // naive: fetch all and take last N
-        List<WalletTransaction> all = walletTransactionRepository.findAll();
-        return all.stream().filter(t -> t.getWallet().getId().equals(platform.getId()))
-                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
-                .limit(Math.max(pageSize, 20))
-                .toList();
+        Pageable pageable = PageRequest.of(0, Math.max(pageSize, 1));
+        Page<WalletTransaction> page = walletTransactionRepository.findByWallet_IdOrderByCreatedAtDesc(platform.getId(), pageable);
+        return page.getContent();
     }
 
     @Transactional(readOnly = true)
     public List<WalletTransaction> listRecentTransactionsForPharmacy(Long pharmacyId, int pageSize) {
         Wallet wallet = getOrCreatePharmacyWallet(pharmacyId);
-        List<WalletTransaction> all = walletTransactionRepository.findAll();
-        return all.stream().filter(t -> t.getWallet().getId().equals(wallet.getId()))
-                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
-                .limit(Math.max(pageSize, 20))
-                .toList();
+        Pageable pageable = PageRequest.of(0, Math.max(pageSize, 1));
+        Page<WalletTransaction> page = walletTransactionRepository.findByWallet_IdOrderByCreatedAtDesc(wallet.getId(), pageable);
+        return page.getContent();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<WalletTransaction> pageTransactionsForPharmacy(Long pharmacyId, int page, int size) {
+        Wallet wallet = getOrCreatePharmacyWallet(pharmacyId);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
+        return walletTransactionRepository.findByWallet_IdOrderByCreatedAtDesc(wallet.getId(), pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<WalletTransaction> pageTransactionsForPlatform(int page, int size) {
+        Wallet platform = getOrCreatePlatformWallet();
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
+        return walletTransactionRepository.findByWallet_IdOrderByCreatedAtDesc(platform.getId(), pageable);
     }
 }
-

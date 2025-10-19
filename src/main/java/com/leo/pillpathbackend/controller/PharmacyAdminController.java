@@ -9,7 +9,6 @@ import com.leo.pillpathbackend.dto.order.PaymentDTO;
 import com.leo.pillpathbackend.entity.*;
 import com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus;
 import com.leo.pillpathbackend.repository.PharmacyOrderRepository;
-import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.PharmacistService;
 import com.leo.pillpathbackend.service.WalletSettingsService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
@@ -25,6 +24,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
 
+import com.leo.pillpathbackend.repository.PharmacyAdminRepository;
+
 @RestController
 @RequestMapping("/api/v1/pharmacy-admin")
 @RequiredArgsConstructor
@@ -35,9 +36,9 @@ public class PharmacyAdminController {
     private final PharmacistService pharmacistService;
 
     private final AuthenticationHelper auth;
-    private final UserRepository userRepository;
     private final PharmacyOrderRepository pharmacyOrderRepository;
     private final WalletSettingsService walletSettingsService;
+    private final PharmacyAdminRepository pharmacyAdminRepository;
 
     private static final RoundingMode RM = RoundingMode.HALF_UP;
 
@@ -280,7 +281,7 @@ public class PharmacyAdminController {
             String token = auth.extractAndValidateToken(request);
             if (token == null) throw new IllegalArgumentException("Missing or invalid authorization header");
             Long adminId = auth.extractPharmacyAdminIdFromToken(token);
-            PharmacyAdmin admin = (PharmacyAdmin) userRepository.findById(adminId)
+            PharmacyAdmin admin = pharmacyAdminRepository.findById(adminId)
                     .orElseThrow(() -> new IllegalArgumentException("Pharmacy admin not found"));
             if (admin.getPharmacy() == null || !admin.getPharmacy().getId().equals(pharmacyId)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Not authorized for this pharmacy"));
@@ -288,8 +289,6 @@ public class PharmacyAdminController {
             List<PharmacyOrder> list = (status == null)
                     ? pharmacyOrderRepository.findByPharmacyIdOrderByCreatedAtDesc(pharmacyId)
                     : pharmacyOrderRepository.findByPharmacyIdAndStatusOrderByCreatedAtDesc(pharmacyId, status);
-            // If you want only received/completed/cancelled by default, filter when status == null
-            // list = list.stream().filter(po -> po.getStatus() == PharmacyOrderStatus.RECEIVED || po.getStatus() == PharmacyOrderStatus.HANDED_OVER || po.getStatus() == PharmacyOrderStatus.CANCELLED).toList();
             List<Map<String, Object>> dtos = list.stream().map(this::toAdminOrderDTO).toList();
             return ResponseEntity.ok(dtos);
         } catch (IllegalArgumentException e) {
@@ -312,7 +311,7 @@ public class PharmacyAdminController {
             String token = auth.extractAndValidateToken(request);
             if (token == null) throw new IllegalArgumentException("Missing or invalid authorization header");
             Long adminId = auth.extractPharmacyAdminIdFromToken(token);
-            PharmacyAdmin admin = (PharmacyAdmin) userRepository.findById(adminId)
+            PharmacyAdmin admin = pharmacyAdminRepository.findById(adminId)
                     .orElseThrow(() -> new IllegalArgumentException("Pharmacy admin not found"));
             if (admin.getPharmacy() == null || !admin.getPharmacy().getId().equals(pharmacyId)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Not authorized for this pharmacy"));
@@ -329,3 +328,4 @@ public class PharmacyAdminController {
         }
     }
 }
+

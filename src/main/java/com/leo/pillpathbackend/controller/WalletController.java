@@ -10,7 +10,6 @@ import com.leo.pillpathbackend.entity.PharmacistUser;
 import com.leo.pillpathbackend.entity.PharmacyAdmin;
 import com.leo.pillpathbackend.entity.Wallet;
 import com.leo.pillpathbackend.entity.WalletTransaction;
-import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.WalletService;
 import com.leo.pillpathbackend.service.WalletSettingsService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
@@ -24,6 +23,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.domain.Page;
+import com.leo.pillpathbackend.repository.PharmacistUserRepository;
+import com.leo.pillpathbackend.repository.PharmacyAdminRepository;
 
 @RestController
 @RequestMapping("/api/v1/wallets")
@@ -35,7 +37,9 @@ public class WalletController {
     private final WalletService walletService;
     private final WalletSettingsService walletSettingsService;
     private final AuthenticationHelper auth;
-    private final UserRepository userRepository;
+    // Type-safe repositories
+    private final PharmacistUserRepository pharmacistUserRepository;
+    private final PharmacyAdminRepository pharmacyAdminRepository;
 
     private WalletTransactionDTO toDTO(WalletTransaction t) {
         return WalletTransactionDTO.builder()
@@ -77,14 +81,14 @@ public class WalletController {
             // Try PHARMACIST first
             try {
                 Long pharmacistId = auth.extractPharmacistIdFromToken(token);
-                PharmacistUser ph = (PharmacistUser) userRepository.findById(pharmacistId)
+                PharmacistUser ph = pharmacistUserRepository.findById(pharmacistId)
                         .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
                 if (ph.getPharmacy() == null) return ResponseEntity.badRequest().body(Map.of("error", "Pharmacist not assigned to a pharmacy"));
                 pharmacyId = ph.getPharmacy().getId();
             } catch (IllegalArgumentException wrongRole) {
                 // Fallback to PHARMACY_ADMIN
                 Long adminId = auth.extractPharmacyAdminIdFromToken(token);
-                PharmacyAdmin admin = (PharmacyAdmin) userRepository.findById(adminId)
+                PharmacyAdmin admin = pharmacyAdminRepository.findById(adminId)
                         .orElseThrow(() -> new IllegalArgumentException("Pharmacy admin not found"));
                 if (admin.getPharmacy() == null) return ResponseEntity.badRequest().body(Map.of("error", "Pharmacy admin not assigned to a pharmacy"));
                 pharmacyId = admin.getPharmacy().getId();
@@ -172,13 +176,13 @@ public class WalletController {
             // Try PHARMACIST
             try {
                 Long pharmacistId = auth.extractPharmacistIdFromToken(token);
-                PharmacistUser ph = (PharmacistUser) userRepository.findById(pharmacistId)
+                PharmacistUser ph = pharmacistUserRepository.findById(pharmacistId)
                         .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
                 resolvedPharmacyId = ph.getPharmacy() != null ? ph.getPharmacy().getId() : null;
             } catch (IllegalArgumentException wrongRole) {
                 // Fallback to PHARMACY_ADMIN
                 Long adminId = auth.extractPharmacyAdminIdFromToken(token);
-                PharmacyAdmin admin = (PharmacyAdmin) userRepository.findById(adminId)
+                PharmacyAdmin admin = pharmacyAdminRepository.findById(adminId)
                         .orElseThrow(() -> new IllegalArgumentException("Pharmacy admin not found"));
                 resolvedPharmacyId = admin.getPharmacy() != null ? admin.getPharmacy().getId() : null;
             }
@@ -202,8 +206,8 @@ public class WalletController {
 
     @GetMapping("/pharmacies/{pharmacyId}/transactions")
     public ResponseEntity<?> pharmacyTransactions(@PathVariable Long pharmacyId,
-                                                  @RequestParam(name = "pageSize", defaultValue = "20") int pageSize,
-                                                  @RequestParam(name = "size", required = false) Integer size,
+                                                  @RequestParam(name = "page", defaultValue = "0") int page,
+                                                  @RequestParam(name = "size", defaultValue = "20") int size,
                                                   HttpServletRequest request) {
         try {
             String token = auth.extractAndValidateToken(request);
@@ -212,26 +216,28 @@ public class WalletController {
             // Try PHARMACIST
             try {
                 Long pharmacistId = auth.extractPharmacistIdFromToken(token);
-                PharmacistUser ph = (PharmacistUser) userRepository.findById(pharmacistId)
+                PharmacistUser ph = pharmacistUserRepository.findById(pharmacistId)
                         .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
                 resolvedPharmacyId = ph.getPharmacy() != null ? ph.getPharmacy().getId() : null;
             } catch (IllegalArgumentException wrongRole) {
                 // Fallback to PHARMACY_ADMIN
                 Long adminId = auth.extractPharmacyAdminIdFromToken(token);
-                PharmacyAdmin admin = (PharmacyAdmin) userRepository.findById(adminId)
+                PharmacyAdmin admin = pharmacyAdminRepository.findById(adminId)
                         .orElseThrow(() -> new IllegalArgumentException("Pharmacy admin not found"));
                 resolvedPharmacyId = admin.getPharmacy() != null ? admin.getPharmacy().getId() : null;
             }
             if (resolvedPharmacyId == null || !resolvedPharmacyId.equals(pharmacyId)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Not authorized for this pharmacy"));
             }
-            int effectiveSize = (size != null && size > 0) ? size : pageSize;
-            List<WalletTransactionDTO> txns = walletService.listRecentTransactionsForPharmacy(pharmacyId, effectiveSize)
-                    .stream().map(this::toDTO).toList();
+            Page<WalletTransaction> txPage = walletService.pageTransactionsForPharmacy(pharmacyId, page, size);
+            List<WalletTransactionDTO> txns = txPage.getContent().stream().map(this::toDTO).toList();
             return ResponseEntity.ok(Map.of(
                     "ownerType", "PHARMACY",
                     "ownerId", pharmacyId,
-                    "pageSize", effectiveSize,
+                    "page", txPage.getNumber(),
+                    "size", txPage.getSize(),
+                    "totalPages", txPage.getTotalPages(),
+                    "totalElements", txPage.getTotalElements(),
                     "transactions", txns
             ));
         } catch (IllegalArgumentException e) {
