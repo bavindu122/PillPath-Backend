@@ -1,7 +1,9 @@
 package com.leo.pillpathbackend.service;
 
 import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
+import com.leo.pillpathbackend.dto.AdminAnalyticsChartsDTO;
 import com.leo.pillpathbackend.dto.AdminDashboardResponseDTO;
+import com.leo.pillpathbackend.dto.AdminKpisDTO;
 import com.leo.pillpathbackend.dto.AdminPrescriptionDTO;
 import com.leo.pillpathbackend.dto.CustomerDTO;
 import com.leo.pillpathbackend.dto.OverviewChartsResponseDTO;
@@ -28,6 +30,10 @@ public interface AdminService {
     OverviewSummaryDTO getOverviewSummary();
 
     OverviewChartsResponseDTO getOverviewCharts();
+
+    AdminKpisDTO getKpis();
+
+    AdminAnalyticsChartsDTO getAnalyticsCharts(Integer year);
 
 
     // Future admin methods can go here:

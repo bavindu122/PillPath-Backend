@@ -123,6 +123,18 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getOverviewCharts());
     }
 
+    // KPIs (all-time aggregates, admin only)
+    @GetMapping("/analytics/kpis")
+    public ResponseEntity<AdminKpisDTO> getKpis() {
+        return ResponseEntity.ok(adminService.getKpis());
+    }
+
+    // Analytics charts (12 months for selected year, admin only)
+    @GetMapping("/analytics/charts")
+    public ResponseEntity<AdminAnalyticsChartsDTO> getAnalyticsCharts(@RequestParam(value = "year", required = false) Integer year) {
+        return ResponseEntity.ok(adminService.getAnalyticsCharts(year));
+    }
+
     // Future admin endpoints:
     // @GetMapping("/users")
     // @PostMapping("/users/{id}/deactivate")

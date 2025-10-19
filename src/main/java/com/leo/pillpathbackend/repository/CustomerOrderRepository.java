@@ -18,6 +18,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     long countByCustomerId(Long customerId);
 
     long countByStatus(CustomerOrderStatus status);
+    long countByStatusIn(java.util.Collection<com.leo.pillpathbackend.entity.enums.CustomerOrderStatus> statuses);
+    long countByStatusInAndCreatedAtBetween(java.util.Collection<CustomerOrderStatus> statuses, java.time.LocalDateTime start, java.time.LocalDateTime end);
 
     @Query("SELECT COALESCE(SUM(o.total), 0) FROM CustomerOrder o")
     double sumTotal();

@@ -28,4 +28,5 @@ public interface PrescriptionRepository extends JpaRepository<Prescription, Long
 
     Page<Prescription> findByCustomerIdOrderByCreatedAtDesc(Long customerId, Pageable pageable);
     long countByCustomerId(Long customerId);
+    long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
 }

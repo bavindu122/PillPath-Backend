@@ -10,6 +10,7 @@ import com.leo.pillpathbackend.entity.Prescription;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
@@ -27,6 +28,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.TextStyle;
 import java.util.Locale;
+import com.leo.pillpathbackend.dto.AdminAnalyticsChartsDTO;
+import java.time.Year;
 
 @Service
 @RequiredArgsConstructor
@@ -339,6 +342,90 @@ public class AdminServiceImpl implements AdminService {
                 .userRegistrationTrend(userTrend)
                 .userRolesDistribution(roles)
                 .pharmacyOnboardingData(pharmacyTrend)
+                .build();
+    }
+
+    @Override
+    public AdminKpisDTO getKpis() {
+        int totalUsers = (int) userRepository.count();
+        int totalPharmacies = (int) pharmacyRepository.count();
+        int totalPrescriptionsUploaded = (int) prescriptionRepository.count();
+
+        // Spec mentions COMPLETED and FULFILLED; enum has no FULFILLED -> count COMPLETED only
+        int ordersProcessed = (int) customerOrderRepository.countByStatusIn(
+                Collections.singletonList(CustomerOrderStatus.COMPLETED)
+        );
+
+        int activePharmacies = (int) pharmacyRepository.countByIsActiveTrue();
+        int suspendedPharmacies = (int) pharmacyRepository.countByIsActiveFalse();
+
+        double totalPayments = 0.0; // placeholder; implement when payment source available
+
+        return AdminKpisDTO.builder()
+                .totalUsers(totalUsers)
+                .totalPharmacies(totalPharmacies)
+                .totalPrescriptionsUploaded(totalPrescriptionsUploaded)
+                .ordersProcessed(ordersProcessed)
+                .activePharmacies(activePharmacies)
+                .suspendedPharmacies(suspendedPharmacies)
+                .totalPayments(totalPayments)
+                .build();
+    }
+
+    @Override
+    public AdminAnalyticsChartsDTO getAnalyticsCharts(Integer year) {
+        int y = (year == null || year <= 0) ? Year.now().getValue() : year;
+        List<AdminAnalyticsChartsDTO.PrescriptionUploadsItem> prescriptionUploads = new ArrayList<>();
+        List<AdminAnalyticsChartsDTO.PharmacyRegistrationsItem> pharmacyRegistrations = new ArrayList<>();
+        List<AdminAnalyticsChartsDTO.GrowthRegistrationsItem> growthRegistrations = new ArrayList<>();
+
+        // Build 12 calendar months for the requested year
+        for (int month = 1; month <= 12; month++) {
+            LocalDate monthStart = LocalDate.of(y, month, 1);
+            LocalDate monthEnd = monthStart.plusMonths(1); // exclusive end
+            String monthLabel = monthStart.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+
+            int uploads = (int) prescriptionRepository.countByCreatedAtBetween(monthStart.atStartOfDay(), monthEnd.atStartOfDay());
+            prescriptionUploads.add(AdminAnalyticsChartsDTO.PrescriptionUploadsItem.builder()
+                    .month(monthLabel)
+                    .uploads(uploads)
+                    .build());
+
+            int registeredPharmacies = (int) pharmacyRepository.countByCreatedAtBetween(monthStart.atStartOfDay(), monthEnd.atStartOfDay());
+            pharmacyRegistrations.add(AdminAnalyticsChartsDTO.PharmacyRegistrationsItem.builder()
+                    .month(monthLabel)
+                    .registered(registeredPharmacies)
+                    .build());
+
+            int newCustomers = (int) userRepository.countCustomersByCreatedAtBetween(monthStart.atStartOfDay(), monthEnd.atStartOfDay());
+            int newPharmacies = registeredPharmacies; // pharmacy registrations in the month
+            growthRegistrations.add(AdminAnalyticsChartsDTO.GrowthRegistrationsItem.builder()
+                    .month(monthLabel)
+                    .customers(newCustomers)
+                    .pharmacies(newPharmacies)
+                    .build());
+        }
+
+        // Order fulfillment (total counts for the selected year)
+        LocalDate yearStart = LocalDate.of(y, 1, 1);
+        LocalDate yearEnd = yearStart.plusYears(1); // exclusive end
+        int delivered = (int) customerOrderRepository.countByStatusInAndCreatedAtBetween(
+                java.util.List.of(CustomerOrderStatus.COMPLETED), yearStart.atStartOfDay(), yearEnd.atStartOfDay());
+        int pending = (int) customerOrderRepository.countByStatusInAndCreatedAtBetween(
+                java.util.List.of(CustomerOrderStatus.PENDING, CustomerOrderStatus.PAID), yearStart.atStartOfDay(), yearEnd.atStartOfDay());
+        int cancelled = (int) customerOrderRepository.countByStatusInAndCreatedAtBetween(
+                java.util.List.of(CustomerOrderStatus.CANCELLED), yearStart.atStartOfDay(), yearEnd.atStartOfDay());
+
+        List<AdminAnalyticsChartsDTO.OrderFulfillmentItem> orderFulfillment = new ArrayList<>();
+        orderFulfillment.add(AdminAnalyticsChartsDTO.OrderFulfillmentItem.builder().status("delivered").count(delivered).build());
+        orderFulfillment.add(AdminAnalyticsChartsDTO.OrderFulfillmentItem.builder().status("pending").count(pending).build());
+        orderFulfillment.add(AdminAnalyticsChartsDTO.OrderFulfillmentItem.builder().status("cancelled").count(cancelled).build());
+
+        return AdminAnalyticsChartsDTO.builder()
+                .prescriptionUploads(prescriptionUploads)
+                .pharmacyRegistrations(pharmacyRegistrations)
+                .growthRegistrations(growthRegistrations)
+                .orderFulfillment(orderFulfillment)
                 .build();
     }
 }

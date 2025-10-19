@@ -61,4 +61,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT COUNT(u) FROM User u WHERE TYPE(u) = PharmacistUser")
     Long countPharmacists();
+
+    @Query("SELECT COUNT(u) FROM User u WHERE TYPE(u) = Customer AND u.createdAt BETWEEN :start AND :end")
+    long countCustomersByCreatedAtBetween(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
 }
