@@ -413,8 +413,10 @@ public class OrderServiceImpl implements OrderService {
                     } else {
                         walletService.postCustomerCardCaptured(poCode, po.getId(), presId, pharmacyId, amount, order.getPaymentReference(), "card_" + po.getId());
                     }
-                } catch (Exception ignore) {
-                    // don't block order on wallet errors in MVP
+                } catch (Exception ex) {
+                    // don't block order on wallet errors in MVP, but log for troubleshooting
+                    log.warn("Wallet integration failed for PharmacyOrder id={}, orderCode={}, paymentMethod={}, amount={}: {}", 
+                        po.getId(), poCode, order.getPaymentMethod(), amount, ex.getMessage(), ex);
                 }
             }
         }
