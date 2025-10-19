@@ -30,6 +30,7 @@ import java.time.format.TextStyle;
 import java.util.Locale;
 import com.leo.pillpathbackend.dto.AdminAnalyticsChartsDTO;
 import java.time.Year;
+import java.time.format.DateTimeFormatter;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +41,9 @@ public class AdminServiceImpl implements AdminService {
     private final PrescriptionRepository prescriptionRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final PharmacyRepository pharmacyRepository;
+    private final com.leo.pillpathbackend.repository.PharmacyOrderRepository pharmacyOrderRepository; // New repository for pharmacy orders
+
+    private static final DateTimeFormatter CUSTOMER_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     // You can inject other repositories here as needed:
     // private final PharmacyRepository pharmacyRepository;
@@ -426,5 +430,77 @@ public class AdminServiceImpl implements AdminService {
                 .growthRegistrations(growthRegistrations)
                 .orderFulfillment(orderFulfillment)
                 .build();
+    }
+
+    @Override
+    public List<PharmacyPerformanceResponseDTO> getPharmacyPerformance() {
+        List<com.leo.pillpathbackend.entity.Pharmacy> pharmacies = pharmacyRepository.findAll();
+        List<PharmacyPerformanceResponseDTO> result = new ArrayList<>();
+        for (com.leo.pillpathbackend.entity.Pharmacy p : pharmacies) {
+            long fulfilled = pharmacyOrderRepository.countByPharmacyIdAndStatus(p.getId(), com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus.HANDED_OVER);
+            String status = mapStatus(p.getIsActive(), p.getIsVerified());
+            String regDate = null;
+            if (p.getCreatedAt() != null) {
+                regDate = p.getCreatedAt()
+                        .atZone(ZoneId.systemDefault())
+                        .withZoneSameInstant(ZoneId.of("UTC"))
+                        .toInstant()
+                        .toString();
+            }
+            double rating = p.getAverageRating() != null ? p.getAverageRating() : 0.0;
+            result.add(PharmacyPerformanceResponseDTO.builder()
+                    .pharmacyId(formatPharmacyId(p.getId()))
+                    .name(p.getName())
+                    .ordersFulfilled(fulfilled)
+                    .rating(rating)
+                    .status(status)
+                    .registrationDate(regDate)
+                    .build());
+        }
+        return result;
+    }
+
+    @Override
+    public List<CustomerActivityResponseDTO> getCustomerActivity() {
+        List<User> customers = userRepository.findAllCustomers();
+        List<CustomerActivityResponseDTO> result = new ArrayList<>();
+        for (User u : customers) {
+            long uploads = prescriptionRepository.countByCustomerId(u.getId());
+            String status = Boolean.TRUE.equals(u.getIsActive()) ? "Active" : "Suspended";
+            String regDate = u.getCreatedAt() != null ? u.getCreatedAt().format(CUSTOMER_DATE_FORMAT) : null;
+            result.add(CustomerActivityResponseDTO.builder()
+                    .customerId(formatCustomerId(u.getId()))
+                    .name(u.getFullName() != null ? u.getFullName() : u.getUsername())
+                    .prescriptionsUploaded(uploads)
+                    .status(status)
+                    .registrationDate(regDate)
+                    .build());
+        }
+        return result;
+    }
+
+    private String formatCustomerId(Long id) {
+        if (id == null) return null;
+        String s = String.valueOf(id);
+        if (s.length() < 3) s = String.format("%03d", id);
+        return "cus_" + s;
+    }
+
+    private String formatPharmacyId(Long id) {
+        if (id == null) return null;
+        String s = String.valueOf(id);
+        if (s.length() < 3) {
+            s = String.format("%03d", id);
+        }
+        return "ph_" + s;
+    }
+
+    private String mapStatus(Boolean isActive, Boolean isVerified) {
+        boolean active = Boolean.TRUE.equals(isActive);
+        boolean verified = Boolean.TRUE.equals(isVerified);
+        if (active && verified) return "Active";
+        if (!active && verified) return "Suspended";
+        // When not verified, treat as Pending (includes inactive+unverified which may be Rejected elsewhere)
+        return "Pending";
     }
 }

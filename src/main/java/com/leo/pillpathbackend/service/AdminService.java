@@ -9,6 +9,8 @@ import com.leo.pillpathbackend.dto.CustomerDTO;
 import com.leo.pillpathbackend.dto.OverviewChartsResponseDTO;
 import com.leo.pillpathbackend.dto.OverviewSummaryDTO;
 import com.leo.pillpathbackend.entity.Announcement;
+import com.leo.pillpathbackend.dto.PharmacyPerformanceResponseDTO;
+import com.leo.pillpathbackend.dto.CustomerActivityResponseDTO;
 
 import java.util.List;
 
@@ -34,6 +36,10 @@ public interface AdminService {
     AdminKpisDTO getKpis();
 
     AdminAnalyticsChartsDTO getAnalyticsCharts(Integer year);
+
+    // New: analytics
+    List<PharmacyPerformanceResponseDTO> getPharmacyPerformance();
+    List<CustomerActivityResponseDTO> getCustomerActivity();
 
 
     // Future admin methods can go here:

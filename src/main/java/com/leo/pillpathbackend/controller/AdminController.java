@@ -135,6 +135,18 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getAnalyticsCharts(year));
     }
 
+    // Pharmacy performance (no pagination/sorting)
+    @GetMapping("/analytics/pharmacy-performance")
+    public ResponseEntity<List<PharmacyPerformanceResponseDTO>> getPharmacyPerformance() {
+        return ResponseEntity.ok(adminService.getPharmacyPerformance());
+    }
+
+    // Customer activity (no pagination/sorting)
+    @GetMapping("/analytics/customer-activity")
+    public ResponseEntity<List<CustomerActivityResponseDTO>> getCustomerActivity() {
+        return ResponseEntity.ok(adminService.getCustomerActivity());
+    }
+
     // Future admin endpoints:
     // @GetMapping("/users")
     // @PostMapping("/users/{id}/deactivate")
