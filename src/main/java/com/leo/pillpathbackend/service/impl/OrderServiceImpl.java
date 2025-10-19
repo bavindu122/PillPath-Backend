@@ -6,6 +6,8 @@ import com.leo.pillpathbackend.entity.enums.*;
 import com.leo.pillpathbackend.repository.*;
 import com.leo.pillpathbackend.service.NotificationService;
 import com.leo.pillpathbackend.service.OrderService;
+import com.leo.pillpathbackend.service.WalletService;
+import com.leo.pillpathbackend.service.WalletSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,6 +31,11 @@ public class OrderServiceImpl implements OrderService {
     private final PharmacyOrderRepository pharmacyOrderRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final WalletService walletService;
+    // Added for finance tracking
+    private final CommissionRecordRepository commissionRecordRepository;
+    private final PayoutRecordRepository payoutRecordRepository;
+    private final WalletSettingsService walletSettingsService;
 
     @Override
     public CustomerOrderDTO placeOrder(Long customerId, PlaceOrderRequestDTO request) {
@@ -355,6 +363,70 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        // 4) Finance bookkeeping: on slice completion create commission/payout records if missing
+        if (status == PharmacyOrderStatus.HANDED_OVER) {
+            try {
+                CustomerOrder co = po.getCustomerOrder();
+                Pharmacy ph = po.getPharmacy();
+                final Long pharmacyIdVal = ph != null ? ph.getId() : null;
+                final String pharmacyNameVal = ph != null ? ph.getName() : null;
+                // compute gross without lambda capturing 'po'
+                BigDecimal grossTmp = po.getTotal();
+                if (grossTmp == null) {
+                    BigDecimal computed = BigDecimal.ZERO;
+                    List<PharmacyOrderItem> itms = po.getItems();
+                    if (itms != null) {
+                        for (PharmacyOrderItem it : itms) {
+                            if (it != null && it.getTotalPrice() != null) {
+                                computed = computed.add(it.getTotalPrice());
+                            }
+                        }
+                    }
+                    grossTmp = computed;
+                }
+                final BigDecimal grossVal = grossTmp != null ? grossTmp : BigDecimal.ZERO;
+                final BigDecimal rateVal = walletSettingsService.resolveCommissionPercent(pharmacyIdVal);
+                final BigDecimal commissionVal = grossVal.multiply(rateVal).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+                final String monthVal = java.time.format.DateTimeFormatter.ofPattern("MM/yyyy").format(java.time.LocalDate.now());
+                final Long orderIdVal = po.getId();
+                final String orderCodeVal = po.getOrderCode();
+
+                PaymentMethod pm = co != null ? co.getPaymentMethod() : null;
+                if (pm == PaymentMethod.CASH) {
+                    // On-hand: record commission due (UNPAID)
+                    if (commissionRecordRepository.findByOrderId(orderIdVal).isEmpty()) {
+                        CommissionRecord cr = CommissionRecord.builder()
+                                .orderId(orderIdVal)
+                                .orderCode(orderCodeVal)
+                                .pharmacyId(pharmacyIdVal)
+                                .pharmacyName(pharmacyNameVal)
+                                .amount(commissionVal)
+                                .month(monthVal)
+                                .status(CommissionStatus.UNPAID)
+                                .build();
+                        commissionRecordRepository.save(cr);
+                    }
+                } else {
+                    // Online: record payout due (UNPAID)
+                    final BigDecimal netVal = grossVal.subtract(commissionVal);
+                    if (payoutRecordRepository.findByOrderId(orderIdVal).isEmpty()) {
+                        PayoutRecord pr = PayoutRecord.builder()
+                                .orderId(orderIdVal)
+                                .orderCode(orderCodeVal)
+                                .pharmacyId(pharmacyIdVal)
+                                .pharmacyName(pharmacyNameVal)
+                                .amount(netVal)
+                                .month(monthVal)
+                                .status(PayoutStatus.UNPAID)
+                                .build();
+                        payoutRecordRepository.save(pr);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Finance bookkeeping failed for order {}: {}", pharmacyOrderId, e.getMessage());
+            }
+        }
+
         return toPharmacyDTO(po, true);
     }
 
@@ -390,6 +462,35 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        // Wallet events per PharmacyOrder
+        if (order.getPharmacyOrders() != null) {
+            for (PharmacyOrder po : order.getPharmacyOrders()) {
+                BigDecimal amount = po.getTotal();
+                if (amount == null) {
+                    // fallback compute from items
+                    amount = Optional.ofNullable(po.getItems()).orElse(Collections.emptyList()).stream()
+                            .map(PharmacyOrderItem::getTotalPrice)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                }
+                if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) continue;
+                String poCode = po.getOrderCode() != null ? po.getOrderCode() : order.getOrderCode();
+                Long presId = order.getPrescription() != null ? order.getPrescription().getId() : null;
+                Long pharmacyId = po.getPharmacy() != null ? po.getPharmacy().getId() : null;
+                try {
+                    if (order.getPaymentMethod() == PaymentMethod.CASH) {
+                        walletService.postCustomerCashCollected(poCode, po.getId(), presId, pharmacyId, amount, "cash_" + po.getId());
+                    } else {
+                        walletService.postCustomerCardCaptured(poCode, po.getId(), presId, pharmacyId, amount, order.getPaymentReference(), "card_" + po.getId());
+                    }
+                } catch (Exception ex) {
+                    // don't block order on wallet errors in MVP, but log for troubleshooting
+                    log.warn("Wallet integration failed for PharmacyOrder id={}, orderCode={}, paymentMethod={}, amount={}: {}", 
+                        po.getId(), poCode, order.getPaymentMethod(), amount, ex.getMessage(), ex);
+                }
+            }
+        }
+
         // Nudge prescription to IN_PROGRESS if still pending/review
         Prescription prescription = order.getPrescription();
         if (prescription != null) {
@@ -409,6 +510,15 @@ public class OrderServiceImpl implements OrderService {
     public List<CustomerOrderDTO> listCustomerOrders(Long customerId, boolean includeItems) {
         List<CustomerOrder> orders = customerOrderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId);
         return orders.stream().map(o -> toCustomerDTO(o, includeItems)).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PharmacyOrderDTO getCustomerPharmacyOrderByCode(Long customerId, String pharmacyOrderCode) {
+        PharmacyOrder po = pharmacyOrderRepository
+                .findByOrderCodeAndCustomerOrder_Customer_Id(pharmacyOrderCode, customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacy order not found"));
+        return toPharmacyDTO(po, true);
     }
 
     private boolean isValidTransition(PharmacyOrderStatus from, PharmacyOrderStatus to) {
@@ -470,7 +580,7 @@ public class OrderServiceImpl implements OrderService {
 
         CustomerOrder parent = po.getCustomerOrder();
         Prescription pres = parent != null ? parent.getPrescription() : null;
-        Customer cust = (parent != null && parent.getCustomer() instanceof Customer c) ? c : null;
+        Customer cust = parent != null ? parent.getCustomer() : null;
 
         String completedAt = (po.getStatus() == PharmacyOrderStatus.HANDED_OVER && po.getUpdatedAt() != null)
                 ? formatTime(po.getUpdatedAt()) : null;

@@ -32,7 +32,7 @@ public class AdminSeeder {
             superAdmin.setFullName("System Administrator");
             superAdmin.setEmail("admin@pillpath.com");
             superAdmin.setPhoneNumber("+1234567890");
-            superAdmin.setPassword(passwordEncoder.encode("TempPassword123!"));
+                superAdmin.setPassword(passwordEncoder.encode("TempPassword123!"));
             superAdmin.setIsActive(true);
             superAdmin.setEmailVerified(true);
             superAdmin.setCreatedAt(LocalDateTime.now());
