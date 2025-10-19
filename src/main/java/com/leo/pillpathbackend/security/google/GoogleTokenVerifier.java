@@ -1,4 +1,3 @@
-// PillPath-Backend/src/main/java/com/leo/pillpathbackend/security/google/GoogleTokenVerifier.java
 package com.leo.pillpathbackend.security.google;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload;
