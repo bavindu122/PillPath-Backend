@@ -47,7 +47,7 @@ public class AdminServiceImpl implements AdminService {
 
     // You can inject other repositories here as needed:
     // private final PharmacyRepository pharmacyRepository;
-    // private final OrderRepository orderRepository;
+    // private final OrderRepository orderRepository
 
     @Override
     public AdminDashboardResponseDTO getDashboardData() {
@@ -477,6 +477,46 @@ public class AdminServiceImpl implements AdminService {
                     .build());
         }
         return result;
+    }
+
+    @Override
+    public List<SuspendedAccountDTO> getSuspendedAccounts() {
+        List<SuspendedAccountDTO> result = new ArrayList<>();
+
+        // Pharmacies: suspended = isActive=false AND isVerified=true
+        List<com.leo.pillpathbackend.entity.Pharmacy> suspendedPharmacies = pharmacyRepository.findSuspendedPharmacies();
+        for (com.leo.pillpathbackend.entity.Pharmacy p : suspendedPharmacies) {
+            result.add(SuspendedAccountDTO.builder()
+                    .type("Pharmacy")
+                    .id(formatPharmacyId(p.getId()))
+                    .name(p.getName())
+                    .reason("") // no field available in entity
+                    .suspendedAt("") // not tracked
+                    .build());
+        }
+
+        // Customers: suspended if isActive=false
+        List<User> customers = userRepository.findAllCustomers();
+        for (User u : customers) {
+            if (Boolean.FALSE.equals(u.getIsActive())) {
+                result.add(SuspendedAccountDTO.builder()
+                        .type("Customer")
+                        .id(formatUserId(u.getId()))
+                        .name(u.getFullName() != null ? u.getFullName() : u.getUsername())
+                        .reason(u.getSuspendReason() != null ? u.getSuspendReason() : "")
+                        .suspendedAt("") // not tracked
+                        .build());
+            }
+        }
+
+        return result;
+    }
+
+    private String formatUserId(Long id) {
+        if (id == null) return null;
+        String s = String.valueOf(id);
+        if (s.length() < 3) s = String.format("%03d", id);
+        return "usr_" + s;
     }
 
     private String formatCustomerId(Long id) {

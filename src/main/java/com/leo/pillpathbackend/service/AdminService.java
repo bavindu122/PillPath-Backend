@@ -11,6 +11,7 @@ import com.leo.pillpathbackend.dto.OverviewSummaryDTO;
 import com.leo.pillpathbackend.entity.Announcement;
 import com.leo.pillpathbackend.dto.PharmacyPerformanceResponseDTO;
 import com.leo.pillpathbackend.dto.CustomerActivityResponseDTO;
+import com.leo.pillpathbackend.dto.SuspendedAccountDTO;
 
 import java.util.List;
 
@@ -40,6 +41,7 @@ public interface AdminService {
     // New: analytics
     List<PharmacyPerformanceResponseDTO> getPharmacyPerformance();
     List<CustomerActivityResponseDTO> getCustomerActivity();
+    List<SuspendedAccountDTO> getSuspendedAccounts();
 
 
     // Future admin methods can go here:

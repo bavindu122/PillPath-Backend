@@ -147,6 +147,12 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getCustomerActivity());
     }
 
+    // Suspended accounts (no pagination/sorting)
+    @GetMapping("/analytics/suspended-accounts")
+    public ResponseEntity<List<SuspendedAccountDTO>> getSuspendedAccounts() {
+        return ResponseEntity.ok(adminService.getSuspendedAccounts());
+    }
+
     // Future admin endpoints:
     // @GetMapping("/users")
     // @PostMapping("/users/{id}/deactivate")

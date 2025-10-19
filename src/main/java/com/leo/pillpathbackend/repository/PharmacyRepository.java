@@ -41,6 +41,10 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
     @Query("SELECT COUNT(p) FROM Pharmacy p WHERE p.isActive = false AND p.isVerified = true")
     Long countSuspendedPharmacies();
 
+    // Suspended pharmacies list
+    @Query("SELECT p FROM Pharmacy p WHERE p.isActive = false AND p.isVerified = true")
+    List<Pharmacy> findSuspendedPharmacies();
+
     // Search and filter queries
     // Add these methods to PharmacyRepository.java
 
