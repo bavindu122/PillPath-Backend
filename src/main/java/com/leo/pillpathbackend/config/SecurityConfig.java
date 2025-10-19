@@ -45,6 +45,10 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    public SecurityConfig() {
+        System.out.println("🟢🟢🟢 SecurityConfig LOADED! 🟢🟢🟢");
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -52,6 +56,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        System.out.println("🔧 Building SecurityFilterChain...");
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
@@ -76,10 +81,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/orders/**").permitAll()
                         .requestMatchers("/api/otc/pharmacy/**").permitAll() // Test only!
                         .requestMatchers("/api/v1/notifications/**").permitAll()
+                        .requestMatchers("/api/otc-orders/**").permitAll()
 
                         .anyRequest().authenticated()
                 );
 
+        System.out.println("✅ SecurityFilterChain built successfully!");
+        System.out.println("✅ /api/otc-orders/** is set to .permitAll()");
         return http.build();
     }
 
@@ -89,7 +97,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT","PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
+        configuration.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
