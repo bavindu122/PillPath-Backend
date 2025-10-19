@@ -87,7 +87,7 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
                 System.out.println("No valid token found");
             }
         } catch (Exception e) {
-            // Log and continue without authentication
+            logger.warn("Exception during token authentication, proceeding without authentication", e);
             System.err.println("Token authentication failed: " + e.getMessage());
             e.printStackTrace();
         }
