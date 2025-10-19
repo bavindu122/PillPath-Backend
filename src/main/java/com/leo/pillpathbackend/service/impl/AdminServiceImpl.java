@@ -1,21 +1,8 @@
 package com.leo.pillpathbackend.service.impl;
 
 import com.leo.pillpathbackend.dto.*;
-import com.leo.pillpathbackend.entity.Prescription;
-import com.leo.pillpathbackend.entity.User;
+import com.leo.pillpathbackend.entity.*;
 import com.leo.pillpathbackend.repository.UserRepository;
-import com.leo.pillpathbackend.service.AdminService;
-import org.springframework.stereotype.Service;
-import com.leo.pillpathbackend.entity.Prescription;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
-import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
-import com.leo.pillpathbackend.entity.Announcement;
-import com.leo.pillpathbackend.repository.AnnouncementRepository;
 import com.leo.pillpathbackend.service.AdminService;
 import org.springframework.stereotype.Service;
 import com.leo.pillpathbackend.repository.PrescriptionRepository;
@@ -31,6 +18,13 @@ import java.util.Locale;
 import com.leo.pillpathbackend.dto.AdminAnalyticsChartsDTO;
 import java.time.Year;
 import java.time.format.DateTimeFormatter;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import com.leo.pillpathbackend.repository.AnnouncementRepository;
+
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +36,7 @@ public class AdminServiceImpl implements AdminService {
     private final CustomerOrderRepository customerOrderRepository;
     private final PharmacyRepository pharmacyRepository;
     private final com.leo.pillpathbackend.repository.PharmacyOrderRepository pharmacyOrderRepository; // New repository for pharmacy orders
+    private final PasswordEncoder passwordEncoder;
 
     private static final DateTimeFormatter CUSTOMER_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -542,5 +537,43 @@ public class AdminServiceImpl implements AdminService {
         if (!active && verified) return "Suspended";
         // When not verified, treat as Pending (includes inactive+unverified which may be Rejected elsewhere)
         return "Pending";
+    }
+
+    @Override
+    public ModeratorCreateResponse addModerator(ModeratorCreateRequest request) {
+        if (request == null || request.getUsername() == null || request.getUsername().trim().isEmpty() ||
+                request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+            throw new IllegalArgumentException("Username and password are required");
+        }
+
+        String username = request.getUsername().trim();
+        if (userRepository.existsByUsername(username)) {
+            throw new IllegalArgumentException("Username already exists");
+        }
+
+        // Generate a synthetic email to satisfy not-null+unique constraint
+        String email = ("mod_" + username + "@pillpath.local").toLowerCase();
+        if (userRepository.existsByEmail(email)) {
+            email = ("mod_" + username + "+1@pillpath.local").toLowerCase();
+        }
+
+        Admin moderator = new Admin();
+        moderator.setUsername(username);
+        moderator.setPassword(passwordEncoder.encode(request.getPassword()));
+        moderator.setEmail(email);
+        moderator.setFullName("Moderator");
+        moderator.setIsActive(true);
+        moderator.setEmailVerified(true);
+        // Admin-specific
+        moderator.setAdminLevel(com.leo.pillpathbackend.entity.enums.AdminLevel.STANDARD);
+        moderator.setDepartment("Administration");
+        moderator.setEmployeeId("MOD" + System.currentTimeMillis());
+
+        Admin saved = (Admin) userRepository.save(moderator);
+        return ModeratorCreateResponse.builder()
+                .id(saved.getId())
+                .username(saved.getUsername())
+                .message("Moderator created successfully")
+                .build();
     }
 }

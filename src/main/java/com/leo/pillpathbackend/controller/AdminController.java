@@ -34,6 +34,13 @@ public class AdminController {
         }
     }
 
+    // Create a moderator (admin-only action)
+    @PostMapping("/moderators")
+    public ResponseEntity<ModeratorCreateResponse> addModerator(@Valid @RequestBody ModeratorCreateRequest request) {
+        ModeratorCreateResponse response = adminService.addModerator(request);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/announcements")
     public ResponseEntity<AddAnnouncementResponse> addAnnouncement(@RequestBody @Valid AddAnnouncementRequest request) {
         Announcement announcement = adminService.addAnnouncement(request);

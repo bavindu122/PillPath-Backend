@@ -12,6 +12,8 @@ import com.leo.pillpathbackend.entity.Announcement;
 import com.leo.pillpathbackend.dto.PharmacyPerformanceResponseDTO;
 import com.leo.pillpathbackend.dto.CustomerActivityResponseDTO;
 import com.leo.pillpathbackend.dto.SuspendedAccountDTO;
+import com.leo.pillpathbackend.dto.ModeratorCreateRequest;
+import com.leo.pillpathbackend.dto.ModeratorCreateResponse;
 
 import java.util.List;
 
@@ -42,6 +44,9 @@ public interface AdminService {
     List<PharmacyPerformanceResponseDTO> getPharmacyPerformance();
     List<CustomerActivityResponseDTO> getCustomerActivity();
     List<SuspendedAccountDTO> getSuspendedAccounts();
+
+    // New: moderators
+    ModeratorCreateResponse addModerator(ModeratorCreateRequest request);
 
 
     // Future admin methods can go here:
