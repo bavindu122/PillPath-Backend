@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <title>PillPath Chat</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>
+    // TODO: Set these values from your authentication system
+    // For testing, you can hardcode values here
+    window.CURRENT_USER_ID = 1; // Replace with actual logged-in user ID
+    window.CURRENT_USER_ROLE = 'customer'; // 'customer', 'pharmacy_admin', or 'pharmacist'
+    window.AUTH_TOKEN = null; // Optional: JWT token if you have one
+  </script>
   <style>
     :root {
       --bg: #f6f7fb;
@@ -31,6 +38,10 @@
   </style>
 </head>
 <body>
+  <!-- WebSocket Libraries (SockJS and Stomp.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+  
   <div class="chat-shell">
     <div class="chat-header">
       <div class="avatar" id="phAvatar"></div>

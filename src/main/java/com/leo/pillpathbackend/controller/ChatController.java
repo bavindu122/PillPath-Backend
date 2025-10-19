@@ -111,10 +111,37 @@ public class ChatController {
     public ResponseEntity<ChatMessageHistoryResponse> getChatMessages(
             @PathVariable Long chatId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int limit) {
+            @RequestParam(defaultValue = "50") int limit,
+            HttpServletRequest request) {
 
-        ChatMessageHistoryResponse messages = chatService.getChatMessages(chatId, page, limit);
-        return ResponseEntity.ok(messages);
+        System.out.println("=== GET CHAT MESSAGES DEBUG ===");
+        System.out.println("ChatId: " + chatId + ", Page: " + page + ", Limit: " + limit);
+        System.out.println("Request URI: " + request.getRequestURI());
+        
+        try {
+            ChatMessageHistoryResponse messages = chatService.getChatMessages(chatId, page, limit);
+            System.out.println("Returning " + messages.getMessages().size() + " messages");
+            
+            // Debug: print first few messages
+            messages.getMessages().stream().limit(3).forEach(msg -> {
+                System.out.println("  - Message " + msg.getId() + ": " + 
+                    msg.getSenderType() + " - " + msg.getContent().substring(0, Math.min(50, msg.getContent().length())));
+            });
+            
+            return ResponseEntity.ok(messages);
+        } catch (Exception e) {
+            System.err.println("ERROR getting messages: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ChatMessageHistoryResponse.builder
+                            ()
+                .chatRoomId(chatId)
+                .messages(java.util.Collections.emptyList())
+                .currentPage(0)
+                .totalPages(0)
+                .totalMessages(0)
+                .hasMore(false)
+                .build());
+        }
     }
 
     /**
@@ -251,6 +278,105 @@ public class ChatController {
             System.out.println("Exception: " + ex.getMessage());
             ex.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("error", "failed"));
+        }
+    }
+
+    /**
+     * API specifically for pharmacy admin dashboard - Get all chats for pharmacy
+     */
+    @GetMapping("/pharmacy-admin/dashboard/chats")
+    public ResponseEntity<List<ChatRoomDTO>> getPharmacyAdminChats(HttpServletRequest request) {
+        try {
+            // Extract userId from Spring Security context
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !(auth.getPrincipal() instanceof Long)) {
+                return ResponseEntity.status(401).body(java.util.Collections.emptyList());
+            }
+
+            Long userId = (Long) auth.getPrincipal();
+            
+            // Force userType to ADMIN for pharmacy admin dashboard
+            List<ChatRoomDTO> chats = chatService.getMyChats(userId, "ADMIN");
+            return ResponseEntity.ok(chats);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(java.util.Collections.emptyList());
+        }
+    }
+
+    /**
+     * API specifically for pharmacy admin dashboard - Get chat messages
+     */
+    @GetMapping("/pharmacy-admin/dashboard/chats/{chatId}/messages")
+    public ResponseEntity<ChatMessageHistoryResponse> getPharmacyAdminChatMessages(
+            @PathVariable Long chatId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int limit,
+            HttpServletRequest request) {
+        
+        try {
+            System.out.println("=== PHARMACY ADMIN GET MESSAGES DEBUG ===");
+            System.out.println("ChatId: " + chatId);
+            System.out.println("Page: " + page + ", Limit: " + limit);
+            System.out.println("Authorization Header: " + request.getHeader("Authorization"));
+            
+            // Get authentication - allow anonymous for testing
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null) {
+                System.out.println("Auth Principal: " + auth.getPrincipal());
+                System.out.println("Auth Authorities: " + auth.getAuthorities());
+            } else {
+                System.out.println("No authentication found - allowing for testing");
+            }
+            
+            ChatMessageHistoryResponse messages = chatService.getChatMessages(chatId, page, limit);
+            System.out.println("Retrieved " + messages.getMessages().size() + " messages");
+            System.out.println("Has more: " + messages.isHasMore());
+            
+            return ResponseEntity.ok(messages);
+        } catch (Exception e) {
+            System.err.println("ERROR getting pharmacy admin messages: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ChatMessageHistoryResponse.builder()
+                .chatRoomId(chatId)
+                .messages(java.util.Collections.emptyList())
+                .currentPage(0)
+                .totalPages(0)
+                .totalMessages(0)
+                .hasMore(false)
+                .build());
+        }
+    }
+
+    /**
+     * API specifically for pharmacy admin dashboard - Send message
+     */
+    @PostMapping("/pharmacy-admin/dashboard/chats/{chatId}/messages")
+    public ResponseEntity<?> sendPharmacyAdminMessage(
+            @PathVariable Long chatId,
+            @RequestBody Map<String, String> messageData,
+            HttpServletRequest request) {
+        
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !(auth.getPrincipal() instanceof Long)) {
+                return ResponseEntity.status(401).body(Map.of("error", "unauthorized"));
+            }
+
+            Long senderId = (Long) auth.getPrincipal();
+            String text = messageData.get("text");
+            
+            if (text == null || text.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "text required"));
+            }
+
+            // Force userType to ADMIN for pharmacy admin dashboard
+            chatService.persistAndBroadcastMessage(chatId, senderId, "ADMIN", text);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Message sent"));
+            
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.status(500).body(Map.of("error", "failed to send message"));
         }
     }
 }

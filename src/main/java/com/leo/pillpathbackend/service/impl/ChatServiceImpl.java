@@ -12,7 +12,6 @@ import com.leo.pillpathbackend.repository.PharmacyRepository;
 import com.leo.pillpathbackend.repository.PharmacyAdminRepository;
 import com.leo.pillpathbackend.repository.PharmacistUserRepository;
 import com.leo.pillpathbackend.service.ChatService;
-import com.leo.pillpathbackend.ws.WatchRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,7 +33,6 @@ public class ChatServiceImpl implements ChatService {
     private final PharmacyRepository pharmacyRepository;
     private final MessageRepository messageRepository;
     private final SimpMessagingTemplate messagingTemplate;
-    private final WatchRegistry watchRegistry;
     private final PharmacyAdminRepository pharmacyAdminRepository;
     private final PharmacistUserRepository pharmacistUserRepository;
 
@@ -181,75 +179,112 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional
     public void persistAndBroadcastMessage(Long chatRoomId, Long senderId, String userType, String text) {
+        System.out.println("\n========== PERSIST AND BROADCAST MESSAGE ==========");
+        System.out.println("ChatRoomId: " + chatRoomId);
+        System.out.println("SenderId: " + senderId);
+        System.out.println("UserType: " + userType);
+        System.out.println("Text: " + text);
+        
+        // STEP 1: Validate chat room exists
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
-                .orElseThrow(() -> new IllegalArgumentException("chat not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Chat room not found"));
+        System.out.println("✅ Chat room found: " + chatRoom.getId());
+        System.out.println("   Customer ID: " + chatRoom.getCustomer().getId());
+        System.out.println("   Pharmacy ID: " + chatRoom.getPharmacy().getId());
 
+        // STEP 2: Identify and validate the sender
         User sender;
         boolean isCustomerSender;
+        
         if ("CUSTOMER".equalsIgnoreCase(userType)) {
+            // Customer sending message
             sender = chatRoom.getCustomer();
-            if (sender == null || !sender.getId().equals(senderId)) throw new IllegalArgumentException("not your chat");
+            if (sender == null || !sender.getId().equals(senderId)) {
+                throw new IllegalArgumentException("You are not authorized to send messages in this chat");
+            }
             isCustomerSender = true;
-        } else if ("ADMIN".equalsIgnoreCase(userType) || "PHARMACIST".equalsIgnoreCase(userType)) {
-            // Resolve the actual pharmacy-side sender entity
-            sender = null;
-            if ("PHARMACIST".equalsIgnoreCase(userType)) {
-                // If chat has assigned pharmacist and matches, use it; otherwise try to load by senderId
-                if (chatRoom.getPharmacist() != null && chatRoom.getPharmacist().getId().equals(senderId)) {
-                    sender = chatRoom.getPharmacist();
-                } else {
-                    sender = pharmacistUserRepository.findById(senderId).orElse(null);
-                }
-            } else { // ADMIN (pharmacy admin)
-                sender = pharmacyAdminRepository.findById(senderId).orElse(null);
+            System.out.println("✅ Sender validated as CUSTOMER: " + sender.getId() + " - " + sender.getFullName());
+        } else if ("ADMIN".equalsIgnoreCase(userType) || "PHARMACY_ADMIN".equalsIgnoreCase(userType)) {
+            // Pharmacy admin sending message
+            PharmacyAdmin admin = pharmacyAdminRepository.findById(senderId).orElse(null);
+            System.out.println("Looking for pharmacy admin with ID: " + senderId);
+            if (admin == null) {
+                System.out.println("❌ Pharmacy admin not found!");
+                throw new IllegalArgumentException("Pharmacy admin not found");
             }
-            if (sender == null) {
-                throw new IllegalArgumentException("invalid pharmacy sender");
+            System.out.println("Found pharmacy admin: " + admin.getId() + " - " + admin.getFullName());
+            System.out.println("Admin's pharmacy ID: " + (admin.getPharmacy() != null ? admin.getPharmacy().getId() : "null"));
+            System.out.println("Chat room pharmacy ID: " + chatRoom.getPharmacy().getId());
+            
+            if (admin.getPharmacy() == null 
+                || !admin.getPharmacy().getId().equals(chatRoom.getPharmacy().getId())) {
+                System.out.println("❌ Pharmacy admin not authorized - pharmacy mismatch!");
+                throw new IllegalArgumentException("You are not authorized to send messages in this chat. " +
+                    "Only pharmacy admins from the pharmacy associated with this chat can respond.");
             }
+            sender = admin;
             isCustomerSender = false;
+            System.out.println("✅ Sender validated as PHARMACY_ADMIN: " + sender.getId() + " - " + sender.getFullName());
         } else {
-            throw new IllegalArgumentException("invalid sender");
+            System.out.println("❌ Invalid sender type: " + userType);
+            throw new IllegalArgumentException("Invalid sender type. Only 'CUSTOMER' and 'PHARMACY_ADMIN' roles are allowed.");
         }
 
+        // STEP 3: Persist message to database FIRST
         Message message = Message.builder()
                 .chatRoom(chatRoom)
-                .sender(sender != null ? sender : chatRoom.getCustomer())
+                .sender(sender)
                 .content(text)
                 .isRead(false)
-                .timestamp(java.time.LocalDateTime.now())
+                .timestamp(LocalDateTime.now())
                 .build();
-        messageRepository.save(message);
+        message = messageRepository.save(message);
+        System.out.println("✅ Message saved to database with ID: " + message.getId());
 
+        // STEP 4: Update chat room metadata
         chatRoom.updateLastMessageTime();
         chatRoom.incrementUnreadCount(isCustomerSender);
         chatRoomRepository.save(chatRoom);
+        System.out.println("✅ Chat room metadata updated");
 
-        // Build payload to match WS consumer
+        // STEP 5: Build message payload for WebSocket delivery
+        // Create a comprehensive payload with all needed info
+        String senderTypeStr = isCustomerSender ? "CUSTOMER" : "ADMIN";
         java.util.Map<String, Object> payload = java.util.Map.of(
-                "customerId", chatRoom.getCustomer().getId(),
-                "sender", isCustomerSender ? "customer" : "admin",
-                "text", text,
-                "time", System.currentTimeMillis()
+                "id", message.getId(),
+                "chatRoomId", chatRoomId,
+                "senderId", sender.getId(),
+                "senderName", sender.getFullName(),
+                "senderType", senderTypeStr,
+                "content", text,
+                "timestamp", message.getTimestamp().toString(),
+                "isRead", false
         );
+        System.out.println("✅ WebSocket payload created: " + payload);
 
-        // Deliver to the customer user destination
-        String customerUserName = "customer:" + chatRoom.getCustomer().getId();
-        messagingTemplate.convertAndSendToUser(customerUserName, "/queue/chat", payload);
-
-        // Deliver to watching staff (admin, pharmacy_admin, pharmacist)
-        for (var w : watchRegistry.getWatchers(chatRoom.getCustomer().getId())) {
-            String role = w.role();
-            if ("admin".equalsIgnoreCase(role) || "pharmacy_admin".equalsIgnoreCase(role) || "pharmacist".equalsIgnoreCase(role)) {
-                String target = role.toLowerCase() + ":" + w.userId();
-                messagingTemplate.convertAndSendToUser(target, "/queue/chat", payload);
-            }
+        // STEP 6: Broadcast to ONLY the participants of this specific chat room
+        System.out.println("\n--- Broadcasting to participants ---");
+        
+        // Always deliver to the customer in this chat
+        Long customerId = chatRoom.getCustomer().getId();
+        String customerDestination = "customer:" + customerId;
+        System.out.println("📤 Sending to customer: " + customerDestination + " -> /queue/chat/" + chatRoomId);
+        messagingTemplate.convertAndSendToUser(customerDestination, "/queue/chat/" + chatRoomId, payload);
+        
+        // Deliver to all pharmacy admins for this pharmacy
+        List<PharmacyAdmin> pharmacyAdmins = pharmacyAdminRepository.findByPharmacyId(chatRoom.getPharmacy().getId());
+        System.out.println("📤 Found " + pharmacyAdmins.size() + " pharmacy admins for pharmacy " + chatRoom.getPharmacy().getId());
+        for (PharmacyAdmin admin : pharmacyAdmins) {
+            String adminDestination = "pharmacy_admin:" + admin.getId();
+            System.out.println("   📤 Sending to pharmacy admin: " + adminDestination + " -> /queue/chat/" + chatRoomId);
+            messagingTemplate.convertAndSendToUser(adminDestination, "/queue/chat/" + chatRoomId, payload);
         }
-
-        // Also echo to pharmacy side primary destination if pharmacist/admin is logged as user destination
-        Long pharmacySideUserId = chatRoom.getPharmacist() != null ? chatRoom.getPharmacist().getId() : null;
-        if (pharmacySideUserId != null) {
-            messagingTemplate.convertAndSendToUser("pharmacist:" + pharmacySideUserId, "/queue/chat", payload);
-        }
+        
+        // Also send to room-based topic for anyone subscribed to this specific chat room
+        System.out.println("📤 Broadcasting to room topic: /topic/chat/room/" + chatRoomId);
+        messagingTemplate.convertAndSend("/topic/chat/room/" + chatRoomId, payload);
+        
+        System.out.println("========== MESSAGE BROADCAST COMPLETE ==========\n");
     }
 
     
@@ -286,7 +321,15 @@ public class ChatServiceImpl implements ChatService {
 
     private MessageDTO convertMessageToDTO(Message message) {
         User sender = message.getSender();
-        String senderType = sender instanceof Customer ? "CUSTOMER" : "PHARMACIST";
+        String senderType;
+        
+        if (sender instanceof Customer) {
+            senderType = "CUSTOMER";
+        } else if (sender instanceof PharmacyAdmin) {
+            senderType = "ADMIN";
+        } else {
+            senderType = "UNKNOWN";
+        }
 
         return MessageDTO.builder()
                 .id(message.getId())
