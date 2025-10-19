@@ -219,7 +219,6 @@ public class AdminServiceImpl implements AdminService {
             dto.setId(user.getId());
             dto.setUsername(user.getFullName());
             dto.setEmail(user.getEmail());
-            dto.setPassword(user.getPassword());
             dto.setFullName(user.getFullName());
             dto.setPhoneNumber(user.getPhoneNumber());
             dto.setDateOfBirth(user.getDateOfBirth());

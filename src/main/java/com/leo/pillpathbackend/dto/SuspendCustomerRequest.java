@@ -1,6 +1,9 @@
 package com.leo.pillpathbackend.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class SuspendCustomerRequest {
+    @NotBlank
     private String reason;
 
     public String getReason() {
@@ -11,4 +14,3 @@ public class SuspendCustomerRequest {
         this.reason = reason;
     }
 }
-
