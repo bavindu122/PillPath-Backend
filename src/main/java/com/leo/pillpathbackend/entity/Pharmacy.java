@@ -61,6 +61,9 @@ public class Pharmacy {
     @Column(name = "banner_public_id")
     private String bannerPublicId;
 
+    @Getter
+    private String imageUrl;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "operating_hours", columnDefinition = "jsonb")
     private Map<String, String> operatingHours;
@@ -103,5 +106,5 @@ public class Pharmacy {
 //    private List<Pharmacist> pharmacists = new ArrayList<>();
 
     @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Order> orders = new ArrayList<>();
+    private List<PharmacyOrder> pharmacyOrders = new ArrayList<>();
 }
