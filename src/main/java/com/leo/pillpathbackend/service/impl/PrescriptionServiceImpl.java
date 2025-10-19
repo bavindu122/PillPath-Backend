@@ -11,9 +11,11 @@ import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
 import com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus;
 import com.leo.pillpathbackend.repository.*;
 import com.leo.pillpathbackend.service.CloudinaryService;
+import com.leo.pillpathbackend.service.NotificationService;
 import com.leo.pillpathbackend.service.PrescriptionService;
 import com.leo.pillpathbackend.util.Mapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional
 public class PrescriptionServiceImpl implements PrescriptionService {
 
@@ -44,6 +47,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final UserRepository userRepository;
     private final PrescriptionSubmissionItemRepository prescriptionSubmissionItemRepository;
     private final PharmacyOrderRepository pharmacyOrderRepository;
+    private final NotificationService notificationService;
 
     private static final DateTimeFormatter ISO_SECOND_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
@@ -98,6 +102,27 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                     .totalPrice(null)
                     .build();
             prescriptionSubmissionRepository.save(submission);
+        }
+
+        // NOTIFICATION: Notify pharmacists about new prescription (Scenario 1)
+        for (Long pid : targetPharmacyIds) {
+            Pharmacy pharmacy = pharmacyRepository.findById(pid).orElse(null);
+            if (pharmacy != null) {
+                // Get all pharmacists for this pharmacy
+                List<Long> pharmacistIds = userRepository.findPharmacistIdsByPharmacyId(pid);
+                if (!pharmacistIds.isEmpty()) {
+                    try {
+                        notificationService.createPrescriptionSentNotification(
+                            saved.getId(),
+                            pid,
+                            pharmacistIds,
+                            customer.getFullName()
+                        );
+                    } catch (Exception e) {
+                        log.error("Failed to send prescription notification for pharmacy {}: {}", pid, e.getMessage());
+                    }
+                }
+            }
         }
 
         return mapper.toPrescriptionDTO(saved);
@@ -172,9 +197,32 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
         // Collect submission ids for order lookup
         List<Long> submissionIds = submissions.stream().map(PrescriptionSubmission::getId).toList();
-        Map<Long, PharmacyOrderStatus> submissionOrderStatus = submissionIds.isEmpty() ? Map.of() :
-                pharmacyOrderRepository.findBySubmissionIdIn(submissionIds).stream()
-                        .collect(java.util.stream.Collectors.toMap(po -> po.getSubmission().getId(), PharmacyOrder::getStatus, (a,b)->a));
+        Map<Long, PharmacyOrderStatus> submissionOrderStatus;
+        Map<Long, String> submissionOrderCode;
+        if (submissionIds.isEmpty()) {
+            submissionOrderStatus = Map.of();
+            submissionOrderCode = Map.of();
+        } else {
+            List<PharmacyOrder> poList = pharmacyOrderRepository.findBySubmissionIdIn(submissionIds);
+            // choose best order per submission: prefer active (not CANCELLED/HANDED_OVER), else latest by createdAt
+            java.util.Map<Long, PharmacyOrder> best = new java.util.HashMap<>();
+            for (PharmacyOrder po : poList) {
+                Long sid = po.getSubmission() != null ? po.getSubmission().getId() : null;
+                if (sid == null) continue;
+                PharmacyOrder current = best.get(sid);
+                boolean poActive = po.getStatus() != PharmacyOrderStatus.CANCELLED && po.getStatus() != PharmacyOrderStatus.HANDED_OVER;
+                boolean curActive = current != null && current.getStatus() != PharmacyOrderStatus.CANCELLED && current.getStatus() != PharmacyOrderStatus.HANDED_OVER;
+                if (current == null
+                        || (poActive && !curActive)
+                        || ((poActive == curActive) && (current.getCreatedAt() == null || (po.getCreatedAt() != null && po.getCreatedAt().isAfter(current.getCreatedAt()))))) {
+                    best.put(sid, po);
+                }
+            }
+            submissionOrderStatus = best.entrySet().stream()
+                    .collect(java.util.stream.Collectors.toMap(java.util.Map.Entry::getKey, e -> e.getValue().getStatus()));
+            submissionOrderCode = best.entrySet().stream()
+                    .collect(java.util.stream.Collectors.toMap(java.util.Map.Entry::getKey, e -> e.getValue().getOrderCode()));
+        }
 
         // group submissions by prescription id
         java.util.Map<Long, List<PrescriptionSubmission>> byPrescription = submissions.stream()
@@ -197,6 +245,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                                         .status(actStatus)
                                         .accepted(existingStatus != null)
                                         .orderStatus(existingStatus != null ? existingStatus.name() : null)
+                                        .pharmacyOrderCode(submissionOrderCode != null ? submissionOrderCode.get(s.getId()) : null)
                                         .actions(PharmacyActivityDTO.Actions.builder()
                                                 .canViewOrderPreview(hasItems)
                                                 .canProceedToPayment(hasItems && !activeOrderExists)
@@ -276,26 +325,29 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         }
         Long pharmacyId = pharmacy.getId();
 
-        if (status == null) {
-            List<PrescriptionSubmission> pending = prescriptionSubmissionRepository
-                    .findByPharmacyIdAndStatusAndAssignedPharmacistIsNullOrderByCreatedAtAsc(pharmacyId, PrescriptionStatus.PENDING_REVIEW);
-            List<PrescriptionSubmission> inProgress = prescriptionSubmissionRepository
-                    .findByPharmacyIdAndAssignedPharmacistIdAndStatusOrderByCreatedAtAsc(pharmacyId, pharmacistId, PrescriptionStatus.IN_PROGRESS);
-            java.util.ArrayList<PrescriptionSubmission> combined = new java.util.ArrayList<>();
-            combined.addAll(pending);
-            combined.addAll(inProgress);
-            return combined.stream().map(this::toQueueDTO).toList();
-        }
+        // Exclude closed statuses from queue
+        java.util.List<PrescriptionStatus> exclude = java.util.List.of(
+                PrescriptionStatus.COMPLETED,
+                PrescriptionStatus.REJECTED,
+                PrescriptionStatus.CANCELLED
+        );
 
         List<PrescriptionSubmission> submissions;
-        if (status == PrescriptionStatus.PENDING_REVIEW) {
-            submissions = prescriptionSubmissionRepository
-                    .findByPharmacyIdAndStatusAndAssignedPharmacistIsNullOrderByCreatedAtAsc(pharmacyId, PrescriptionStatus.PENDING_REVIEW);
-        } else if (status == PrescriptionStatus.IN_PROGRESS) {
-            submissions = prescriptionSubmissionRepository
-                    .findByPharmacyIdAndAssignedPharmacistIdAndStatusOrderByCreatedAtAsc(pharmacyId, pharmacistId, PrescriptionStatus.IN_PROGRESS);
+        if (status == null) {
+            // All submissions except closed: include unassigned + those assigned to this pharmacist
+            List<PrescriptionSubmission> unassigned = prescriptionSubmissionRepository.findQueueUnassignedExcluding(pharmacyId, exclude);
+            List<PrescriptionSubmission> mine = prescriptionSubmissionRepository.findQueueAssignedToPharmacistExcluding(pharmacyId, pharmacistId, exclude);
+            java.util.ArrayList<PrescriptionSubmission> combined = new java.util.ArrayList<>(unassigned);
+            combined.addAll(mine);
+            submissions = combined;
         } else {
-            submissions = java.util.List.of();
+            // If filter is one of excluded, return empty
+            if (exclude.contains(status)) {
+                submissions = java.util.List.of();
+            } else {
+                // Show all submissions at this pharmacy with that status
+                submissions = prescriptionSubmissionRepository.findByPharmacyIdAndStatusOrderByCreatedAtAsc(pharmacyId, status);
+            }
         }
         return submissions.stream().map(this::toQueueDTO).toList();
     }
@@ -351,6 +403,25 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         submission.getItems().add(item);
         recalcSubmissionTotals(submission);
         prescriptionSubmissionRepository.save(submission);
+        
+        // NOTIFICATION: Notify customer when order preview is ready (Scenario 2)
+        // Send notification if this is the first item or if submission now has items with total > 0
+        if (submission.getTotalPrice() != null && submission.getTotalPrice().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            Prescription prescription = submission.getPrescription();
+            if (prescription != null && prescription.getCustomer() != null) {
+                try {
+                    notificationService.createOrderPreviewReadyNotification(
+                        submission.getId(),
+                        prescription.getId(),
+                        prescription.getCustomer().getId(),
+                        submission.getPharmacy().getName()
+                    );
+                } catch (Exception e) {
+                    log.error("Failed to send order preview notification: {}", e.getMessage());
+                }
+            }
+        }
+        
         return buildSubmissionItemsDTO(submission, pharmacistId);
     }
 
@@ -565,5 +636,32 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                 .actions(actions)
                 .unavailableItems(unavailable)
                 .build();
+    }
+
+    @Override
+    public void updateSubmissionStatus(Long pharmacistId, Long submissionId, PrescriptionStatus status) {
+        if (status == null) throw new IllegalArgumentException("status required");
+        PrescriptionSubmission submission = loadAndAuthorizeSubmission(pharmacistId, submissionId, true);
+        ensureEditable(pharmacistId, submission);
+        // Update status directly
+        submission.setStatus(status);
+        prescriptionSubmissionRepository.save(submission);
+    }
+
+    @Override
+    public void deleteSubmission(Long pharmacistId, Long submissionId) {
+        PrescriptionSubmission submission = loadAndAuthorizeSubmission(pharmacistId, submissionId, true);
+        ensureEditable(pharmacistId, submission);
+        // Prevent deletion if tied to an active customer order (PENDING or PAID)
+        boolean hasActiveOrder = pharmacyOrderRepository.existsBySubmissionIdAndCustomerOrder_StatusIn(
+                submission.getId(), java.util.List.of(
+                        com.leo.pillpathbackend.entity.enums.CustomerOrderStatus.PENDING,
+                        com.leo.pillpathbackend.entity.enums.CustomerOrderStatus.PAID
+                )
+        );
+        if (hasActiveOrder) {
+            throw new IllegalStateException("Cannot delete a submission that is part of an active order");
+        }
+        prescriptionSubmissionRepository.delete(submission);
     }
 }

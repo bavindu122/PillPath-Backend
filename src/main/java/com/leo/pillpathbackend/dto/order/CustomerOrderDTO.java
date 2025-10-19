@@ -13,6 +13,7 @@ public class CustomerOrderDTO {
     private String orderCode;
     private String createdAt;
     private String updatedAt;
+    private Long prescriptionId;
     private String prescriptionCode;
     private CustomerOrderStatus status;
     private PaymentDTO payment;
@@ -20,4 +21,3 @@ public class CustomerOrderDTO {
     private String currency;
     private List<PharmacyOrderDTO> pharmacyOrders;
 }
-

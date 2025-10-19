@@ -46,4 +46,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
         ORDER BY EXTRACT(MONTH FROM created_at)
         """, nativeQuery = true)
     List<Object[]> getUserRegistrationTrend();
+
+    // Get all pharmacist IDs for a specific pharmacy
+    @Query("SELECT p.id FROM PharmacistUser p WHERE p.pharmacy.id = :pharmacyId")
+    List<Long> findPharmacistIdsByPharmacyId(@Param("pharmacyId") Long pharmacyId);
 }
