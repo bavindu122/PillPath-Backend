@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
+import com.leo.pillpathbackend.repository.PrescriptionSubmissionRepository;
+import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +42,7 @@ public class AdminServiceImpl implements AdminService {
     private final PharmacyRepository pharmacyRepository;
     private final com.leo.pillpathbackend.repository.PharmacyOrderRepository pharmacyOrderRepository; // New repository for pharmacy orders
     private final PasswordEncoder passwordEncoder;
+    private final PrescriptionSubmissionRepository prescriptionSubmissionRepository;
 
     private static final DateTimeFormatter CUSTOMER_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -265,7 +268,12 @@ public class AdminServiceImpl implements AdminService {
             dto.setId(p.getCode()); // or p.getId().toString()
             dto.setPatient(p.getCustomer().getFullName());
             dto.setPharmacy(p.getPharmacy().getName());
-            dto.setStatus(p.getStatus().name());
+            // status from prescription_submission; default REJECTED if not found
+            String status = prescriptionSubmissionRepository
+                    .findByPrescriptionIdAndPharmacyId(p.getId(), p.getPharmacy().getId())
+                    .map(s -> s.getStatus().name())
+                    .orElse(PrescriptionStatus.REJECTED.name());
+            dto.setStatus(status);
             dto.setSubmitted(p.getCreatedAt().toLocalDate().toString());
             dto.setTotalPrice(String.valueOf(p.getTotalPrice()));
             dto.setPatientImage(p.getCustomer().getProfilePictureUrl());
