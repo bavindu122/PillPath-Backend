@@ -7,7 +7,6 @@ import com.leo.pillpathbackend.dto.request.CreatePrescriptionRequest;
 import com.leo.pillpathbackend.dto.activity.PrescriptionActivityListResponse;
 import com.leo.pillpathbackend.dto.PharmacistSubmissionItemsDTO;
 import com.leo.pillpathbackend.entity.PharmacistUser;
-import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.PrescriptionService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +23,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
+import com.leo.pillpathbackend.repository.PharmacistUserRepository;
+
 @RestController
 @RequestMapping("/api/v1/prescriptions")
 @RequiredArgsConstructor
@@ -33,7 +34,7 @@ public class PrescriptionController {
 
     private final PrescriptionService prescriptionService;
     private final AuthenticationHelper auth;
-    private final UserRepository userRepository;
+    private final PharmacistUserRepository pharmacistUserRepository;
 
     // Customer: upload a prescription image to a chosen pharmacy
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -119,7 +120,7 @@ public class PrescriptionController {
     public ResponseEntity<?> pharmacyPrescriptions(HttpServletRequest request) {
         try {
             Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
-            PharmacistUser pharmacist = (PharmacistUser) userRepository.findById(pharmacistId)
+            PharmacistUser pharmacist = pharmacistUserRepository.findById(pharmacistId)
                     .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
             if (pharmacist.getPharmacy() == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Pharmacist is not assigned to a pharmacy"));
@@ -127,8 +128,6 @@ public class PrescriptionController {
             Long pharmacyId = pharmacist.getPharmacy().getId();
             List<PrescriptionListItemDTO> list = prescriptionService.getPharmacyPrescriptions(pharmacyId);
             return ResponseEntity.ok(list);
-        } catch (ClassCastException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid user type"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -141,7 +140,7 @@ public class PrescriptionController {
     public ResponseEntity<?> pharmacyPrescription(@PathVariable Long id, HttpServletRequest request) {
         try {
             Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
-            PharmacistUser pharmacist = (PharmacistUser) userRepository.findById(pharmacistId)
+            PharmacistUser pharmacist = pharmacistUserRepository.findById(pharmacistId)
                     .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
             if (pharmacist.getPharmacy() == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Pharmacist is not assigned to a pharmacy"));
@@ -149,8 +148,6 @@ public class PrescriptionController {
             Long pharmacyId = pharmacist.getPharmacy().getId();
             PrescriptionDTO dto = prescriptionService.getPharmacyPrescription(id, pharmacyId);
             return ResponseEntity.ok(dto);
-        } catch (ClassCastException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid user type"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -167,7 +164,7 @@ public class PrescriptionController {
     ) {
         try {
             Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
-            PharmacistUser pharmacist = (PharmacistUser) userRepository.findById(pharmacistId)
+            PharmacistUser pharmacist = pharmacistUserRepository.findById(pharmacistId)
                     .orElseThrow(() -> new IllegalArgumentException("Pharmacist not found"));
             if (pharmacist.getPharmacy() == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Pharmacist is not assigned to a pharmacy"));
@@ -175,8 +172,6 @@ public class PrescriptionController {
             Long pharmacyId = pharmacist.getPharmacy().getId();
             PrescriptionDTO dto = prescriptionService.replaceItemsForPharmacy(pharmacyId, id, items);
             return ResponseEntity.ok(dto);
-        } catch (ClassCastException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid user type"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -273,28 +268,9 @@ public class PrescriptionController {
         }
     }
 
-    // Pharmacist: update an item
-    @PutMapping("/pharmacist/submissions/{submissionId}/items/{itemId}")
-    public ResponseEntity<?> updateSubmissionItem(@PathVariable Long submissionId,
-                                                  @PathVariable Long itemId,
-                                                  @RequestBody PrescriptionItemDTO item,
-                                                  HttpServletRequest request) {
-        try {
-            Long pharmacistId = auth.extractPharmacistIdFromRequest(request);
-            PharmacistSubmissionItemsDTO dto = prescriptionService.updateSubmissionItem(pharmacistId, submissionId, itemId, item);
-            return ResponseEntity.ok(dto);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
-        }
-    }
-
     // Pharmacist: remove an item
     @DeleteMapping("/pharmacist/submissions/{submissionId}/items/{itemId}")
-    public ResponseEntity<?> deleteSubmissionItem(@PathVariable Long submissionId,
+    public ResponseEntity<?> removeSubmissionItem(@PathVariable Long submissionId,
                                                   @PathVariable Long itemId,
                                                   HttpServletRequest request) {
         try {
