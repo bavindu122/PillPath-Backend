@@ -1,22 +1,35 @@
 package com.leo.pillpathbackend.service.impl;
 
 import com.leo.pillpathbackend.dto.*;
+import com.leo.pillpathbackend.entity.Prescription;
 import com.leo.pillpathbackend.entity.User;
 import com.leo.pillpathbackend.repository.UserRepository;
 import com.leo.pillpathbackend.service.AdminService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.leo.pillpathbackend.entity.Prescription;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
 import com.leo.pillpathbackend.entity.Announcement;
 import com.leo.pillpathbackend.repository.AnnouncementRepository;
 import com.leo.pillpathbackend.service.AdminService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.leo.pillpathbackend.repository.PrescriptionRepository;
+import com.leo.pillpathbackend.repository.CustomerOrderRepository;
+import lombok.RequiredArgsConstructor;
+import com.leo.pillpathbackend.repository.PharmacyRepository;
+import com.leo.pillpathbackend.entity.enums.CustomerOrderStatus;
+import com.leo.pillpathbackend.dto.OverviewChartsResponseDTO;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.TextStyle;
+import java.util.Locale;
+import com.leo.pillpathbackend.dto.AdminAnalyticsChartsDTO;
+import java.time.Year;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +37,10 @@ public class AdminServiceImpl implements AdminService {
 
     private final UserRepository userRepository;
     private final AnnouncementRepository announcementRepository;
+    private final PrescriptionRepository prescriptionRepository;
+    private final CustomerOrderRepository customerOrderRepository;
+    private final PharmacyRepository pharmacyRepository;
+
     // You can inject other repositories here as needed:
     // private final PharmacyRepository pharmacyRepository;
     // private final OrderRepository orderRepository;
@@ -190,5 +207,224 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new RuntimeException("Announcement not found with id: " + id));
 
         announcementRepository.delete(announcement);
+    }
+
+    @Override
+    public List<CustomerDTO> getAllCustomers() {
+        // Assuming you have a method in UserRepository to fetch all customers
+        List<User> customers = userRepository.findAllCustomers();
+        List<CustomerDTO> dtos = new ArrayList<>();
+        for (User user : customers) {
+            CustomerDTO dto = new CustomerDTO();
+            dto.setId(user.getId());
+            dto.setUsername(user.getFullName());
+            dto.setEmail(user.getEmail());
+            dto.setFullName(user.getFullName());
+            dto.setPhoneNumber(user.getPhoneNumber());
+            dto.setDateOfBirth(user.getDateOfBirth());
+            dto.setAddress(user.getAddress());
+            dto.setProfilePictureUrl(user.getProfilePictureUrl());
+            dto.setIsActive(user.getIsActive());
+            dto.setSuspendReason(user.getSuspendReason());
+            dto.setCreatedAt(user.getCreatedAt());
+            dto.setPrescriptionCount((int) prescriptionRepository.countByCustomerId(user.getId()));
+            dto.setOrderCount((int) customerOrderRepository.countByCustomerId(user.getId()));
+
+            // Set other fields as needed
+            dtos.add(dto);
+        }
+        return dtos;
+    }
+
+    @Override
+    public void suspendCustomer(Long id, String suspendReason) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        user.setIsActive(false);
+        user.setSuspendReason(suspendReason);
+        userRepository.save(user);
+    }
+
+    @Override
+    public void activateCustomer(Long id) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        user.setIsActive(true);
+
+        userRepository.save(user);
+    }
+
+    @Override
+    public List<AdminPrescriptionDTO> getAllPrescriptionsForAdmin() {
+        List<Prescription> prescriptions = prescriptionRepository.findAll();
+        List<AdminPrescriptionDTO> dtos = new ArrayList<>();
+        for (Prescription p : prescriptions) {
+            AdminPrescriptionDTO dto = new AdminPrescriptionDTO();
+            dto.setId(p.getCode()); // or p.getId().toString()
+            dto.setPatient(p.getCustomer().getFullName());
+            dto.setPharmacy(p.getPharmacy().getName());
+            dto.setStatus(p.getStatus().name());
+            dto.setSubmitted(p.getCreatedAt().toLocalDate().toString());
+            dto.setTotalPrice(String.valueOf(p.getTotalPrice()));
+            dto.setPatientImage(p.getCustomer().getProfilePictureUrl());
+            dto.setPharmacyImage(p.getPharmacy().getImageUrl());
+            dtos.add(dto);
+        }
+        return dtos;
+    }
+
+    @Override
+    public OverviewSummaryDTO getOverviewSummary() {
+        int totalUsers = (int) userRepository.count();
+        int activePharmacies = pharmacyRepository.countActivePharmacies() != null
+                ? pharmacyRepository.countActivePharmacies().intValue()
+                : 0;
+        int prescriptionsUploaded = (int) prescriptionRepository.count();
+        int completedOrders = (int) customerOrderRepository.countByStatus(CustomerOrderStatus.COMPLETED);
+        double totalRevenue = customerOrderRepository.sumTotal(); // placeholder: total of all orders
+        double walletBalance = 0.0; // TODO: implement wallet balance source
+        return OverviewSummaryDTO.builder()
+                .totalUsers(totalUsers)
+                .activePharmacies(activePharmacies)
+                .prescriptionsUploaded(prescriptionsUploaded)
+                .completedOrders(completedOrders)
+                .totalRevenue(totalRevenue)
+                .walletBalance(walletBalance)
+                .currency("LKR")
+                .build();
+    }
+
+    @Override
+    public OverviewChartsResponseDTO getOverviewCharts() {
+        // Use server timezone
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate now = LocalDate.now(zone);
+        int months = 6;
+
+        // Build last 6 months inclusive of current
+        List<OverviewChartsResponseDTO.UserRegistrationTrendItem> userTrend = new ArrayList<>();
+        List<OverviewChartsResponseDTO.PharmacyOnboardingItem> pharmacyTrend = new ArrayList<>();
+
+        for (int i = months - 1; i >= 0; i--) {
+            LocalDate monthStart = now.minusMonths(i).withDayOfMonth(1);
+            LocalDate monthEnd = monthStart.plusMonths(1).withDayOfMonth(1); // exclusive end
+            String monthLabel = monthStart.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+            String isoMonth = monthStart.toString().substring(0, 7);
+
+            int users = (int) userRepository.countByCreatedAtBetween(monthStart.atStartOfDay(), monthEnd.atStartOfDay());
+            userTrend.add(OverviewChartsResponseDTO.UserRegistrationTrendItem.builder()
+                    .month(monthLabel)
+                    .isoMonth(isoMonth)
+                    .users(users)
+                    .build());
+
+            int pharmacies = (int) pharmacyRepository.countByCreatedAtBetween(monthStart.atStartOfDay(), monthEnd.atStartOfDay());
+            pharmacyTrend.add(OverviewChartsResponseDTO.PharmacyOnboardingItem.builder()
+                    .month(monthLabel)
+                    .isoMonth(isoMonth)
+                    .pharmacies(pharmacies)
+                    .build());
+        }
+
+        // Role distribution snapshot
+        List<OverviewChartsResponseDTO.RoleDistributionItem> roles = new ArrayList<>();
+        roles.add(OverviewChartsResponseDTO.RoleDistributionItem.builder()
+                .name("Customers").value(userRepository.countCustomers().intValue()).build());
+        roles.add(OverviewChartsResponseDTO.RoleDistributionItem.builder()
+                .name("Pharmacists").value(userRepository.countPharmacists().intValue()).build());
+        roles.add(OverviewChartsResponseDTO.RoleDistributionItem.builder()
+                .name("Pharmacy Admins").value(userRepository.countPharmacyAdmins().intValue()).build());
+        roles.add(OverviewChartsResponseDTO.RoleDistributionItem.builder()
+                .name("System Admins").value(userRepository.countSystemAdmins().intValue()).build());
+
+        return OverviewChartsResponseDTO.builder()
+                .userRegistrationTrend(userTrend)
+                .userRolesDistribution(roles)
+                .pharmacyOnboardingData(pharmacyTrend)
+                .build();
+    }
+
+    @Override
+    public AdminKpisDTO getKpis() {
+        int totalUsers = (int) userRepository.count();
+        int totalPharmacies = (int) pharmacyRepository.count();
+        int totalPrescriptionsUploaded = (int) prescriptionRepository.count();
+
+        // Spec mentions COMPLETED and FULFILLED; enum has no FULFILLED -> count COMPLETED only
+        int ordersProcessed = (int) customerOrderRepository.countByStatusIn(
+                Collections.singletonList(CustomerOrderStatus.COMPLETED)
+        );
+
+        int activePharmacies = (int) pharmacyRepository.countByIsActiveTrue();
+        int suspendedPharmacies = (int) pharmacyRepository.countByIsActiveFalse();
+
+        double totalPayments = 0.0; // placeholder; implement when payment source available
+
+        return AdminKpisDTO.builder()
+                .totalUsers(totalUsers)
+                .totalPharmacies(totalPharmacies)
+                .totalPrescriptionsUploaded(totalPrescriptionsUploaded)
+                .ordersProcessed(ordersProcessed)
+                .activePharmacies(activePharmacies)
+                .suspendedPharmacies(suspendedPharmacies)
+                .totalPayments(totalPayments)
+                .build();
+    }
+
+    @Override
+    public AdminAnalyticsChartsDTO getAnalyticsCharts(Integer year) {
+        int y = (year == null || year <= 0) ? Year.now().getValue() : year;
+        List<AdminAnalyticsChartsDTO.PrescriptionUploadsItem> prescriptionUploads = new ArrayList<>();
+        List<AdminAnalyticsChartsDTO.PharmacyRegistrationsItem> pharmacyRegistrations = new ArrayList<>();
+        List<AdminAnalyticsChartsDTO.GrowthRegistrationsItem> growthRegistrations = new ArrayList<>();
+
+        // Build 12 calendar months for the requested year
+        for (int month = 1; month <= 12; month++) {
+            LocalDate monthStart = LocalDate.of(y, month, 1);
+            LocalDate monthEnd = monthStart.plusMonths(1); // exclusive end
+            String monthLabel = monthStart.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+
+            int uploads = (int) prescriptionRepository.countByCreatedAtBetween(monthStart.atStartOfDay(), monthEnd.atStartOfDay());
+            prescriptionUploads.add(AdminAnalyticsChartsDTO.PrescriptionUploadsItem.builder()
+                    .month(monthLabel)
+                    .uploads(uploads)
+                    .build());
+
+            int registeredPharmacies = (int) pharmacyRepository.countByCreatedAtBetween(monthStart.atStartOfDay(), monthEnd.atStartOfDay());
+            pharmacyRegistrations.add(AdminAnalyticsChartsDTO.PharmacyRegistrationsItem.builder()
+                    .month(monthLabel)
+                    .registered(registeredPharmacies)
+                    .build());
+
+            int newCustomers = (int) userRepository.countCustomersByCreatedAtBetween(monthStart.atStartOfDay(), monthEnd.atStartOfDay());
+            int newPharmacies = registeredPharmacies; // pharmacy registrations in the month
+            growthRegistrations.add(AdminAnalyticsChartsDTO.GrowthRegistrationsItem.builder()
+                    .month(monthLabel)
+                    .customers(newCustomers)
+                    .pharmacies(newPharmacies)
+                    .build());
+        }
+
+        // Order fulfillment (total counts for the selected year)
+        LocalDate yearStart = LocalDate.of(y, 1, 1);
+        LocalDate yearEnd = yearStart.plusYears(1); // exclusive end
+        int delivered = (int) customerOrderRepository.countByStatusInAndCreatedAtBetween(
+                java.util.List.of(CustomerOrderStatus.COMPLETED), yearStart.atStartOfDay(), yearEnd.atStartOfDay());
+        int pending = (int) customerOrderRepository.countByStatusInAndCreatedAtBetween(
+                java.util.List.of(CustomerOrderStatus.PENDING, CustomerOrderStatus.PAID), yearStart.atStartOfDay(), yearEnd.atStartOfDay());
+        int cancelled = (int) customerOrderRepository.countByStatusInAndCreatedAtBetween(
+                java.util.List.of(CustomerOrderStatus.CANCELLED), yearStart.atStartOfDay(), yearEnd.atStartOfDay());
+
+        List<AdminAnalyticsChartsDTO.OrderFulfillmentItem> orderFulfillment = new ArrayList<>();
+        orderFulfillment.add(AdminAnalyticsChartsDTO.OrderFulfillmentItem.builder().status("delivered").count(delivered).build());
+        orderFulfillment.add(AdminAnalyticsChartsDTO.OrderFulfillmentItem.builder().status("pending").count(pending).build());
+        orderFulfillment.add(AdminAnalyticsChartsDTO.OrderFulfillmentItem.builder().status("cancelled").count(cancelled).build());
+
+        return AdminAnalyticsChartsDTO.builder()
+                .prescriptionUploads(prescriptionUploads)
+                .pharmacyRegistrations(pharmacyRegistrations)
+                .growthRegistrations(growthRegistrations)
+                .orderFulfillment(orderFulfillment)
+                .build();
     }
 }
