@@ -14,6 +14,7 @@ import com.leo.pillpathbackend.dto.CustomerActivityResponseDTO;
 import com.leo.pillpathbackend.dto.SuspendedAccountDTO;
 import com.leo.pillpathbackend.dto.ModeratorCreateRequest;
 import com.leo.pillpathbackend.dto.ModeratorCreateResponse;
+import com.leo.pillpathbackend.dto.ModeratorListItemDTO;
 
 import java.util.List;
 
@@ -40,14 +41,15 @@ public interface AdminService {
 
     AdminAnalyticsChartsDTO getAnalyticsCharts(Integer year);
 
-    // New: analytics
+    // Analytics
     List<PharmacyPerformanceResponseDTO> getPharmacyPerformance();
     List<CustomerActivityResponseDTO> getCustomerActivity();
     List<SuspendedAccountDTO> getSuspendedAccounts();
 
-    // New: moderators
+    // Moderators
     ModeratorCreateResponse addModerator(ModeratorCreateRequest request);
-
+    List<ModeratorListItemDTO> getModerators();
+    void deleteModerator(String idOrCode);
 
     // Future admin methods can go here:
     // List<UserDTO> getAllUsers();

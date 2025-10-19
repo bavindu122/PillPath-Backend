@@ -24,6 +24,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END FROM Admin a WHERE a.adminLevel = :adminLevel")
     boolean existsByAdminLevel(@Param("adminLevel") AdminLevel adminLevel);
 
+    // List admins by level
+    @Query("SELECT a FROM Admin a WHERE a.adminLevel = :adminLevel ORDER BY a.createdAt DESC")
+    List<com.leo.pillpathbackend.entity.Admin> findAdminsByLevel(@Param("adminLevel") AdminLevel adminLevel);
+
     // Type-based counts by subclass
     @Query("SELECT COUNT(u) FROM User u WHERE TYPE(u) = Customer")
     Long countCustomers();

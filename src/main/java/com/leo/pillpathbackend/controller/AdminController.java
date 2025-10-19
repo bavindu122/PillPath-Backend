@@ -34,6 +34,19 @@ public class AdminController {
         }
     }
 
+    // List moderators
+    @GetMapping("/moderators")
+    public ResponseEntity<List<ModeratorListItemDTO>> getModerators() {
+        return ResponseEntity.ok(adminService.getModerators());
+    }
+
+    // Delete moderator
+    @DeleteMapping("/moderators/{id}")
+    public ResponseEntity<Void> deleteModerator(@PathVariable("id") String id) {
+        adminService.deleteModerator(id);
+        return ResponseEntity.noContent().build();
+    }
+
     // Create a moderator (admin-only action)
     @PostMapping("/moderators")
     public ResponseEntity<ModeratorCreateResponse> addModerator(@Valid @RequestBody ModeratorCreateRequest request) {

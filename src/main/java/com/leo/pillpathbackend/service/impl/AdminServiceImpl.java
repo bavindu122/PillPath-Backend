@@ -20,11 +20,14 @@ import java.time.Year;
 import java.time.format.DateTimeFormatter;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.leo.pillpathbackend.repository.AnnouncementRepository;
+import com.leo.pillpathbackend.dto.ModeratorListItemDTO;
+import com.leo.pillpathbackend.entity.enums.AdminLevel;
 
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.time.LocalDateTime;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -530,6 +533,13 @@ public class AdminServiceImpl implements AdminService {
         return "ph_" + s;
     }
 
+    private String formatModeratorId(Long id) {
+        if (id == null) return null;
+        String s = String.valueOf(id);
+        if (s.length() < 3) s = String.format("%03d", id);
+        return "mod_" + s;
+    }
+
     private String mapStatus(Boolean isActive, Boolean isVerified) {
         boolean active = Boolean.TRUE.equals(isActive);
         boolean verified = Boolean.TRUE.equals(isVerified);
@@ -575,5 +585,44 @@ public class AdminServiceImpl implements AdminService {
                 .username(saved.getUsername())
                 .message("Moderator created successfully")
                 .build();
+    }
+
+    @Override
+    public List<ModeratorListItemDTO> getModerators() {
+        List<Admin> admins = userRepository.findAdminsByLevel(AdminLevel.STANDARD);
+        return admins.stream().map(a -> ModeratorListItemDTO.builder()
+                .id(formatModeratorId(a.getId()))
+                .username(a.getUsername())
+                .createdAt(a.getCreatedAt() != null ? a.getCreatedAt().format(CUSTOMER_DATE_FORMAT) : null)
+                .build()).collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteModerator(String idOrCode) {
+        Long id = null;
+        if (idOrCode == null || idOrCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("Moderator id is required");
+        }
+        String trimmed = idOrCode.trim();
+        if (trimmed.startsWith("mod_")) {
+            try {
+                id = Long.parseLong(trimmed.substring(4));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid moderator id format");
+            }
+        } else {
+            try {
+                id = Long.parseLong(trimmed);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid moderator id format");
+            }
+        }
+        Admin admin = (Admin) userRepository.findById(id)
+                .filter(u -> u instanceof Admin)
+                .orElseThrow(() -> new RuntimeException("Moderator not found"));
+        if (admin.getAdminLevel() != AdminLevel.STANDARD) {
+            throw new RuntimeException("Cannot delete non-moderator admin");
+        }
+        userRepository.deleteById(id);
     }
 }
