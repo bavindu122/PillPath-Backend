@@ -31,7 +31,7 @@ public class FamilyMemberController {
             FamilyMember saved = familyMemberService.addMember(dto);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
-            e.printStackTrace(); // Add this for debugging
+            logger.error("Failed to add family member", e);
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage(),
                     "type", e.getClass().getSimpleName()
