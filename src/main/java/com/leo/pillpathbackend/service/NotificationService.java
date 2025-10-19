@@ -99,7 +99,10 @@ public class NotificationService {
                 notification.setRecipientType("PHARMACIST");
                 notification.setPrescriptionId(prescriptionId);
                 notification.setPharmacyId(pharmacyId);
-                notification.setLink(String.format("/pharmacist/prescriptions/%d", prescriptionId));
+                // Navigate pharmacists to their pharmacy review queue endpoint page
+                // Backend endpoint pattern: GET /api/v1/prescriptions/pharmacy/{pharmacyId}
+                // Include prescriptionId as query for client-side focus when present
+                notification.setLink(String.format("/pharmacist/prescriptions/pharmacy/%d?prescriptionId=%d", pharmacyId, prescriptionId));
                 notification.setCreatedAt(LocalDateTime.now());
                 
                 Notification savedNotification = notificationRepository.save(notification);
@@ -153,7 +156,7 @@ public class NotificationService {
             notification.setRecipientType("CUSTOMER");
             notification.setOrderId(orderId);
             notification.setPrescriptionId(prescriptionId);
-            notification.setLink(String.format("/customer/orders/%d/preview", orderId));
+            notification.setLink(String.format("/customer/order-preview/%d", prescriptionId));
             notification.setCreatedAt(LocalDateTime.now());
             
             Notification savedNotification = notificationRepository.save(notification);
@@ -287,6 +290,7 @@ public class NotificationService {
     @Transactional
     public void createOrderReadyNotification(
             Long orderId,
+            String orderCode,
             Long customerId,
             String pharmacyName) {
         
@@ -298,7 +302,8 @@ public class NotificationService {
         notification.setRecipientId(customerId);
         notification.setRecipientType("CUSTOMER");
         notification.setOrderId(orderId);
-        notification.setLink(String.format("/customer/orders/%d", orderId));
+        notification.setOrderCode(orderCode);
+        notification.setLink(String.format("/customer/orders/%s", orderCode));
         notification.setCreatedAt(LocalDateTime.now());
         
         Notification savedNotification = notificationRepository.save(notification);
@@ -307,7 +312,6 @@ public class NotificationService {
         // Send email notification
         try {
             userRepository.findById(customerId).ifPresent(user -> {
-                String orderCode = "ORD-" + orderId;
                 String pickupCode = "PU-" + orderId; // Can be customized based on actual pickup code
                 emailService.sendOrderReadyEmail(
                         user.getEmail(),
@@ -333,6 +337,7 @@ public class NotificationService {
     @Transactional
     public void createOrderPreparingNotification(
             Long orderId,
+            String orderCode,
             Long customerId,
             String pharmacyName) {
         
@@ -354,7 +359,8 @@ public class NotificationService {
             notification.setRecipientId(customerId);
             notification.setRecipientType("CUSTOMER");
             notification.setOrderId(orderId);
-            notification.setLink(String.format("/customer/orders/%d", orderId));
+            notification.setOrderCode(orderCode);
+            notification.setLink(String.format("/customer/orders/%s", orderCode));
             notification.setCreatedAt(LocalDateTime.now());
             
             Notification savedNotification = notificationRepository.save(notification);
@@ -363,7 +369,6 @@ public class NotificationService {
             // Send email notification
             try {
                 userRepository.findById(customerId).ifPresent(user -> {
-                    String orderCode = "ORD-" + orderId;
                     emailService.sendOrderPreparingEmail(
                             user.getEmail(),
                             user.getFullName() != null ? user.getFullName() : user.getUsername(),
@@ -387,6 +392,7 @@ public class NotificationService {
     @Transactional
     public void createOrderHandedOverNotification(
             Long orderId,
+            String orderCode,
             Long customerId,
             String pharmacyName,
             LocalDateTime handoverTime) {
@@ -409,7 +415,8 @@ public class NotificationService {
             notification.setRecipientId(customerId);
             notification.setRecipientType("CUSTOMER");
             notification.setOrderId(orderId);
-            notification.setLink(String.format("/customer/orders/%d", orderId));
+            notification.setOrderCode(orderCode);
+            notification.setLink(String.format("/customer/orders/%s", orderCode));
             notification.setCreatedAt(LocalDateTime.now());
             
             Notification savedNotification = notificationRepository.save(notification);
@@ -418,7 +425,6 @@ public class NotificationService {
             // Send email notification
             try {
                 userRepository.findById(customerId).ifPresent(user -> {
-                    String orderCode = "ORD-" + orderId;
                     emailService.sendOrderHandedOverEmail(
                             user.getEmail(),
                             user.getFullName() != null ? user.getFullName() : user.getUsername(),
@@ -506,6 +512,7 @@ public class NotificationService {
         dto.setRead(notification.isRead());
         dto.setCreatedAt(notification.getCreatedAt());
         dto.setLink(notification.getLink());
+        dto.setOrderCode(notification.getOrderCode());
         dto.setPrescriptionId(notification.getPrescriptionId());
         dto.setOrderId(notification.getOrderId());
         dto.setPharmacyId(notification.getPharmacyId());

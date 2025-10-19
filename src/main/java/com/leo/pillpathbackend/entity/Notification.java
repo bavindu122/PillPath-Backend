@@ -53,6 +53,9 @@ public class Notification {
     @Column(name = "order_id")
     private Long orderId;
     
+    @Column(name = "order_code")
+    private String orderCode; // e.g., "ORD-20251019-1"
+    
     @Column(name = "pharmacy_id")
     private Long pharmacyId;
     

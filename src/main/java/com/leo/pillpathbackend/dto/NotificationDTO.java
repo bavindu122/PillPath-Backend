@@ -20,6 +20,7 @@ public class NotificationDTO {
     private String link;
     private Long prescriptionId;
     private Long orderId;
+    private String orderCode; // e.g., "ORD-20251019-1"
     private Long pharmacyId;
     private Long customerId;
 }

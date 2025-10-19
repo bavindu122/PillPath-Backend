@@ -307,6 +307,7 @@ public class OrderServiceImpl implements OrderService {
                 if (status == PharmacyOrderStatus.PREPARING) {
                     notificationService.createOrderPreparingNotification(
                         po.getId(),
+                        po.getOrderCode(),
                         customerId,
                         pharmacyName
                     );
@@ -316,6 +317,7 @@ public class OrderServiceImpl implements OrderService {
                 else if (status == PharmacyOrderStatus.READY_FOR_PICKUP) {
                     notificationService.createOrderReadyNotification(
                         po.getId(),
+                        po.getOrderCode(),
                         customerId,
                         pharmacyName
                     );
@@ -325,6 +327,7 @@ public class OrderServiceImpl implements OrderService {
                 else if (status == PharmacyOrderStatus.HANDED_OVER) {
                     notificationService.createOrderHandedOverNotification(
                         po.getId(),
+                        po.getOrderCode(),
                         customerId,
                         pharmacyName,
                         LocalDateTime.now()
