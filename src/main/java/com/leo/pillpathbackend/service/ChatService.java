@@ -13,4 +13,5 @@ public interface ChatService {
     ChatMessageHistoryResponse getChatMessages(Long chatRoomId, int page, int size);
     int getUnreadCount(Long userId, String userType);
     void persistAndBroadcastMessage(Long chatRoomId, Long senderId, String userType, String text);
+    void markChatAsRead(Long chatRoomId, Long userId, String userType);
 }

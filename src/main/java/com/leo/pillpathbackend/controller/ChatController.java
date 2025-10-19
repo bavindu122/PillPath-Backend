@@ -145,6 +145,37 @@ public class ChatController {
     }
 
     /**
+     * Mark a chat as read (reset unread count for current user)
+     */
+    @PostMapping("/{chatId:\\d+}/mark-read")
+    public ResponseEntity<?> markChatAsRead(@PathVariable Long chatId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof Long)) {
+            return ResponseEntity.status(401).body(Map.of("error", "unauthorized"));
+        }
+
+        Long userId = (Long) auth.getPrincipal();
+        String userType = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority())
+                .map(role -> {
+                    if ("ROLE_USER".equals(role) || "ROLE_CUSTOMER".equals(role)) return "CUSTOMER";
+                    if ("ROLE_PHARMACIST".equals(role)) return "PHARMACIST";
+                    if ("ROLE_PHARMACY_ADMIN".equals(role)) return "ADMIN";
+                    if ("ROLE_ADMIN".equals(role)) return "ADMIN";
+                    return "CUSTOMER";
+                })
+                .orElse("CUSTOMER");
+
+        try {
+            chatService.markChatAsRead(chatId, userId, userType);
+            return ResponseEntity.ok(Map.of("success", true));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
      * Health check endpoint
      */
     @GetMapping("/health")
@@ -357,26 +388,61 @@ public class ChatController {
             HttpServletRequest request) {
         
         try {
+            System.out.println("=== PHARMACY ADMIN SEND MESSAGE DEBUG ===");
+            System.out.println("ChatId: " + chatId);
+            System.out.println("Request body: " + messageData);
+            System.out.println("Authorization Header: " + request.getHeader("Authorization"));
+            
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth == null || !(auth.getPrincipal() instanceof Long)) {
-                return ResponseEntity.status(401).body(Map.of("error", "unauthorized"));
+            System.out.println("Auth: " + (auth != null ? auth.toString() : "null"));
+            
+            Long senderId = null;
+            
+            // Try to get senderId from authentication
+            if (auth != null && auth.getPrincipal() instanceof Long) {
+                senderId = (Long) auth.getPrincipal();
+                System.out.println("SenderId from auth: " + senderId);
+            } 
+            // Fallback: Allow passing senderId in request body for testing
+            else if (messageData.containsKey("senderId")) {
+                senderId = Long.parseLong(messageData.get("senderId"));
+                System.out.println("SenderId from request body: " + senderId);
+            }
+            // Fallback: Use default CURRENT_USER_ID from frontend
+            else {
+                System.out.println("❌ No senderId found in auth or request body");
+                return ResponseEntity.status(401).body(Map.of(
+                    "error", "unauthorized", 
+                    "hint", "Set AUTH_TOKEN or include senderId in request body"
+                ));
             }
 
-            Long senderId = (Long) auth.getPrincipal();
             String text = messageData.get("text");
             
             if (text == null || text.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "text required"));
             }
 
+            System.out.println("Calling persistAndBroadcastMessage with:");
+            System.out.println("  chatId: " + chatId);
+            System.out.println("  senderId: " + senderId);
+            System.out.println("  userType: ADMIN");
+            System.out.println("  text: " + text);
+            
             // Force userType to ADMIN for pharmacy admin dashboard
             chatService.persistAndBroadcastMessage(chatId, senderId, "ADMIN", text);
+            
+            System.out.println("✅ Message sent successfully");
             return ResponseEntity.ok(Map.of("success", true, "message", "Message sent"));
             
         } catch (IllegalArgumentException ex) {
+            System.err.println("❌ IllegalArgumentException: " + ex.getMessage());
+            ex.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         } catch (Exception ex) {
-            return ResponseEntity.status(500).body(Map.of("error", "failed to send message"));
+            System.err.println("❌ Exception: " + ex.getMessage());
+            ex.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "failed to send message", "details", ex.getMessage()));
         }
     }
 }

@@ -3,6 +3,7 @@ package com.leo.pillpathbackend.controller;
 import com.leo.pillpathbackend.config.ws.WsUserPrincipal;
 import com.leo.pillpathbackend.entity.ChatRoom;
 import com.leo.pillpathbackend.repository.ChatRoomRepository;
+import com.leo.pillpathbackend.service.ChatService;
 import com.leo.pillpathbackend.ws.WatchRegistry;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class ChatWsController {
     private final SimpMessagingTemplate messagingTemplate;
     private final WatchRegistry watchRegistry;
     private final ChatRoomRepository chatRoomRepository;
+    private final ChatService chatService;
 
     /**
      * Handle WebSocket connection events.
@@ -131,8 +133,17 @@ public class ChatWsController {
                 return;
             }
 
-            // Broadcast to room topic (all subscribers to this specific chat room)
-            messagingTemplate.convertAndSend("/topic/chat/room/" + chatRoomId, messageData);
+            // PERSIST MESSAGE TO DATABASE (not just broadcast)
+            // Map role to userType expected by service
+            String mappedUserType = switch (userRole) {
+                case "customer" -> "CUSTOMER";
+                case "pharmacy_admin", "admin" -> "ADMIN";
+                case "pharmacist" -> "PHARMACIST";
+                default -> "CUSTOMER";
+            };
+
+            // This will save to DB and broadcast to all participants
+            chatService.persistAndBroadcastMessage(chatRoomId, userId, mappedUserType, text);
             
             // Send acknowledgment to sender
             messagingTemplate.convertAndSendToUser(

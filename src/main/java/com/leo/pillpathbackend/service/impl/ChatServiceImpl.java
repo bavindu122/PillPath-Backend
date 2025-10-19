@@ -225,9 +225,30 @@ public class ChatServiceImpl implements ChatService {
             sender = admin;
             isCustomerSender = false;
             System.out.println("✅ Sender validated as PHARMACY_ADMIN: " + sender.getId() + " - " + sender.getFullName());
+        } else if ("PHARMACIST".equalsIgnoreCase(userType)) {
+            // Pharmacist sending message
+            PharmacistUser pharmacist = pharmacistUserRepository.findById(senderId).orElse(null);
+            System.out.println("Looking for pharmacist with ID: " + senderId);
+            if (pharmacist == null) {
+                System.out.println("❌ Pharmacist not found!");
+                throw new IllegalArgumentException("Pharmacist not found");
+            }
+            System.out.println("Found pharmacist: " + pharmacist.getId() + " - " + pharmacist.getFullName());
+            System.out.println("Pharmacist's pharmacy ID: " + (pharmacist.getPharmacy() != null ? pharmacist.getPharmacy().getId() : "null"));
+            System.out.println("Chat room pharmacy ID: " + chatRoom.getPharmacy().getId());
+            
+            if (pharmacist.getPharmacy() == null 
+                || !pharmacist.getPharmacy().getId().equals(chatRoom.getPharmacy().getId())) {
+                System.out.println("❌ Pharmacist not authorized - pharmacy mismatch!");
+                throw new IllegalArgumentException("You are not authorized to send messages in this chat. " +
+                    "Only pharmacy staff from the pharmacy associated with this chat can respond.");
+            }
+            sender = pharmacist;
+            isCustomerSender = false;
+            System.out.println("✅ Sender validated as PHARMACIST: " + sender.getId() + " - " + sender.getFullName());
         } else {
             System.out.println("❌ Invalid sender type: " + userType);
-            throw new IllegalArgumentException("Invalid sender type. Only 'CUSTOMER' and 'PHARMACY_ADMIN' roles are allowed.");
+            throw new IllegalArgumentException("Invalid sender type. Only 'CUSTOMER', 'PHARMACY_ADMIN', and 'PHARMACIST' roles are allowed.");
         }
 
         // STEP 3: Persist message to database FIRST
@@ -287,6 +308,25 @@ public class ChatServiceImpl implements ChatService {
         System.out.println("========== MESSAGE BROADCAST COMPLETE ==========\n");
     }
 
+    @Override
+    @Transactional
+    public void markChatAsRead(Long chatRoomId, Long userId, String userType) {
+        System.out.println("Marking chat " + chatRoomId + " as read for user " + userId + " (type: " + userType + ")");
+        
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(() -> new IllegalArgumentException("Chat room not found"));
+        
+        // Reset unread count for the appropriate side
+        if ("CUSTOMER".equalsIgnoreCase(userType)) {
+            chatRoom.resetUnreadCount(true);
+        } else if ("ADMIN".equalsIgnoreCase(userType) || "PHARMACY_ADMIN".equalsIgnoreCase(userType) || "PHARMACIST".equalsIgnoreCase(userType)) {
+            chatRoom.resetUnreadCount(false);
+        }
+        
+        chatRoomRepository.save(chatRoom);
+        System.out.println("✅ Chat marked as read, unread count reset");
+    }
+
     
 
     private String getLastMessage(Long chatRoomId) {
@@ -327,6 +367,8 @@ public class ChatServiceImpl implements ChatService {
             senderType = "CUSTOMER";
         } else if (sender instanceof PharmacyAdmin) {
             senderType = "ADMIN";
+        } else if (sender instanceof PharmacistUser) {
+            senderType = "PHARMACIST";
         } else {
             senderType = "UNKNOWN";
         }
