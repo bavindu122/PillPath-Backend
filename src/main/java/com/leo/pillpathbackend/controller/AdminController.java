@@ -10,6 +10,8 @@ import com.leo.pillpathbackend.entity.Announcement;
 import com.leo.pillpathbackend.service.AdminService;
 import jakarta.validation.Valid;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+
 import java.util.List;
 
 
@@ -107,6 +109,18 @@ public class AdminController {
     @GetMapping("/prescriptions")
     public ResponseEntity<List<AdminPrescriptionDTO>> getPrescriptionsForAdmin() {
         return ResponseEntity.ok(adminService.getAllPrescriptionsForAdmin());
+    }
+
+    // Overview stat cards (all-time, admin only)
+    @GetMapping("/overview/summary")
+    public ResponseEntity<OverviewSummaryDTO> getOverviewSummary() {
+        return ResponseEntity.ok(adminService.getOverviewSummary());
+    }
+
+    // Overview charts (last 6 months, admin only)
+    @GetMapping("/overview/charts")
+    public ResponseEntity<OverviewChartsResponseDTO> getOverviewCharts() {
+        return ResponseEntity.ok(adminService.getOverviewCharts());
     }
 
     // Future admin endpoints:

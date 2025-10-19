@@ -20,6 +20,13 @@ import org.springframework.stereotype.Service;
 import com.leo.pillpathbackend.repository.PrescriptionRepository;
 import com.leo.pillpathbackend.repository.CustomerOrderRepository;
 import lombok.RequiredArgsConstructor;
+import com.leo.pillpathbackend.repository.PharmacyRepository;
+import com.leo.pillpathbackend.entity.enums.CustomerOrderStatus;
+import com.leo.pillpathbackend.dto.OverviewChartsResponseDTO;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.TextStyle;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +36,7 @@ public class AdminServiceImpl implements AdminService {
     private final AnnouncementRepository announcementRepository;
     private final PrescriptionRepository prescriptionRepository;
     private final CustomerOrderRepository customerOrderRepository;
+    private final PharmacyRepository pharmacyRepository;
 
     // You can inject other repositories here as needed:
     // private final PharmacyRepository pharmacyRepository;
@@ -261,5 +269,76 @@ public class AdminServiceImpl implements AdminService {
             dtos.add(dto);
         }
         return dtos;
+    }
+
+    @Override
+    public OverviewSummaryDTO getOverviewSummary() {
+        int totalUsers = (int) userRepository.count();
+        int activePharmacies = pharmacyRepository.countActivePharmacies() != null
+                ? pharmacyRepository.countActivePharmacies().intValue()
+                : 0;
+        int prescriptionsUploaded = (int) prescriptionRepository.count();
+        int completedOrders = (int) customerOrderRepository.countByStatus(CustomerOrderStatus.COMPLETED);
+        double totalRevenue = customerOrderRepository.sumTotal(); // placeholder: total of all orders
+        double walletBalance = 0.0; // TODO: implement wallet balance source
+        return OverviewSummaryDTO.builder()
+                .totalUsers(totalUsers)
+                .activePharmacies(activePharmacies)
+                .prescriptionsUploaded(prescriptionsUploaded)
+                .completedOrders(completedOrders)
+                .totalRevenue(totalRevenue)
+                .walletBalance(walletBalance)
+                .currency("LKR")
+                .build();
+    }
+
+    @Override
+    public OverviewChartsResponseDTO getOverviewCharts() {
+        // Use server timezone
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate now = LocalDate.now(zone);
+        int months = 6;
+
+        // Build last 6 months inclusive of current
+        List<OverviewChartsResponseDTO.UserRegistrationTrendItem> userTrend = new ArrayList<>();
+        List<OverviewChartsResponseDTO.PharmacyOnboardingItem> pharmacyTrend = new ArrayList<>();
+
+        for (int i = months - 1; i >= 0; i--) {
+            LocalDate monthStart = now.minusMonths(i).withDayOfMonth(1);
+            LocalDate monthEnd = monthStart.plusMonths(1).withDayOfMonth(1); // exclusive end
+            String monthLabel = monthStart.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+            String isoMonth = monthStart.toString().substring(0, 7);
+
+            int users = (int) userRepository.countByCreatedAtBetween(monthStart.atStartOfDay(), monthEnd.atStartOfDay());
+            userTrend.add(OverviewChartsResponseDTO.UserRegistrationTrendItem.builder()
+                    .month(monthLabel)
+                    .isoMonth(isoMonth)
+                    .users(users)
+                    .build());
+
+            int pharmacies = (int) pharmacyRepository.countByCreatedAtBetween(monthStart.atStartOfDay(), monthEnd.atStartOfDay());
+            pharmacyTrend.add(OverviewChartsResponseDTO.PharmacyOnboardingItem.builder()
+                    .month(monthLabel)
+                    .isoMonth(isoMonth)
+                    .pharmacies(pharmacies)
+                    .build());
+        }
+
+        // Role distribution snapshot
+        List<OverviewChartsResponseDTO.RoleDistributionItem> roles = new ArrayList<>();
+        roles.add(OverviewChartsResponseDTO.RoleDistributionItem.builder()
+                .name("Customers").value(userRepository.countCustomers().intValue()).build());
+        roles.add(OverviewChartsResponseDTO.RoleDistributionItem.builder()
+                .name("Pharmacists").value(userRepository.countPharmacists().intValue()).build());
+        roles.add(OverviewChartsResponseDTO.RoleDistributionItem.builder()
+                .name("Pharmacy Admins").value(userRepository.countPharmacyAdmins().intValue()).build());
+        roles.add(OverviewChartsResponseDTO.RoleDistributionItem.builder()
+                .name("System Admins").value(userRepository.countSystemAdmins().intValue()).build());
+
+        return OverviewChartsResponseDTO.builder()
+                .userRegistrationTrend(userTrend)
+                .userRolesDistribution(roles)
+                .pharmacyOnboardingData(pharmacyTrend)
+                .build();
     }
 }

@@ -3,6 +3,8 @@ package com.leo.pillpathbackend.repository;
 import com.leo.pillpathbackend.entity.CustomerOrder;
 import com.leo.pillpathbackend.entity.enums.CustomerOrderStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -14,4 +16,9 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     List<CustomerOrder> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
     long countByCustomerId(Long customerId);
+
+    long countByStatus(CustomerOrderStatus status);
+
+    @Query("SELECT COALESCE(SUM(o.total), 0) FROM CustomerOrder o")
+    double sumTotal();
 }

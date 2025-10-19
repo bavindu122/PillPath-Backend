@@ -24,6 +24,7 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
     Long countByIsActiveTrueAndIsVerifiedFalse();
     Long countByIsActiveFalseAndIsVerifiedTrue();
     Long countByIsActiveFalseAndIsVerifiedFalse();
+    long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
 
     // Admin management queries
     @Query("SELECT COUNT(p) FROM Pharmacy p WHERE p.isActive = true AND p.isVerified = true")

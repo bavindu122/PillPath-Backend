@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,22 +24,26 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END FROM Admin a WHERE a.adminLevel = :adminLevel")
     boolean existsByAdminLevel(@Param("adminLevel") AdminLevel adminLevel);
 
-    // Dashboard specific queries
-    @Query("SELECT COUNT(u) FROM User u WHERE u.class = Customer")
+    // Type-based counts by subclass
+    @Query("SELECT COUNT(u) FROM User u WHERE TYPE(u) = Customer")
     Long countCustomers();
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.class = PharmacyAdmin")
+    @Query("SELECT COUNT(u) FROM User u WHERE TYPE(u) = PharmacyAdmin")
     Long countPharmacyAdmins();
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.class = Admin")
+    @Query("SELECT COUNT(u) FROM User u WHERE TYPE(u) = Admin")
     Long countSystemAdmins();
 
     @Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
     List<User> findTop5ByOrderByCreatedAtDesc();
 
-    @Query("SELECT u FROM User u WHERE u.class = Customer")
+    @Query("SELECT u FROM User u WHERE TYPE(u) = Customer")
     List<User> findAllCustomers();
 
+    // Count users created within a date-time range
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+    // Optional: existing native trend (not used by charts endpoint)
     @Query(value = """
         SELECT
             TO_CHAR(created_at, 'Mon') as month,
@@ -53,4 +58,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Get all pharmacist IDs for a specific pharmacy
     @Query("SELECT p.id FROM PharmacistUser p WHERE p.pharmacy.id = :pharmacyId")
     List<Long> findPharmacistIdsByPharmacyId(@Param("pharmacyId") Long pharmacyId);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE TYPE(u) = PharmacistUser")
+    Long countPharmacists();
 }
