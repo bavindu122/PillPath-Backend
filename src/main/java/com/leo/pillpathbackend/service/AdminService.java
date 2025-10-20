@@ -54,6 +54,7 @@ public interface AdminService {
 
     // Pharmacy Reviews
     List<AdminPharmacyReviewDTO> getAllPharmacyReviews();
+    void deletePharmacyReview(String reviewId);
 
     // Future admin methods can go here:
     // List<UserDTO> getAllUsers();

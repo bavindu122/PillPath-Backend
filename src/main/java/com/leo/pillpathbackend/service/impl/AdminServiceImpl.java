@@ -656,4 +656,16 @@ public class AdminServiceImpl implements AdminService {
         }
         return result;
     }
+
+    @Override
+    public void deletePharmacyReview(String reviewId) {
+        if (reviewId == null || reviewId.isBlank()) {
+            throw new IllegalArgumentException("reviewId is required");
+        }
+        boolean exists = pharmacyReviewRepository.existsById(reviewId);
+        if (!exists) {
+            throw new RuntimeException("Review not found");
+        }
+        pharmacyReviewRepository.deleteById(reviewId);
+    }
 }

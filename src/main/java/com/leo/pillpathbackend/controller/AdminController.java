@@ -178,6 +178,18 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getAllPharmacyReviews());
     }
 
+    @DeleteMapping("/reviews/{reviewId}")
+    public ResponseEntity<Void> deletePharmacyReview(@PathVariable("reviewId") String reviewId) {
+        try {
+            adminService.deletePharmacyReview(reviewId);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     // Future admin endpoints:
     // @GetMapping("/users")
     // @PostMapping("/users/{id}/deactivate")
