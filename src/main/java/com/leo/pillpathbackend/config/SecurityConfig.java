@@ -1,40 +1,8 @@
 package com.leo.pillpathbackend.config;
 
-import com.leo.pillpathbackend.security.filter.CustomTokenAuthenticationFilter;
-import org.springframework.beans.factory.annotation.Autowired;
-//import org.springframework.context.annotation.Bean;
-//import org.springframework.context.annotation.Configuration;
-//import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-//import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-//import org.springframework.security.crypto.password.PasswordEncoder;
-//import org.springframework.security.web.SecurityFilterChain;
-//
-//@Configuration
-//public class SecurityConfig {
-//
-//    @Bean
-//    public PasswordEncoder passwordEncoder() {
-//        return new BCryptPasswordEncoder();
-//    }
-//    @Bean
-//    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-//        http
-//                .csrf(csrf -> csrf.disable())
-//                .authorizeHttpRequests(authz -> authz
-//                        .requestMatchers("/api/v1/customers/register").permitAll()
-//                        .requestMatchers("/api/v1/customers/check-email/**").permitAll()
-//                        .anyRequest().authenticated()
-//                );
-//
-//        return http.build();
-//    }
-//}
-// java
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -46,19 +14,22 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy;
-
-import com.leo.pillpathbackend.security.filter.CustomTokenAuthenticationFilter;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 
 import java.util.List;
-import org.springframework.http.HttpMethod;
+
+import com.leo.pillpathbackend.security.JwtAuthenticationFilter;
+import com.leo.pillpathbackend.security.filter.CustomTokenAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
-@EnableGlobalMethodSecurity(prePostEnabled = true)
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    @Autowired
-    private CustomTokenAuthenticationFilter customTokenFilter;
+    public SecurityConfig() {
+        System.out.println("🟢🟢🟢 SecurityConfig LOADED! 🟢🟢🟢");
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -66,91 +37,92 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           JwtAuthenticationFilter jwtAuthenticationFilter,
+                                           CustomTokenAuthenticationFilter customTokenAuthenticationFilter) throws Exception {
+        System.out.println("🔧 Building SecurityFilterChain...");
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(customTokenFilter, UsernamePasswordAuthenticationFilter.class)
-                .headers(headers -> headers
-                        .crossOriginOpenerPolicy(coop -> coop.policy(CrossOriginOpenerPolicy.SAME_ORIGIN_ALLOW_POPUPS))
-                )
-            
-                .authorizeHttpRequests(authz -> authz
-                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/ws/**").permitAll()
-                        .requestMatchers("/app/**").permitAll()
-                        .requestMatchers("/topic/**").permitAll()
-                        
-                        .requestMatchers("/ws/health").permitAll()
-                        .requestMatchers("/ws/chat/**").permitAll()
-                
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers("/api/v1/users/**").permitAll()  // Unified login
-                        .requestMatchers("/api/v1/users/admin/login").permitAll()  // Admin login
-                        .requestMatchers("/api/v1/users/change-password").permitAll()
-                        .requestMatchers("/api/v1/customers/register").permitAll()
-                        .requestMatchers("/api/v1/customers/login").permitAll()
-                        .requestMatchers("/api/v1/customers/register").permitAll()
-                        .requestMatchers("/api/v1/customers/oauth").permitAll() // allow Google sign‑in
-                        .requestMatchers("/api/v1/customers/check-email/**").permitAll()
-                        .requestMatchers("/api/members/**").authenticated()
-                        .requestMatchers("/api/v1/customers/profile/**").permitAll()
-                        
-                        // Pharmacy endpoints
-                        .requestMatchers("/api/v1/pharmacies/register").permitAll()
-                        .requestMatchers("/api/v1/pharmacy-admins/register").permitAll()
-                        .requestMatchers("/api/v1/admin/**").permitAll()
-                        .requestMatchers("/api/v1/pharmacies/**").permitAll()
-                        .requestMatchers("/api/v1/pharmacy-admin/**").permitAll()
-                        .requestMatchers("/api/pharmacy-admin/**").permitAll()
-                        
-                        // Other endpoints
-                        .requestMatchers("/api/v1/prescriptions/**").permitAll()
-                        .requestMatchers("/api/v1/medicines/**").permitAll()
-                        .requestMatchers("/api/v1/orders/**").permitAll()
-                        .requestMatchers("/api/v1/wallets/**").permitAll()
-                        .requestMatchers("/api/chats/**").permitAll()  // Chat endpoints
-                        .requestMatchers("/api/v1/chats/**").permitAll()  // Chat endpoints with v1
-                        .requestMatchers("/api/v1/v1/chats/**").permitAll()  // Temporary alias path used by frontend
-                        .requestMatchers("/api/v1/v1/chats/threads").permitAll()  // Explicit path
-                        // For local development: explicitly allow anonymous GET to messages path
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/chats/*/messages").permitAll()
-            // For local development: allow anonymous GET to unread-count
-            .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/chats/unread-count").permitAll()
-                        .requestMatchers("/api/v1/notifications/**").permitAll()
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .headers(headers -> headers
+                .crossOriginOpenerPolicy(coop -> coop.policy(CrossOriginOpenerPolicy.SAME_ORIGIN_ALLOW_POPUPS))
+                .crossOriginResourcePolicy(corp -> corp.policy(CrossOriginResourcePolicy.CROSS_ORIGIN))
+            )
+            .authorizeHttpRequests(authz -> authz
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/ws/**").permitAll()
+                .requestMatchers("/app/**").permitAll()
+                .requestMatchers("/topic/**").permitAll()
+                .requestMatchers("/ws/health").permitAll()
+                .requestMatchers("/ws/chat/**").permitAll()
+                .requestMatchers("/error").permitAll()
 
-                        .anyRequest().authenticated()
-                );
+                // Auth endpoints
+                .requestMatchers("/api/v1/users/**").permitAll()
+                .requestMatchers("/api/v1/users/admin/login").permitAll()
+                .requestMatchers("/api/v1/users/change-password").permitAll()
+                .requestMatchers("/api/v1/customers/register").permitAll()
+                .requestMatchers("/api/v1/customers/login").permitAll()
+                .requestMatchers("/api/v1/customers/oauth").permitAll()
+                .requestMatchers("/api/v1/customers/check-email/**").permitAll()
+                .requestMatchers("/api/v1/customers/profile/**").permitAll()
+
+                // Public registration endpoints
+                .requestMatchers("/api/v1/pharmacies/register").permitAll()
+                .requestMatchers("/api/v1/pharmacy-admins/register").permitAll()
+
+                // Public OTC catalog endpoints (browse only)
+                .requestMatchers("/api/otc/**").permitAll()
+
+                // OTC order endpoints: only GET is public; other methods require auth
+                .requestMatchers(HttpMethod.GET, "/api/otc-orders/**").permitAll()
+
+                // Protect admin and pharmacy-admin APIs
+                .requestMatchers("/api/v1/admin/**").hasAuthority("ADMIN")
+                .requestMatchers("/api/v1/pharmacy-admin/**").hasAuthority("PHARMACY_ADMIN")
+                .requestMatchers("/api/pharmacy-admin/**").hasAuthority("PHARMACY_ADMIN")
+
+                // Leave existing public APIs as-is for now
+                .requestMatchers("/api/v1/pharmacies/**").permitAll()
+                .requestMatchers("/api/v1/prescriptions/**").permitAll()
+                .requestMatchers("/api/v1/medicines/**").permitAll()
+                .requestMatchers("/api/v1/wallets/**").permitAll()
+                .requestMatchers("/api/chats/**").permitAll()
+                .requestMatchers("/api/v1/chats/**").permitAll()
+                .requestMatchers("/api/v1/v1/chats/**").permitAll()
+                .requestMatchers("/api/v1/v1/chats/threads").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/chats/*/messages").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/chats/unread-count").permitAll()
+                .requestMatchers("/api/v1/notifications/**").permitAll()
+                .requestMatchers("/api/pharmacy-orders/**").permitAll()
+                .requestMatchers("/api/v1/pharmacy/dashboard/**").permitAll()
+
+                .anyRequest().authenticated()
+            )
+            // Register actual filter beans directly
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(customTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        System.out.println("✅ SecurityFilterChain built successfully!");
+        System.out.println("✅ /api/otc-orders/** GET is set to .permitAll(); write ops require auth");
         return http.build();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        // Single, consistent CORS configuration (no duplicate variables)
         CorsConfiguration configuration = new CorsConfiguration();
-        // In local development allow the frontend origin explicitly (adjust if your web client runs on different host/port)
-        configuration.setAllowedOriginPatterns(List.of(
+        configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
                 "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "*"
+                "http://127.0.0.1:3000"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
-        CorsConfiguration cfg = new CorsConfiguration();
-        // Replace with your real frontend origins
-        cfg.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "http://localhost:3000",
-                "http://127.0.0.1:5173",
-                "https://your-domain.com"
-        ));
-        cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
-        cfg.setAllowedHeaders(List.of("*"));
-        cfg.setAllowCredentials(true);
+        configuration.setAllowedHeaders(List.of("*") );
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
+        configuration.setAllowCredentials(true); // Explicit origins above keep this valid
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
