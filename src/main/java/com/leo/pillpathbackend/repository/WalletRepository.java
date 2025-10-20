@@ -10,4 +10,3 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
     Optional<Wallet> findByOwnerTypeAndOwnerId(WalletOwnerType ownerType, Long ownerId);
     Optional<Wallet> findByOwnerTypeAndOwnerIdIsNull(WalletOwnerType ownerType);
 }
-

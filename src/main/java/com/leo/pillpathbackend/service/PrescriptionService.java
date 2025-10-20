@@ -6,6 +6,9 @@ import com.leo.pillpathbackend.dto.PrescriptionListItemDTO;
 import com.leo.pillpathbackend.dto.activity.PrescriptionActivityListResponse;
 import com.leo.pillpathbackend.dto.request.CreatePrescriptionRequest;
 import com.leo.pillpathbackend.dto.PharmacistQueueItemDTO;
+import com.leo.pillpathbackend.dto.reroute.RerouteCandidatesResponse;
+import com.leo.pillpathbackend.dto.reroute.RerouteRequest;
+import com.leo.pillpathbackend.dto.reroute.RerouteResponse;
 import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -49,5 +52,20 @@ public interface PrescriptionService {
 
     // Pharmacist: delete a submission (only if no active order references it)
     void deleteSubmission(Long pharmacistId, Long submissionId);
-}
 
+    // Reroute: list candidate pharmacies
+    RerouteCandidatesResponse listRerouteCandidates(Long customerId,
+                                                    Long prescriptionId,
+                                                    Long excludePharmacyId,
+                                                    Double lat,
+                                                    Double lng,
+                                                    Double radiusKm,
+                                                    Integer limit,
+                                                    Integer offset);
+
+    // Reroute: create new submissions per target pharmacy with unavailable items
+    RerouteResponse rerouteUnavailableItems(Long customerId,
+                                            Long prescriptionId,
+                                            RerouteRequest request,
+                                            String idempotencyKey);
+}
