@@ -2,6 +2,7 @@ package com.leo.pillpathbackend.controller;
 
 import com.leo.pillpathbackend.dto.ChatMessageHistoryResponse;
 import com.leo.pillpathbackend.dto.ChatRoomDTO;
+import com.leo.pillpathbackend.dto.MessageDTO;
 import com.leo.pillpathbackend.dto.StartChatRequest;
 import com.leo.pillpathbackend.service.ChatService;
 import lombok.RequiredArgsConstructor;
@@ -124,8 +125,12 @@ public class ChatController {
             
             // Debug: print first few messages
             messages.getMessages().stream().limit(3).forEach(msg -> {
-                System.out.println("  - Message " + msg.getId() + ": " + 
-                    msg.getSenderType() + " - " + msg.getContent().substring(0, Math.min(50, msg.getContent().length())));
+                System.out.println("  - Message " + msg.getId() + ": ");
+                System.out.println("      Content: '" + msg.getContent() + "'");
+                System.out.println("      SenderType: " + msg.getSenderType());
+                System.out.println("      SenderId: " + msg.getSenderId());
+                System.out.println("      SenderName: " + msg.getSenderName());
+                System.out.println("      Content length: " + (msg.getContent() != null ? msg.getContent().length() : "null"));
             });
             
             return ResponseEntity.ok(messages);
@@ -299,9 +304,9 @@ public class ChatController {
             }
 
             System.out.println("Calling persistAndBroadcastMessage...");
-            chatService.persistAndBroadcastMessage(chatId, senderId, userType, text);
-            System.out.println("Message sent successfully");
-            return ResponseEntity.ok(Map.of("ok", true));
+            MessageDTO savedMessage = chatService.persistAndBroadcastMessage(chatId, senderId, userType, text);
+            System.out.println("Message sent successfully, returning MessageDTO: " + savedMessage);
+            return ResponseEntity.ok(savedMessage);
         } catch (IllegalArgumentException ex) {
             System.out.println("IllegalArgumentException: " + ex.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));

@@ -178,7 +178,7 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
-    public void persistAndBroadcastMessage(Long chatRoomId, Long senderId, String userType, String text) {
+    public MessageDTO persistAndBroadcastMessage(Long chatRoomId, Long senderId, String userType, String text) {
         System.out.println("\n========== PERSIST AND BROADCAST MESSAGE ==========");
         System.out.println("ChatRoomId: " + chatRoomId);
         System.out.println("SenderId: " + senderId);
@@ -306,6 +306,11 @@ public class ChatServiceImpl implements ChatService {
         messagingTemplate.convertAndSend("/topic/chat/room/" + chatRoomId, payload);
         
         System.out.println("========== MESSAGE BROADCAST COMPLETE ==========\n");
+        
+        // STEP 7: Convert and return the message as DTO
+        MessageDTO messageDTO = convertMessageToDTO(message);
+        System.out.println("✅ Returning MessageDTO with content: '" + messageDTO.getContent() + "'");
+        return messageDTO;
     }
 
     @Override
