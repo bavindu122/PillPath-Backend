@@ -57,8 +57,6 @@ import com.leo.pillpathbackend.security.filter.CustomTokenAuthenticationFilter;
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
-    
-    private final JwtAuthenticationFilter jwtAuthFilter;
 
     public SecurityConfig() {
         System.out.println("🟢🟢🟢 SecurityConfig LOADED! 🟢🟢🟢");
