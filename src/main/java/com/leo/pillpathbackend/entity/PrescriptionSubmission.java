@@ -1,6 +1,7 @@
 package com.leo.pillpathbackend.entity;
 
 import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
+import com.leo.pillpathbackend.entity.enums.SubmissionSource;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -46,6 +47,20 @@ public class PrescriptionSubmission {
     @Builder.Default
     private List<PrescriptionSubmissionItem> items = new ArrayList<>();
 
+    // New: origin and references for reroute flows
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source")
+    private SubmissionSource source = SubmissionSource.UPLOAD;
+
+    @Column(name = "parent_preview_id")
+    private String parentPreviewId; // preview code/id that this reroute came from
+
+    @Column(name = "original_pharmacy_id")
+    private Long originalPharmacyId; // the pharmacy that had unavailable items
+
+    @Column(length = 1000, name = "note")
+    private String note; // optional note for this submission (e.g., reroute note)
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -53,4 +68,3 @@ public class PrescriptionSubmission {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 }
-

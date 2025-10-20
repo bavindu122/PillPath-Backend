@@ -4,7 +4,13 @@ import com.leo.pillpathbackend.dto.order.CustomerOrderDTO;
 import com.leo.pillpathbackend.dto.order.PlaceOrderRequestDTO;
 import com.leo.pillpathbackend.dto.order.PayOrderRequestDTO;
 import com.leo.pillpathbackend.dto.order.PharmacyOrderDTO;
+import com.leo.pillpathbackend.dto.order.UnifiedOrderSummaryDTO;
+import com.leo.pillpathbackend.dto.order.OrderTotalsDTO;
+import com.leo.pillpathbackend.dto.order.PaymentDTO;
+import com.leo.pillpathbackend.entity.enums.PaymentMethod;
+import com.leo.pillpathbackend.entity.enums.PaymentStatus;
 import com.leo.pillpathbackend.service.OrderService;
+import com.leo.pillpathbackend.service.OtcOrderService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +21,10 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +38,7 @@ public class OrderController {
 
     private final OrderService orderService;
     private final AuthenticationHelper auth;
+    private final OtcOrderService otcOrderService;
 
     // Customer places multi-pharmacy order
     @PostMapping
@@ -53,15 +64,119 @@ public class OrderController {
         }
     }
 
-    // Customer: list own orders (optionally include items)
+    // Customer: list own orders (optionally include items) with type filter (all|prescription|otc)
     @GetMapping("/my")
     public ResponseEntity<?> myOrders(@RequestParam(name = "includeItems", defaultValue = "false") boolean includeItems,
+                                      @RequestParam(name = "type", defaultValue = "all") String type,
                                       HttpServletRequest httpRequest) {
         try {
             Long customerId = auth.extractCustomerIdFromRequest(httpRequest);
-            log.info("Customer {} listing orders includeItems={}", customerId, includeItems);
-            List<CustomerOrderDTO> list = orderService.listCustomerOrders(customerId, includeItems);
-            return ResponseEntity.ok(list);
+            log.info("Customer {} listing orders includeItems={} type={}", customerId, includeItems, type);
+
+            List<UnifiedOrderSummaryDTO> result = new ArrayList<>();
+
+            boolean wantPresc = "all".equalsIgnoreCase(type) || "prescription".equalsIgnoreCase(type);
+            boolean wantOtc = "all".equalsIgnoreCase(type) || "otc".equalsIgnoreCase(type);
+
+            if (wantPresc) {
+                List<CustomerOrderDTO> presc = orderService.listCustomerOrders(customerId, includeItems);
+                for (CustomerOrderDTO co : presc) {
+                    UnifiedOrderSummaryDTO.UnifiedOrderSummaryDTOBuilder b = UnifiedOrderSummaryDTO.builder()
+                            .orderType("PRESCRIPTION")
+                            .orderCode(co.getOrderCode())
+                            .createdAt(co.getCreatedAt())
+                            .status(co.getStatus() != null ? co.getStatus().name() : null)
+                            .payment(co.getPayment())
+                            .totals(co.getTotals());
+
+                    // Map pharmacy orders summary (code, id, name, status, prescriptionImageUrl)
+                    if (co.getPharmacyOrders() != null) {
+                        List<UnifiedOrderSummaryDTO.UnifiedPharmacyOrderSummaryDTO> pos = co.getPharmacyOrders().stream().map(po ->
+                                UnifiedOrderSummaryDTO.UnifiedPharmacyOrderSummaryDTO.builder()
+                                        .orderCode(po.getOrderCode())
+                                        .pharmacyId(po.getPharmacyId())
+                                        .pharmacyName(po.getPharmacyName())
+                                        .status(po.getStatus() != null ? po.getStatus().name() : null)
+                                        .prescriptionImageUrl(po.getPrescriptionImageUrl())
+                                        .build()
+                        ).toList();
+                        b.pharmacyOrders(pos);
+                    }
+
+                    result.add(b.build());
+                }
+            }
+
+            if (wantOtc) {
+                var otcOrders = otcOrderService.getCustomerOrders(customerId);
+                for (var oo : otcOrders) {
+                    // Build totals and payment
+                    OrderTotalsDTO totals = OrderTotalsDTO.builder()
+                            .total(oo.getTotal())
+                            .currency("LKR")
+                            .build();
+
+                    PaymentDTO payment = null;
+                    try {
+                        PaymentMethod pm = oo.getPaymentMethod() != null ? PaymentMethod.valueOf(oo.getPaymentMethod()) : null;
+                        PaymentStatus ps = oo.getPaymentStatus() != null ? PaymentStatus.valueOf(oo.getPaymentStatus()) : null;
+                        payment = PaymentDTO.builder()
+                                .method(pm)
+                                .status(ps)
+                                .amount(oo.getTotal())
+                                .currency("LKR")
+                                .reference(null)
+                                .build();
+                    } catch (Exception ignore) {
+                        // Fallback: partial payment info
+                        payment = PaymentDTO.builder()
+                                .method(null)
+                                .status(null)
+                                .amount(oo.getTotal())
+                                .currency("LKR")
+                                .reference(null)
+                                .build();
+                    }
+
+                    UnifiedOrderSummaryDTO.UnifiedOrderSummaryDTOBuilder b = UnifiedOrderSummaryDTO.builder()
+                            .orderType("OTC")
+                            .orderCode(oo.getOrderCode())
+                            .createdAt(oo.getCreatedAt() != null ? oo.getCreatedAt().toString() : null)
+                            .status(oo.getStatus())
+                            .payment(payment)
+                            .totals(totals);
+
+                    // Convenience: set primary pharmacy info from first slice
+                    if (oo.getPharmacyOrders() != null && !oo.getPharmacyOrders().isEmpty()) {
+                        var first = oo.getPharmacyOrders().get(0);
+                        b.pharmacyId(first.getPharmacyId());
+                        b.pharmacyName(first.getPharmacyName());
+
+                        if (includeItems && first.getItems() != null) {
+                            var items = first.getItems().stream().map(it ->
+                                    UnifiedOrderSummaryDTO.UnifiedOtcItemDTO.builder()
+                                            .otcProductId(null) // not stored in current schema
+                                            .name(it.getMedicineName())
+                                            .quantity(it.getQuantity())
+                                            .unitPrice(it.getUnitPrice())
+                                            .productImageUrl(null) // not stored; UI may resolve via /api/otc/{id}
+                                            .build()
+                            ).toList();
+                            b.items(items);
+                        }
+                    }
+
+                    result.add(b.build());
+                }
+            }
+
+            // Sort by createdAt descending (most recent first)
+            result.sort(Comparator.comparing(
+                    UnifiedOrderSummaryDTO::getCreatedAt,
+                    Comparator.nullsLast(Comparator.naturalOrder())
+            ).reversed());
+
+            return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {
             String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Unauthorized" : e.getMessage();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", msg));
@@ -129,4 +244,36 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
         }
     }
+
+    // Customer: assign order to a family member
+    @PutMapping("/{orderCode}/assign-family-member")
+    public ResponseEntity<?> assignOrderToFamilyMember(
+            @PathVariable String orderCode,
+            @RequestBody Map<String, Long> body,
+            HttpServletRequest httpRequest) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(httpRequest);
+            Long familyMemberId = body.get("familyMemberId");
+            
+            if (familyMemberId == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "familyMemberId is required"));
+            }
+            
+            log.info("Customer {} assigning order {} to family member {}", customerId, orderCode, familyMemberId);
+            orderService.assignOrderToFamilyMember(orderCode, customerId, familyMemberId);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Order assigned successfully",
+                "orderCode", orderCode,
+                "familyMemberId", familyMemberId
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error assigning order {} to family member", orderCode, e);
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Internal server error" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
+        }
+    }
 }
+

@@ -36,6 +36,10 @@ public class CustomerOrder {
     @JoinColumn(name = "prescription_id")
     private Prescription prescription;
 
+    // Optional: which family member this order is for
+    @Column(name = "family_member_id")
+    private Long familyMemberId;
+
     @Enumerated(EnumType.STRING)
     private CustomerOrderStatus status = CustomerOrderStatus.PENDING;
 
@@ -62,6 +66,14 @@ public class CustomerOrder {
     // New field to store external payment reference / transaction id
     @Column(length = 128)
     private String paymentReference;
+
+    // ✅ For OTC orders - delivery address
+    @Column(length = 500)
+    private String deliveryAddress;
+
+    // ✅ For OTC orders - customer notes
+    @Column(length = 1000)
+    private String notes;
 
     @CreationTimestamp
     private LocalDateTime createdAt;

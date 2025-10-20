@@ -47,11 +47,18 @@ public class PharmacyAdminController {
         Customer cust = parent != null ? parent.getCustomer() : null;
         BigDecimal total = Optional.ofNullable(po.getTotal()).orElseGet(() -> Optional.ofNullable(po.getItems()).orElse(List.of()).stream()
                 .map(PharmacyOrderItem::getTotalPrice).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add));
-        BigDecimal commissionPercent = walletSettingsService.resolveCommissionPercent(po.getPharmacy().getId());
+
+        // Prefer immutable snapshots if present; fallback to current settings
+        BigDecimal commissionPercent = Optional.ofNullable(po.getCommissionPercentSnapshot())
+                .orElseGet(() -> walletSettingsService.resolveCommissionPercent(po.getPharmacy().getId()));
         if (commissionPercent == null) commissionPercent = BigDecimal.ZERO;
-        BigDecimal commissionAmount = total.multiply(commissionPercent).divide(new BigDecimal("100"), 2, RM);
-        BigDecimal convenienceFee = Optional.ofNullable(walletSettingsService.getSettings().getConvenienceFee()).orElse(BigDecimal.ZERO).setScale(2, RM);
-        BigDecimal netAfterCommission = total.subtract(commissionAmount).setScale(2, RM);
+        final BigDecimal cpFinal = commissionPercent;
+        BigDecimal commissionAmount = Optional.ofNullable(po.getCommissionAmountSnapshot())
+                .orElseGet(() -> total.multiply(cpFinal).divide(new BigDecimal("100"), 2, RM));
+        BigDecimal convenienceFee = Optional.ofNullable(po.getConvenienceFeeSnapshot())
+                .orElseGet(() -> Optional.ofNullable(walletSettingsService.getSettings().getConvenienceFee()).orElse(BigDecimal.ZERO).setScale(2, RM));
+        BigDecimal netAfterCommission = Optional.ofNullable(po.getNetAfterCommissionSnapshot())
+                .orElseGet(() -> total.subtract(commissionAmount).setScale(2, RM));
 
         List<PharmacyOrderItemDTO> itemDTOs = Optional.ofNullable(po.getItems()).orElse(List.of()).stream().map(it -> PharmacyOrderItemDTO.builder()
                 .itemId(it.getId())

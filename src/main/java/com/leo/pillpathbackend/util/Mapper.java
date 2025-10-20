@@ -1,6 +1,9 @@
 package com.leo.pillpathbackend.util;
 
 import com.leo.pillpathbackend.dto.*;
+import com.leo.pillpathbackend.dto.order.OrderTotalsDTO;
+import com.leo.pillpathbackend.dto.order.PharmacyOrderDTO;
+import com.leo.pillpathbackend.dto.order.PharmacyOrderItemDTO;
 import com.leo.pillpathbackend.entity.*;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -528,6 +531,64 @@ public class Mapper {
                 .totalPrice(dto.getTotalPrice())
                 .available(dto.getAvailable())
                 .notes(dto.getNotes())
+                .build();
+    }
+
+    public OrderTotalsDTO toOrderTotalsDTO(CustomerOrder order) {
+        if (order == null) return null;
+        return OrderTotalsDTO.builder()
+                .subtotal(order.getSubtotal())
+                .discount(order.getDiscount())
+                .tax(order.getTax())
+                .shipping(order.getShipping())
+                .total(order.getTotal())
+                .currency(order.getCurrency())
+                .build();
+    }
+
+    public PharmacyOrderDTO toPharmacyOrderDTO(PharmacyOrder po, boolean includeItems) {
+        if (po == null) return null;
+        
+        List<PharmacyOrderItemDTO> items = null;
+        if (includeItems && po.getItems() != null) {
+            items = po.getItems().stream()
+                    .map(item -> PharmacyOrderItemDTO.builder()
+                            .itemId(item.getId())
+                            .medicineName(item.getMedicineName())
+                            .genericName(item.getGenericName())
+                            .dosage(item.getDosage())
+                            .quantity(item.getQuantity())
+                            .unitPrice(item.getUnitPrice())
+                            .totalPrice(item.getTotalPrice())
+                            .build())
+                    .toList();
+        }
+
+        CustomerOrder parent = po.getCustomerOrder();
+        
+        return PharmacyOrderDTO.builder()
+                .pharmacyOrderId(po.getId())
+                .pharmacyId(po.getPharmacy() != null ? po.getPharmacy().getId() : null)
+                .pharmacyName(po.getPharmacy() != null ? po.getPharmacy().getName() : null)
+                .status(po.getStatus())
+                .pickupCode(po.getPickupCode())
+                .pickupLocation(po.getPickupLocation())
+                .pickupLat(po.getPickupLat())
+                .pickupLng(po.getPickupLng())
+                .customerNote(po.getCustomerNote())
+                .pharmacistNote(po.getPharmacistNote())
+                .createdAt(po.getCreatedAt() != null ? po.getCreatedAt().toString() : null)
+                .updatedAt(po.getUpdatedAt() != null ? po.getUpdatedAt().toString() : null)
+                .orderCode(parent != null ? parent.getOrderCode() : null)
+                .items(items)
+                .totals(OrderTotalsDTO.builder()
+                        .subtotal(po.getSubtotal())
+                        .discount(po.getDiscount())
+                        .tax(po.getTax())
+                        .shipping(po.getShipping())
+                        .total(po.getTotal())
+                        .currency(parent != null ? parent.getCurrency() : "LKR")
+                        .build())
                 .build();
     }
 }

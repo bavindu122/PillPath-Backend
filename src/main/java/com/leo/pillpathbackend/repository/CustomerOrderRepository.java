@@ -14,8 +14,13 @@ import java.util.Optional;
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
     Optional<CustomerOrder> findByOrderCodeAndCustomerId(String orderCode, Long customerId);
     boolean existsByPrescriptionIdAndCustomerIdAndStatusIn(Long prescriptionId, Long customerId, Collection<CustomerOrderStatus> statuses);
+    Optional<CustomerOrder> findByPrescriptionId(Long prescriptionId);
 
     List<CustomerOrder> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
+
+        // ✅ ADD THESE TWO NEW METHODS
+    Optional<CustomerOrder> findByOrderCode(String orderCode);
+    // List<CustomerOrder> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
     long countByCustomerId(Long customerId);
 
     // Loyalty points - find card payment orders

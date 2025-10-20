@@ -6,6 +6,9 @@ import com.leo.pillpathbackend.dto.PrescriptionListItemDTO;
 import com.leo.pillpathbackend.dto.request.CreatePrescriptionRequest;
 import com.leo.pillpathbackend.dto.activity.PrescriptionActivityListResponse;
 import com.leo.pillpathbackend.dto.PharmacistSubmissionItemsDTO;
+import com.leo.pillpathbackend.dto.reroute.RerouteCandidatesResponse;
+import com.leo.pillpathbackend.dto.reroute.RerouteRequest;
+import com.leo.pillpathbackend.dto.reroute.RerouteResponse;
 import com.leo.pillpathbackend.entity.PharmacistUser;
 import com.leo.pillpathbackend.service.PrescriptionService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
@@ -22,6 +25,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import com.leo.pillpathbackend.repository.PharmacistUserRepository;
 
@@ -93,6 +97,22 @@ public class PrescriptionController {
         try {
             Long customerId = auth.extractCustomerIdFromRequest(request);
             List<PrescriptionListItemDTO> list = prescriptionService.getCustomerPrescriptions(customerId);
+            return ResponseEntity.ok(list);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Customer: list prescriptions for a specific family member
+    @GetMapping("/family-member/{familyMemberId}")
+    public ResponseEntity<?> getFamilyMemberPrescriptions(
+            @PathVariable Long familyMemberId,
+            HttpServletRequest request) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+            List<PrescriptionListItemDTO> list = prescriptionService.getFamilyMemberPrescriptions(customerId, familyMemberId);
             return ResponseEntity.ok(list);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
@@ -343,6 +363,76 @@ public class PrescriptionController {
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Customer: assign prescription to a family member
+    @PutMapping("/{prescriptionId}/assign-family-member")
+    public ResponseEntity<?> assignPrescriptionToFamilyMember(
+            @PathVariable Long prescriptionId,
+            @RequestBody Map<String, Long> body,
+            HttpServletRequest request) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+            Long familyMemberId = body.get("familyMemberId");
+            
+            if (familyMemberId == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "familyMemberId is required"));
+            }
+            
+            prescriptionService.assignPrescriptionToFamilyMember(prescriptionId, customerId, familyMemberId);
+            return ResponseEntity.ok(Map.of(
+                "message", "Prescription assigned successfully",
+                "prescriptionId", prescriptionId,
+                "familyMemberId", familyMemberId
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+    // New: Reroute candidates for a customer's prescription
+    @GetMapping("/customer/{prescriptionId}/reroute/candidates")
+    public ResponseEntity<?> rerouteCandidates(@PathVariable Long prescriptionId,
+                                               @RequestParam(value = "excludePharmacyId", required = false) Long excludePharmacyId,
+                                               @RequestParam(value = "lat", required = false) Double lat,
+                                               @RequestParam(value = "lng", required = false) Double lng,
+                                               @RequestParam(value = "radiusKm", required = false) Double radiusKm,
+                                               @RequestParam(value = "limit", required = false) Integer limit,
+                                               @RequestParam(value = "offset", required = false) Integer offset,
+                                               HttpServletRequest request) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+            RerouteCandidatesResponse resp = prescriptionService.listRerouteCandidates(customerId, prescriptionId,
+                    excludePharmacyId, lat, lng, radiusKm, limit, offset);
+            return ResponseEntity.ok(resp);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // New: Reroute unavailable items to new pharmacies
+    @PostMapping("/customer/{prescriptionId}/reroute")
+    public ResponseEntity<?> rerouteUnavailable(@PathVariable Long prescriptionId,
+                                                @RequestBody RerouteRequest body,
+                                                @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                                HttpServletRequest request) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+            RerouteResponse resp = prescriptionService.rerouteUnavailableItems(customerId, prescriptionId, body, idempotencyKey);
+            return ResponseEntity.status(HttpStatus.CREATED).body(resp);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error in rerouteUnavailable", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }

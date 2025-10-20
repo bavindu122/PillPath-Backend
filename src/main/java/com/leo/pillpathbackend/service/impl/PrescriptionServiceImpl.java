@@ -6,9 +6,13 @@ import com.leo.pillpathbackend.dto.PrescriptionListItemDTO;
 import com.leo.pillpathbackend.dto.activity.*;
 import com.leo.pillpathbackend.dto.request.CreatePrescriptionRequest;
 import com.leo.pillpathbackend.dto.PharmacistSubmissionItemsDTO;
+import com.leo.pillpathbackend.dto.reroute.RerouteCandidatesResponse;
+import com.leo.pillpathbackend.dto.reroute.RerouteRequest;
+import com.leo.pillpathbackend.dto.reroute.RerouteResponse;
 import com.leo.pillpathbackend.entity.*;
 import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
 import com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus;
+import com.leo.pillpathbackend.entity.enums.SubmissionSource;
 import com.leo.pillpathbackend.repository.*;
 import com.leo.pillpathbackend.service.CloudinaryService;
 import com.leo.pillpathbackend.service.NotificationService;
@@ -26,11 +30,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +47,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final UserRepository userRepository;
     private final PrescriptionSubmissionItemRepository prescriptionSubmissionItemRepository;
     private final PharmacyOrderRepository pharmacyOrderRepository;
+    private final CustomerOrderRepository customerOrderRepository;
     private final NotificationService notificationService;
 
     private static final DateTimeFormatter ISO_SECOND_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
@@ -137,6 +138,19 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<PrescriptionListItemDTO> getFamilyMemberPrescriptions(Long customerId, Long familyMemberId) {
+        return prescriptionRepository.findByCustomerIdAndFamilyMemberIdOrderByCreatedAtDesc(customerId, familyMemberId)
+                .stream().map(prescription -> {
+                    PrescriptionListItemDTO dto = mapper.toPrescriptionListItemDTO(prescription);
+                    // Try to find the associated order for navigation
+                    customerOrderRepository.findByPrescriptionId(prescription.getId())
+                            .ifPresent(order -> dto.setOrderCode(order.getOrderCode()));
+                    return dto;
+                }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<PrescriptionListItemDTO> getPharmacyPrescriptions(Long pharmacyId) {
         return prescriptionRepository.findByPharmacyIdOrderByCreatedAtDesc(pharmacyId)
                 .stream().map(mapper::toPrescriptionListItemDTO).toList();
@@ -147,7 +161,26 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     public PrescriptionDTO getCustomerPrescription(Long id, Long customerId) {
         Prescription p = prescriptionRepository.findByIdAndCustomerId(id, customerId)
                 .orElseThrow(() -> new NoSuchElementException("Prescription not found"));
-        return mapper.toPrescriptionDTO(p);
+        PrescriptionDTO dto = mapper.toPrescriptionDTO(p);
+        
+        // Include order information if prescription has been ordered
+        customerOrderRepository.findByPrescriptionId(id).ifPresent(order -> {
+            dto.setOrderCode(order.getOrderCode());
+            
+            // Set order totals
+            dto.setOrderTotals(mapper.toOrderTotalsDTO(order));
+            
+            // Set pharmacy orders (the actual fulfilled items from pharmacies)
+            if (order.getPharmacyOrders() != null && !order.getPharmacyOrders().isEmpty()) {
+                dto.setPharmacyOrders(
+                    order.getPharmacyOrders().stream()
+                        .map(po -> mapper.toPharmacyOrderDTO(po, true))
+                        .toList()
+                );
+            }
+        });
+        
+        return dto;
     }
 
     @Override
@@ -663,5 +696,218 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             throw new IllegalStateException("Cannot delete a submission that is part of an active order");
         }
         prescriptionSubmissionRepository.delete(submission);
+    }
+
+    @Override
+    public void assignPrescriptionToFamilyMember(Long prescriptionId, Long customerId, Long familyMemberId) {
+        // Load the prescription
+        Prescription prescription = prescriptionRepository.findById(prescriptionId)
+                .orElseThrow(() -> new IllegalArgumentException("Prescription not found"));
+        
+        // Verify that the prescription belongs to this customer
+        if (!prescription.getCustomer().getId().equals(customerId)) {
+            throw new IllegalArgumentException("You don't have permission to assign this prescription");
+        }
+        
+        // Update the prescription's family member reference
+        prescription.setFamilyMemberId(familyMemberId);
+        prescriptionRepository.save(prescription);
+        
+        log.info("Prescription {} assigned to family member {} by customer {}", 
+                prescriptionId, familyMemberId, customerId);
+    }
+    // New: Reroute candidates
+    @Override
+    @Transactional(readOnly = true)
+    public RerouteCandidatesResponse listRerouteCandidates(Long customerId,
+                                                           Long prescriptionId,
+                                                           Long excludePharmacyId,
+                                                           Double lat,
+                                                           Double lng,
+                                                           Double radiusKm,
+                                                           Integer limit,
+                                                           Integer offset) {
+        if (customerId == null) throw new IllegalArgumentException("Unauthorized");
+        Prescription p = prescriptionRepository.findByIdAndCustomerId(prescriptionId, customerId)
+                .orElseThrow(() -> new NoSuchElementException("Prescription not found"));
+
+        double useLat;
+        double useLng;
+        if (lat != null && lng != null) {
+            useLat = lat;
+            useLng = lng;
+        } else if (p.getLatitude() != null && p.getLongitude() != null) {
+            useLat = p.getLatitude().doubleValue();
+            useLng = p.getLongitude().doubleValue();
+        } else {
+            // Fallback: no coordinates, return recent active pharmacies
+            List<Pharmacy> all = pharmacyRepository.findTop10ByOrderByCreatedAtDesc();
+            List<com.leo.pillpathbackend.dto.reroute.RerouteCandidateDTO> items = all.stream()
+                    .filter(ph -> excludePharmacyId == null || !ph.getId().equals(excludePharmacyId))
+                    .filter(ph -> Boolean.TRUE.equals(ph.getIsActive()) && Boolean.TRUE.equals(ph.getIsVerified()))
+                    .map(ph -> com.leo.pillpathbackend.dto.reroute.RerouteCandidateDTO.builder()
+                            .pharmacyId(ph.getId())
+                            .name(ph.getName())
+                            .address(ph.getAddress())
+                            .distanceKm(null)
+                            .rating(ph.getAverageRating())
+                            .deliveryEtaMinutes("30-45")
+                            .acceptingReroute(Boolean.TRUE)
+                            .build())
+                    .toList();
+            return RerouteCandidatesResponse.builder().items(paginate(items, limit, offset)).build();
+        }
+
+        double rad = radiusKm != null && radiusKm > 0 ? radiusKm : 10.0; // default 10km
+        List<Pharmacy> nearby = pharmacyRepository.findActivePharmaciesWithinRadius(useLat, useLng, rad);
+        List<com.leo.pillpathbackend.dto.reroute.RerouteCandidateDTO> items = nearby.stream()
+                .filter(ph -> excludePharmacyId == null || !ph.getId().equals(excludePharmacyId))
+                .map(ph -> {
+                    Double dist = null;
+                    if (ph.getLatitude() != null && ph.getLongitude() != null) {
+                        dist = haversineKm(useLat, useLng, ph.getLatitude().doubleValue(), ph.getLongitude().doubleValue());
+                    }
+                    return com.leo.pillpathbackend.dto.reroute.RerouteCandidateDTO.builder()
+                            .pharmacyId(ph.getId())
+                            .name(ph.getName())
+                            .address(ph.getAddress())
+                            .distanceKm(dist)
+                            .rating(ph.getAverageRating())
+                            .deliveryEtaMinutes(etaFromDistance(dist))
+                            .acceptingReroute(Boolean.TRUE)
+                            .build();
+                })
+                .sorted(Comparator.comparing(d -> Optional.ofNullable(d.getDistanceKm()).orElse(Double.MAX_VALUE)))
+                .toList();
+
+        return RerouteCandidatesResponse.builder().items(paginate(items, limit, offset)).build();
+    }
+
+    private <T> List<T> paginate(List<T> list, Integer limit, Integer offset) {
+        int off = offset != null && offset > 0 ? offset : 0;
+        int lim = limit != null && limit > 0 ? Math.min(limit, 100) : 20;
+        if (off >= list.size()) return List.of();
+        int toIndex = Math.min(off + lim, list.size());
+        return list.subList(off, toIndex);
+    }
+
+    private String etaFromDistance(Double distKm) {
+        if (distKm == null) return "30-45";
+        if (distKm < 2) return "20-30";
+        if (distKm < 5) return "30-45";
+        return "45-60";
+    }
+
+    private double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    // New: Reroute create
+    @Override
+    public RerouteResponse rerouteUnavailableItems(Long customerId, Long prescriptionId, RerouteRequest request, String idempotencyKey) {
+        if (customerId == null) throw new IllegalArgumentException("Unauthorized");
+        if (request == null) throw new IllegalArgumentException("Request required");
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new IllegalArgumentException("items cannot be empty");
+        }
+        // Resolve target IDs
+        List<Long> targets = new ArrayList<>();
+        if (request.getTargetPharmacyIds() != null) targets.addAll(request.getTargetPharmacyIds());
+        if (request.getTargetPharmacyId() != null) targets.add(request.getTargetPharmacyId());
+        // sanitize
+        targets.removeIf(Objects::isNull);
+        targets = new ArrayList<>(new LinkedHashSet<>(targets));
+        if (targets.isEmpty()) throw new IllegalArgumentException("targetPharmacyId(s) required");
+        if (request.getOriginalPharmacyId() != null && targets.contains(request.getOriginalPharmacyId())) {
+            throw new IllegalArgumentException("target cannot include originalPharmacyId");
+        }
+
+        Prescription p = prescriptionRepository.findByIdAndCustomerId(prescriptionId, customerId)
+                .orElseThrow(() -> new NoSuchElementException("Prescription not found"));
+
+        String rrId = "RR-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) +
+                "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+
+        List<RerouteResponse.Created> created = new ArrayList<>();
+        List<RerouteResponse.Skipped> skipped = new ArrayList<>();
+
+        for (Long pid : targets) {
+            Optional<Pharmacy> phOpt = pharmacyRepository.findById(pid);
+            if (phOpt.isEmpty()) {
+                skipped.add(RerouteResponse.Skipped.builder().pharmacyId(pid).reason("NOT_FOUND").build());
+                continue;
+            }
+            Pharmacy ph = phOpt.get();
+            if (!Boolean.TRUE.equals(ph.getIsActive())) {
+                skipped.add(RerouteResponse.Skipped.builder().pharmacyId(pid).reason("OUT_OF_SERVICE").build());
+                continue;
+            }
+            // duplicate submission check
+            Optional<PrescriptionSubmission> existing = prescriptionSubmissionRepository.findByPrescriptionIdAndPharmacyId(p.getId(), pid);
+            if (existing.isPresent()) {
+                skipped.add(RerouteResponse.Skipped.builder().pharmacyId(pid).reason("DUPLICATE").build());
+                continue;
+            }
+
+            PrescriptionSubmission submission = PrescriptionSubmission.builder()
+                    .prescription(p)
+                    .pharmacy(ph)
+                    .status(PrescriptionStatus.PENDING_REVIEW)
+                    .source(SubmissionSource.REROUTE)
+                    .parentPreviewId(request.getParentPreviewId())
+                    .originalPharmacyId(request.getOriginalPharmacyId())
+                    .note(request.getNote())
+                    .build();
+            submission = prescriptionSubmissionRepository.save(submission);
+
+            for (RerouteRequest.RerouteItemRequest it : request.getItems()) {
+                PrescriptionSubmissionItem entity = new PrescriptionSubmissionItem();
+                entity.setSubmission(submission);
+                entity.setMedicineName(it.getName());
+                entity.setGenericName(it.getGenericName());
+                entity.setDosage(it.getDosage());
+                entity.setQuantity(it.getQuantity() != null ? it.getQuantity() : 1);
+                entity.setAvailable(null); // unknown yet
+                entity.setNotes(it.getNotes());
+                prescriptionSubmissionItemRepository.save(entity);
+                submission.getItems().add(entity);
+            }
+            recalcSubmissionTotals(submission);
+            prescriptionSubmissionRepository.save(submission);
+
+            // notify pharmacists at target pharmacy
+            try {
+                List<Long> pharmacistIds = userRepository.findPharmacistIdsByPharmacyId(pid);
+                if (!pharmacistIds.isEmpty() && p.getCustomer() != null) {
+                    notificationService.createPrescriptionSentNotification(
+                            p.getId(),
+                            pid,
+                            pharmacistIds,
+                            p.getCustomer().getFullName()
+                    );
+                }
+            } catch (Exception ex) {
+                log.error("Failed to send reroute notification for pharmacy {}: {}", pid, ex.getMessage());
+            }
+
+            created.add(RerouteResponse.Created.builder()
+                    .pharmacyId(pid)
+                    .submissionId(submission.getId())
+                    .status(submission.getStatus().name())
+                    .build());
+        }
+
+        return RerouteResponse.builder()
+                .rerouteRequestId(rrId)
+                .created(created)
+                .skipped(skipped)
+                .build();
     }
 }

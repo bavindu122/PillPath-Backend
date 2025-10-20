@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PillPath Chat Test - Pharmacy Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>
+    // IMPORTANT: Set these for testing
+    // In production, get these from your authentication system
+    window.CURRENT_USER_ID = 100;  // Pharmacy Admin ID (change this to test different admins)
+    window.CURRENT_USER_ROLE = 'pharmacy_admin';
+    window.AUTH_TOKEN = null; // Optional: your JWT token
+  </script>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --bubble-left: #ffffff;
+      --bubble-right: #E3F2FD;
+      --text: #222;
+      --muted: #777;
+      --accent: #1976d2;
+    }
+    body { 
+      margin:0; 
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
+      background: var(--bg); 
+    }
+    .info-bar {
+      background: #e3f2fd;
+      padding: 10px 16px;
+      border-bottom: 1px solid #2196f3;
+      text-align: center;
+      font-size: 13px;
+      color: #0d47a1;
+    }
+    .chat-shell { 
+      max-width: 760px; 
+      margin: 0 auto; 
+      height: calc(100vh - 40px); 
+      display: grid; 
+      grid-template-rows: auto auto 1fr auto; 
+    }
+    .chat-header { 
+      padding: 14px 16px; 
+      background: #fff; 
+      border-bottom: 1px solid #eee; 
+      display:flex; 
+      align-items:center; 
+      gap:12px; 
+    }
+    .chat-header .avatar { 
+      width:36px; 
+      height:36px; 
+      background:#eee; 
+      border-radius:50%; 
+    }
+    .chat-header .title { 
+      font-weight: 600; 
+    }
+    .connection-status {
+      padding: 8px 16px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #dee2e6;
+      font-size: 12px;
+    }
+    .connection-status.connected { background: #d4edda; color: #155724; }
+    .connection-status.disconnected { background: #f8d7da; color: #721c24; }
+    .messages { 
+      padding: 12px; 
+      overflow-y: auto; 
+      display:flex; 
+      flex-direction: column; 
+      gap: 10px; 
+    }
+    .msg { 
+      max-width: 72%; 
+      padding: 10px 12px; 
+      border-radius: 14px; 
+      color: var(--text); 
+      font-size: 14px; 
+      line-height: 1.35; 
+      display:inline-flex; 
+      flex-direction: column; 
+    }
+    .msg.left { 
+      background: var(--bubble-left); 
+      align-self: flex-start; 
+      border-top-left-radius: 6px; 
+    }
+    .msg.right { 
+      background: var(--bubble-right); 
+      align-self: flex-end; 
+      border-top-right-radius: 6px; 
+    }
+    .meta { 
+      margin-top: 6px; 
+      font-size: 11px; 
+      color: var(--muted); 
+      align-self: flex-end; 
+    }
+    .composer { 
+      background:#fff; 
+      border-top: 1px solid #eee; 
+      padding: 10px; 
+      display:flex; 
+      gap: 8px; 
+    }
+    .composer input { 
+      flex: 1; 
+      padding: 10px 12px; 
+      border: 1px solid #ddd; 
+      border-radius: 10px; 
+      font-size: 14px; 
+    }
+    .composer button { 
+      padding: 10px 14px; 
+      border: 0; 
+      background: var(--accent); 
+      color: #fff; 
+      border-radius: 10px; 
+      cursor: pointer; 
+    }
+    .composer button:hover {
+      background: #1565c0;
+    }
+    .typing { 
+      color: var(--muted); 
+      font-size: 12px; 
+      padding: 0 14px 8px; 
+      display:none; 
+    }
+    .typing.show { 
+      display:block; 
+    }
+  </style>
+</head>
+<body>
+  <!-- WebSocket Libraries (SockJS and Stomp.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+  
+  <div class="info-bar">
+    🧪 Test Mode: Pharmacy Admin View | User ID: <span id="userIdDisplay"></span> | Chat ID: <span id="chatIdDisplay"></span>
+    <br><small>Open this page and the customer test page side-by-side to test real-time chat</small>
+  </div>
+  
+  <div class="chat-shell">
+    <div class="chat-header">
+      <div class="avatar" id="customerAvatar"></div>
+      <div>
+        <div class="title" id="customerName">Customer</div>
+        <div class="subtitle" id="customerSub" style="font-size:12px;color:#777">Active now</div>
+      </div>
+    </div>
+    
+    <div id="connectionStatus" class="connection-status disconnected">
+      ⚠️ Not connected
+    </div>
+    
+    <main id="messages" class="messages" aria-live="polite">
+      <div style="text-align: center; color: #999; padding: 20px;">
+        Loading messages...
+      </div>
+    </main>
+    
+    <form id="composer" class="composer">
+      <input id="text" autocomplete="off" placeholder="Type a message" />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+  
+  <script>
+    // Display test info
+    document.getElementById('userIdDisplay').textContent = window.CURRENT_USER_ID;
+    const chatIdMatch = location.pathname.match(/\/chat\/(\d+)/);
+    const displayChatId = chatIdMatch ? chatIdMatch[1] : 'unknown';
+    document.getElementById('chatIdDisplay').textContent = displayChatId;
+  </script>
+  
+  <script src="/js/chat.js"></script>
+  
+  <script>
+    // Update connection status indicator
+    const statusEl = document.getElementById('connectionStatus');
+    
+    // Check WebSocket connection every second
+    setInterval(() => {
+      if (window.chatDebug && window.chatDebug.isConnected()) {
+        statusEl.className = 'connection-status connected';
+        statusEl.textContent = '✅ Connected to chat room ' + displayChatId;
+      } else {
+        statusEl.className = 'connection-status disconnected';
+        statusEl.textContent = '⚠️ Not connected - attempting to connect...';
+      }
+    }, 1000);
+  </script>
+</body>
+</html>

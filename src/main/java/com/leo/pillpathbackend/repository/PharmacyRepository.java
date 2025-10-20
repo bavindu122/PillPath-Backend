@@ -78,4 +78,9 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
     @Query("SELECT p FROM Pharmacy p WHERE p.id = :id")
     Optional<Pharmacy> findPharmacyForProfile(@Param("id") Long id);
 
+    List<Pharmacy> findByNameContainingIgnoreCaseAndIsActiveAndIsVerified(String name, boolean b, boolean b1);
+
+    // Allow searching by name regardless of activation/verification status (returns registered pharmacies)
+    List<Pharmacy> findByNameContainingIgnoreCase(String name);
+
 }
