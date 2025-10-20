@@ -101,6 +101,22 @@ public class PrescriptionController {
         }
     }
 
+    // Customer: list prescriptions for a specific family member
+    @GetMapping("/family-member/{familyMemberId}")
+    public ResponseEntity<?> getFamilyMemberPrescriptions(
+            @PathVariable Long familyMemberId,
+            HttpServletRequest request) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+            List<PrescriptionListItemDTO> list = prescriptionService.getFamilyMemberPrescriptions(customerId, familyMemberId);
+            return ResponseEntity.ok(list);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // Customer: view a specific prescription
     @GetMapping("/my/{id}")
     public ResponseEntity<?> myPrescription(@PathVariable Long id, HttpServletRequest request) {
@@ -342,6 +358,33 @@ public class PrescriptionController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Customer: assign prescription to a family member
+    @PutMapping("/{prescriptionId}/assign-family-member")
+    public ResponseEntity<?> assignPrescriptionToFamilyMember(
+            @PathVariable Long prescriptionId,
+            @RequestBody Map<String, Long> body,
+            HttpServletRequest request) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(request);
+            Long familyMemberId = body.get("familyMemberId");
+            
+            if (familyMemberId == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "familyMemberId is required"));
+            }
+            
+            prescriptionService.assignPrescriptionToFamilyMember(prescriptionId, customerId, familyMemberId);
+            return ResponseEntity.ok(Map.of(
+                "message", "Prescription assigned successfully",
+                "prescriptionId", prescriptionId,
+                "familyMemberId", familyMemberId
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }

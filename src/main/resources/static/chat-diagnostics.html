@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Chat System Diagnostics</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .section {
+            background: #2d2d2d;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #4ec9b0;
+            margin-top: 0;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        .success {
+            color: #4ec9b0;
+        }
+        .error {
+            color: #f48771;
+        }
+        .log {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 3px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #444;
+            padding-left: 10px;
+        }
+        .log-entry.info { border-left-color: #4ec9b0; }
+        .log-entry.error { border-left-color: #f48771; }
+        .log-entry.warn { border-left-color: #dcdcaa; }
+        input, select {
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: #d4d4d4;
+            padding: 5px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 PillPath Chat System Diagnostics</h1>
+    
+    <!-- Configuration -->
+    <div class="section">
+        <h2>Configuration</h2>
+        <label>Chat ID: <input type="number" id="chatId" value="1"></label><br>
+        <label>Customer ID: <input type="number" id="customerId" value="1"></label><br>
+        <label>Pharmacy Admin ID: <input type="number" id="adminId" value="100"></label><br>
+        <button onclick="saveConfig()">Save Config</button>
+    </div>
+    
+    <!-- Test Endpoints -->
+    <div class="section">
+        <h2>Test REST Endpoints</h2>
+        <button onclick="testGetMessages('customer')">GET Messages (Customer)</button>
+        <button onclick="testGetMessages('admin')">GET Messages (Pharmacy Admin)</button>
+        <button onclick="testSendMessage('customer')">POST Message (Customer)</button>
+        <button onclick="testSendMessage('admin')">POST Message (Pharmacy Admin)</button>
+    </div>
+    
+    <!-- Test WebSocket -->
+    <div class="section">
+        <h2>Test WebSocket Connection</h2>
+        <button onclick="testWebSocketConnection('customer')">Connect as Customer</button>
+        <button onclick="testWebSocketConnection('admin')">Connect as Pharmacy Admin</button>
+        <button onclick="disconnectWebSocket()">Disconnect</button>
+        <div id="wsStatus" style="margin-top: 10px;">
+            Status: <span id="wsStatusText">Not connected</span>
+        </div>
+    </div>
+    
+    <!-- Logs -->
+    <div class="section">
+        <h2>Logs</h2>
+        <button onclick="clearLogs()">Clear Logs</button>
+        <div id="logs" class="log"></div>
+    </div>
+
+    <!-- WebSocket Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    
+    <script>
+        let config = {
+            chatId: 1,
+            customerId: 1,
+            adminId: 100
+        };
+        
+        let stompClient = null;
+        let currentRole = null;
+        
+        function saveConfig() {
+            config.chatId = parseInt(document.getElementById('chatId').value);
+            config.customerId = parseInt(document.getElementById('customerId').value);
+            config.adminId = parseInt(document.getElementById('adminId').value);
+            log('info', 'Configuration saved: ' + JSON.stringify(config));
+        }
+        
+        function log(level, message) {
+            const logsDiv = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + level;
+            entry.textContent = new Date().toLocaleTimeString() + ' [' + level.toUpperCase() + '] ' + message;
+            logsDiv.appendChild(entry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        async function testGetMessages(role) {
+            const endpoint = role === 'customer' 
+                ? `/api/v1/chats/${config.chatId}/messages?page=0&limit=50`
+                : `/api/v1/chats/pharmacy-admin/dashboard/chats/${config.chatId}/messages?page=0&limit=50`;
+            
+            log('info', `Testing GET ${endpoint}`);
+            
+            try {
+                const response = await fetch(endpoint);
+                log('info', `Response status: ${response.status}`);
+                
+                const data = await response.json();
+                log('info', `Received ${data.messages ? data.messages.length : 0} messages`);
+                log('info', JSON.stringify(data, null, 2));
+            } catch (error) {
+                log('error', 'Failed to fetch messages: ' + error.message);
+            }
+        }
+        
+        async function testSendMessage(role) {
+            const userId = role === 'customer' ? config.customerId : config.adminId;
+            const endpoint = role === 'customer'
+                ? `/api/v1/chats/${config.chatId}/messages`
+                : `/api/v1/chats/pharmacy-admin/dashboard/chats/${config.chatId}/messages`;
+            
+            const text = `Test message from ${role} at ${new Date().toLocaleTimeString()}`;
+            
+            log('info', `Testing POST ${endpoint}`);
+            log('info', `Message: ${text}`);
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text })
+                });
+                
+                log('info', `Response status: ${response.status}`);
+                const data = await response.json();
+                log('info', JSON.stringify(data, null, 2));
+                
+                if (response.ok) {
+                    log('success', '✅ Message sent successfully!');
+                } else {
+                    log('error', '❌ Failed to send message: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                log('error', 'Failed to send message: ' + error.message);
+            }
+        }
+        
+        function testWebSocketConnection(role) {
+            const userId = role === 'customer' ? config.customerId : config.adminId;
+            const roleParam = role === 'customer' ? 'customer' : 'pharmacy_admin';
+            
+            log('info', `Connecting WebSocket as ${roleParam} with userId ${userId}`);
+            
+            try {
+                const wsUrl = `/ws/chat?role=${roleParam}&userId=${userId}`;
+                log('info', `WebSocket URL: ${wsUrl}`);
+                
+                const socket = new SockJS(wsUrl);
+                stompClient = Stomp.over(socket);
+                currentRole = roleParam;
+                
+                stompClient.connect({}, function(frame) {
+                    log('success', '✅ WebSocket connected!');
+                    document.getElementById('wsStatusText').textContent = `Connected as ${roleParam}`;
+                    document.getElementById('wsStatusText').style.color = '#4ec9b0';
+                    
+                    // Subscribe to room topic
+                    stompClient.subscribe('/topic/chat/room/' + config.chatId, function(message) {
+                        log('info', '📨 Received from /topic/chat/room/' + config.chatId);
+                        const data = JSON.parse(message.body);
+                        log('info', JSON.stringify(data, null, 2));
+                    });
+                    
+                    // Subscribe to user queue
+                    stompClient.subscribe('/user/queue/chat/' + config.chatId, function(message) {
+                        log('info', '📬 Received from /user/queue/chat/' + config.chatId);
+                        const data = JSON.parse(message.body);
+                        log('info', JSON.stringify(data, null, 2));
+                    });
+                    
+                    log('success', '✅ Subscribed to chat room ' + config.chatId);
+                    
+                }, function(error) {
+                    log('error', '❌ WebSocket connection error: ' + error);
+                    document.getElementById('wsStatusText').textContent = 'Error';
+                    document.getElementById('wsStatusText').style.color = '#f48771';
+                });
+                
+            } catch (error) {
+                log('error', 'Failed to connect WebSocket: ' + error.message);
+            }
+        }
+        
+        function disconnectWebSocket() {
+            if (stompClient) {
+                stompClient.disconnect(function() {
+                    log('info', 'WebSocket disconnected');
+                    document.getElementById('wsStatusText').textContent = 'Not connected';
+                    document.getElementById('wsStatusText').style.color = '#d4d4d4';
+                });
+            }
+        }
+        
+        // Initial log
+        log('info', 'Diagnostics page loaded');
+        saveConfig();
+    </script>
+</body>
+</html>

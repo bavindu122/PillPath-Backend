@@ -129,4 +129,35 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
         }
     }
+
+    // Customer: assign order to a family member
+    @PutMapping("/{orderCode}/assign-family-member")
+    public ResponseEntity<?> assignOrderToFamilyMember(
+            @PathVariable String orderCode,
+            @RequestBody Map<String, Long> body,
+            HttpServletRequest httpRequest) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(httpRequest);
+            Long familyMemberId = body.get("familyMemberId");
+            
+            if (familyMemberId == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "familyMemberId is required"));
+            }
+            
+            log.info("Customer {} assigning order {} to family member {}", customerId, orderCode, familyMemberId);
+            orderService.assignOrderToFamilyMember(orderCode, customerId, familyMemberId);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Order assigned successfully",
+                "orderCode", orderCode,
+                "familyMemberId", familyMemberId
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error assigning order {} to family member", orderCode, e);
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Internal server error" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
+        }
+    }
 }

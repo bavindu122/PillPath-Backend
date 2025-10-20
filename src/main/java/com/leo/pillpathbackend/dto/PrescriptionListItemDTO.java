@@ -16,5 +16,6 @@ public class PrescriptionListItemDTO
     private PrescriptionStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String orderCode; // Associated order code for navigation
 }
 

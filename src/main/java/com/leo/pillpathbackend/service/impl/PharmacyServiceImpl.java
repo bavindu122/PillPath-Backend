@@ -407,6 +407,47 @@ public class PharmacyServiceImpl implements PharmacyService {
         return getMockOTCProducts();
     }
 
+    /**
+     * Search pharmacies by name for chat initiation.
+     * Returns registered pharmacies; active/verified pharmacies are prioritized.
+     */
+    @Override
+    public List<PharmacySearchDTO> searchPharmaciesByName(String name) {
+        // First, find active & verified matches to prioritize them
+        List<Pharmacy> prioritized = pharmacyRepository.findByNameContainingIgnoreCaseAndIsActiveAndIsVerified(name, true, true);
+
+        // Then find all matches regardless of status
+        List<Pharmacy> allMatches = pharmacyRepository.findByNameContainingIgnoreCase(name);
+
+        // Combine while preserving priority and avoiding duplicates
+        List<Pharmacy> combined = allMatches.stream()
+                .distinct()
+                .collect(Collectors.toList());
+
+        // Sort so prioritized ones come first
+        combined.sort((p1, p2) -> {
+            boolean p1Prior = p1.getIsActive() != null && p1.getIsVerified() != null && p1.getIsActive() && p1.getIsVerified();
+            boolean p2Prior = p2.getIsActive() != null && p2.getIsVerified() != null && p2.getIsActive() && p2.getIsVerified();
+            if (p1Prior == p2Prior) return p1.getName().compareToIgnoreCase(p2.getName());
+            return p1Prior ? -1 : 1;
+        });
+
+        return combined.stream()
+            .map(pharmacy -> PharmacySearchDTO.builder()
+                .id(pharmacy.getId())
+                .name(pharmacy.getName())
+                .address(pharmacy.getAddress())
+                .phoneNumber(pharmacy.getPhoneNumber())
+                .email(pharmacy.getEmail())
+                .logoUrl(pharmacy.getLogoUrl())
+                .isVerified(pharmacy.getIsVerified())
+                .isActive(pharmacy.getIsActive())
+                .averageRating(pharmacy.getAverageRating())
+                .totalReviews(pharmacy.getTotalReviews())
+                .build())
+            .collect(Collectors.toList());
+    }
+
     private String getPharmacyStatus(Pharmacy pharmacy) {
         if (!pharmacy.getIsActive() && !pharmacy.getIsVerified()) {
             return "Rejected";
@@ -427,8 +468,6 @@ public class PharmacyServiceImpl implements PharmacyService {
                         (hours.contains("24") || hours.contains("00:00-23:59")));
     }
     
-    // ...existing code...
-
     private String getCurrentOperatingStatus(Map<String, String> operatingHours) {
         if (operatingHours == null) return "Hours not available";
 
@@ -544,7 +583,6 @@ public class PharmacyServiceImpl implements PharmacyService {
         }
     }
 
-// ...existing code...
 
     private List<ReviewDTO> getRecentReviews(Long pharmacyId) {
         // Mock data - implement with actual review repository later

@@ -21,6 +21,7 @@ public interface OrderService {
     PharmacyOrderDTO updatePharmacyOrderStatusByAdmin(Long pharmacyAdminId, Long pharmacyOrderId, PharmacyOrderStatus status);
     
     CustomerOrderDTO payOrder(Long customerId, String orderCode, PayOrderRequestDTO request);
+    void assignOrderToFamilyMember(String orderCode, Long customerId, Long familyMemberId);
 }
 
 
