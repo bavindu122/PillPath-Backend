@@ -542,6 +542,7 @@ public class OrderServiceImpl implements OrderService {
                 .updatedAt(formatTime(order.getUpdatedAt()))
                 .prescriptionId(order.getPrescription() != null ? order.getPrescription().getId() : null)
                 .prescriptionCode(order.getPrescription() != null ? order.getPrescription().getCode() : null)
+                .familyMemberId(order.getFamilyMemberId())
                 .status(order.getStatus())
                 .payment(PaymentDTO.builder()
                         .method(order.getPaymentMethod())
@@ -660,5 +661,25 @@ public class OrderServiceImpl implements OrderService {
 
     private String formatTime(java.time.LocalDateTime dt) {
         return dt == null ? null : dt.toString();
+    }
+
+    @Override
+    public void assignOrderToFamilyMember(String orderCode, Long customerId, Long familyMemberId) {
+        // Load the order and verify ownership in one query
+        CustomerOrder order = customerOrderRepository.findByOrderCodeAndCustomerId(orderCode, customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found or you don't have permission to access it"));
+        
+        // Update the order's family member reference
+        order.setFamilyMemberId(familyMemberId);
+        customerOrderRepository.save(order);
+        
+        // Also update the prescription if it exists
+        if (order.getPrescription() != null) {
+            order.getPrescription().setFamilyMemberId(familyMemberId);
+            prescriptionRepository.save(order.getPrescription());
+        }
+        
+        log.info("Order {} and its prescription assigned to family member {} by customer {}", 
+                orderCode, familyMemberId, customerId);
     }
 }

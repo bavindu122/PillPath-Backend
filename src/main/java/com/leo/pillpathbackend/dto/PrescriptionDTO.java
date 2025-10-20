@@ -1,5 +1,7 @@
 package com.leo.pillpathbackend.dto;
 
+import com.leo.pillpathbackend.dto.order.OrderTotalsDTO;
+import com.leo.pillpathbackend.dto.order.PharmacyOrderDTO;
 import com.leo.pillpathbackend.entity.enums.DeliveryPreference;
 import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
 import lombok.*;
@@ -38,5 +40,10 @@ public class PrescriptionDTO {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Order information (if prescription has been ordered)
+    private String orderCode;
+    private OrderTotalsDTO orderTotals;
+    private List<PharmacyOrderDTO> pharmacyOrders;
 }
 

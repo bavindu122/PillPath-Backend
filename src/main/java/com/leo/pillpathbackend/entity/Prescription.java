@@ -34,6 +34,10 @@ public class Prescription {
     @JoinColumn(name = "customer_id")
     private User customer;
 
+    // Optional: which family member this prescription is for
+    @Column(name = "family_member_id")
+    private Long familyMemberId;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "pharmacy_id", referencedColumnName = "id")
     private Pharmacy pharmacy;

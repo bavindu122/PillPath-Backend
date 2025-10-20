@@ -17,6 +17,8 @@ public interface PrescriptionService {
 
     List<PrescriptionListItemDTO> getCustomerPrescriptions(Long customerId);
 
+    List<PrescriptionListItemDTO> getFamilyMemberPrescriptions(Long customerId, Long familyMemberId);
+
     List<PrescriptionListItemDTO> getPharmacyPrescriptions(Long pharmacyId);
 
     PrescriptionDTO getCustomerPrescription(Long id, Long customerId);
@@ -49,5 +51,8 @@ public interface PrescriptionService {
 
     // Pharmacist: delete a submission (only if no active order references it)
     void deleteSubmission(Long pharmacistId, Long submissionId);
+
+    // Customer: assign prescription to a family member
+    void assignPrescriptionToFamilyMember(Long prescriptionId, Long customerId, Long familyMemberId);
 }
 
