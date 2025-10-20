@@ -99,7 +99,7 @@ public class AdminFinanceController {
             if (pharmacyId != null) {
                 preds.add(cb.equal(jPharmacy.get("id"), pharmacyId));
             }
-            if (startTs != null && endTs != null) {
+            if (startTs != null) { // endTs implied non-null whenever startTs is non-null in above logic
                 preds.add(cb.between(root.get("updatedAt"), startTs, endTs));
             }
             if (channel != null) {
@@ -130,9 +130,17 @@ public class AdminFinanceController {
             SettlementChannel sc = resolveChannel(pm);
             Long pid = ph != null ? ph.getId() : null;
             BigDecimal gross = Optional.ofNullable(po.getTotal()).orElse(BigDecimal.ZERO);
-            BigDecimal rate = walletSettingsService.resolveCommissionPercent(pid);
-            BigDecimal commission = gross.multiply(rate).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
-            BigDecimal net = sc == SettlementChannel.ONLINE ? gross.subtract(commission) : BigDecimal.ZERO;
+
+            // Prefer snapshot values if available; avoid lambda captures with mutable locals
+            BigDecimal rate = Optional.ofNullable(po.getCommissionPercentSnapshot())
+                    .orElseGet(() -> walletSettingsService.resolveCommissionPercent(pid));
+            if (rate == null) rate = BigDecimal.ZERO;
+            BigDecimal commission = (po.getCommissionAmountSnapshot() != null)
+                    ? po.getCommissionAmountSnapshot()
+                    : gross.multiply(rate).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+            BigDecimal net = (sc == SettlementChannel.ONLINE)
+                    ? Optional.ofNullable(po.getNetAfterCommissionSnapshot()).orElse(gross.subtract(commission))
+                    : BigDecimal.ZERO;
 
             String commissionId = null; Boolean received = null; String payoutId = null;
             if (sc == SettlementChannel.ON_HAND) {

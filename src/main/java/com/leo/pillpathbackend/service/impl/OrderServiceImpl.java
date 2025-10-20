@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import static java.math.RoundingMode.HALF_UP;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -294,18 +295,31 @@ public class OrderServiceImpl implements OrderService {
 
         po.setStatus(status);
         
-        if (status == PharmacyOrderStatus.READY_FOR_PICKUP) {
-            CustomerOrder customerOrder = po.getCustomerOrder();
-            if (customerOrder != null && customerOrder.getCustomer() != null) {
-                try {
-                    notificationService.createOrderReadyNotification(
-                        po.getId(),
-                        customerOrder.getCustomer().getId(),
-                        po.getPharmacy().getName()
-                    );
-                } catch (Exception e) {
-                    log.error("Failed to send order ready notification: {}", e.getMessage());
+        // Snapshot finance values when finalizing the slice
+        if (status == PharmacyOrderStatus.HANDED_OVER) {
+            try {
+                Long pharmacyId = po.getPharmacy() != null ? po.getPharmacy().getId() : null;
+                BigDecimal gross = po.getTotal();
+                if (gross == null) {
+                    gross = java.util.Optional.ofNullable(po.getItems()).orElse(java.util.List.of()).stream()
+                            .map(PharmacyOrderItem::getTotalPrice)
+                            .filter(java.util.Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
                 }
+                BigDecimal rate = walletSettingsService.resolveCommissionPercent(pharmacyId);
+                if (rate == null) rate = BigDecimal.ZERO;
+                BigDecimal commission = gross.multiply(rate).divide(new BigDecimal("100"), 2, HALF_UP);
+                BigDecimal convenience = java.util.Optional.ofNullable(walletSettingsService.getSettings())
+                        .map(com.leo.pillpathbackend.entity.PlatformSettings::getConvenienceFee)
+                        .orElse(BigDecimal.ZERO).setScale(2, HALF_UP);
+                BigDecimal net = gross.subtract(commission).setScale(2, HALF_UP);
+
+                po.setCommissionPercentSnapshot(rate.setScale(2, HALF_UP));
+                po.setCommissionAmountSnapshot(commission);
+                po.setConvenienceFeeSnapshot(convenience);
+                po.setNetAfterCommissionSnapshot(net);
+            } catch (Exception ignore) {
+                // do not block status update on snapshot errors
             }
         }
         
@@ -483,18 +497,31 @@ public class OrderServiceImpl implements OrderService {
 
         po.setStatus(status);
         
-        if (status == PharmacyOrderStatus.READY_FOR_PICKUP) {
-            CustomerOrder customerOrder = po.getCustomerOrder();
-            if (customerOrder != null && customerOrder.getCustomer() != null) {
-                try {
-                    notificationService.createOrderReadyNotification(
-                        po.getId(),
-                        customerOrder.getCustomer().getId(),
-                        po.getPharmacy().getName()
-                    );
-                } catch (Exception e) {
-                    log.error("Failed to send order ready notification: {}", e.getMessage());
+        // Snapshot finance values when finalizing the slice (admin path)
+        if (status == PharmacyOrderStatus.HANDED_OVER) {
+            try {
+                Long pharmacyId = po.getPharmacy() != null ? po.getPharmacy().getId() : null;
+                BigDecimal gross = po.getTotal();
+                if (gross == null) {
+                    gross = java.util.Optional.ofNullable(po.getItems()).orElse(java.util.List.of()).stream()
+                            .map(PharmacyOrderItem::getTotalPrice)
+                            .filter(java.util.Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
                 }
+                BigDecimal rate = walletSettingsService.resolveCommissionPercent(pharmacyId);
+                if (rate == null) rate = BigDecimal.ZERO;
+                BigDecimal commission = gross.multiply(rate).divide(new BigDecimal("100"), 2, HALF_UP);
+                BigDecimal convenience = java.util.Optional.ofNullable(walletSettingsService.getSettings())
+                        .map(com.leo.pillpathbackend.entity.PlatformSettings::getConvenienceFee)
+                        .orElse(BigDecimal.ZERO).setScale(2, HALF_UP);
+                BigDecimal net = gross.subtract(commission).setScale(2, HALF_UP);
+
+                po.setCommissionPercentSnapshot(rate.setScale(2, HALF_UP));
+                po.setCommissionAmountSnapshot(commission);
+                po.setConvenienceFeeSnapshot(convenience);
+                po.setNetAfterCommissionSnapshot(net);
+            } catch (Exception ignore) {
+                // do not block status update on snapshot errors
             }
         }
         
@@ -801,5 +828,4 @@ public class OrderServiceImpl implements OrderService {
                 orderCode, familyMemberId, customerId);
     }
 }
-
 
