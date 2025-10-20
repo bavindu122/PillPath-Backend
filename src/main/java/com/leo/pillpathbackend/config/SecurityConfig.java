@@ -1,5 +1,7 @@
 package com.leo.pillpathbackend.config;
 
+import com.leo.pillpathbackend.security.filter.CustomTokenAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Autowired;
 //import org.springframework.context.annotation.Bean;
 //import org.springframework.context.annotation.Configuration;
 //import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -48,6 +50,7 @@ import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHe
 import com.leo.pillpathbackend.security.filter.CustomTokenAuthenticationFilter;
 
 import java.util.List;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @EnableWebSecurity
@@ -72,21 +75,22 @@ public class SecurityConfig {
                 .headers(headers -> headers
                         .crossOriginOpenerPolicy(coop -> coop.policy(CrossOriginOpenerPolicy.SAME_ORIGIN_ALLOW_POPUPS))
                 )
+            
                 .authorizeHttpRequests(authz -> authz
-                        // WebSocket endpoints
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/app/**").permitAll()
                         .requestMatchers("/topic/**").permitAll()
                         
-                        // Chat API endpoints
-                        .requestMatchers("/api/v1/chats/**").permitAll()
-                        
-                        // User management endpoints
+                        .requestMatchers("/ws/health").permitAll()
+                        .requestMatchers("/ws/chat/**").permitAll()
+                
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/v1/users/**").permitAll()  // Unified login
                         .requestMatchers("/api/v1/users/admin/login").permitAll()  // Admin login
                         .requestMatchers("/api/v1/users/change-password").permitAll()
-
-                        // Customer endpoints
+                        .requestMatchers("/api/v1/customers/register").permitAll()
                         .requestMatchers("/api/v1/customers/login").permitAll()
                         .requestMatchers("/api/v1/customers/register").permitAll()
                         .requestMatchers("/api/v1/customers/oauth").permitAll() // allow Google sign‑in
@@ -115,6 +119,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/chats/*/messages").permitAll()
             // For local development: allow anonymous GET to unread-count
             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/chats/unread-count").permitAll()
+                        .requestMatchers("/api/v1/notifications/**").permitAll()
 
                         .anyRequest().authenticated()
                 );
@@ -135,6 +140,17 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
+        CorsConfiguration cfg = new CorsConfiguration();
+        // Replace with your real frontend origins
+        cfg.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "http://127.0.0.1:5173",
+                "https://your-domain.com"
+        ));
+        cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+        cfg.setAllowedHeaders(List.of("*"));
+        cfg.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
