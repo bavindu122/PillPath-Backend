@@ -268,14 +268,16 @@ public class AdminServiceImpl implements AdminService {
             dto.setId(p.getCode()); // or p.getId().toString()
             dto.setPatient(p.getCustomer().getFullName());
             dto.setPharmacy(p.getPharmacy().getName());
-            // status from prescription_submission; default REJECTED if not found
-            String status = prescriptionSubmissionRepository
-                    .findByPrescriptionIdAndPharmacyId(p.getId(), p.getPharmacy().getId())
-                    .map(s -> s.getStatus().name())
-                    .orElse(PrescriptionStatus.REJECTED.name());
+            // Fetch submission for this prescription-pharmacy pair
+            var subOpt = prescriptionSubmissionRepository.findByPrescriptionIdAndPharmacyId(p.getId(), p.getPharmacy().getId());
+            String status = subOpt.map(s -> s.getStatus().name()).orElse(PrescriptionStatus.REJECTED.name());
             dto.setStatus(status);
+            // total_price from prescription_submission
+            String total = subOpt.map(s -> s.getTotalPrice())
+                    .map(java.math.BigDecimal::toPlainString)
+                    .orElse("0");
+            dto.setTotalPrice(total);
             dto.setSubmitted(p.getCreatedAt().toLocalDate().toString());
-            dto.setTotalPrice(String.valueOf(p.getTotalPrice()));
             dto.setPatientImage(p.getCustomer().getProfilePictureUrl());
             dto.setPharmacyImage(p.getPharmacy().getImageUrl());
             dtos.add(dto);
