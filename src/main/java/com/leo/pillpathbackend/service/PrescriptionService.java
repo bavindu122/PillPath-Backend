@@ -58,7 +58,6 @@ public interface PrescriptionService {
     // Customer: assign prescription to a family member
     void assignPrescriptionToFamilyMember(Long prescriptionId, Long customerId, Long familyMemberId);
 
-
     // Reroute: list candidate pharmacies
     RerouteCandidatesResponse listRerouteCandidates(Long customerId,
                                                     Long prescriptionId,
