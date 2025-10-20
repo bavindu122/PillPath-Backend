@@ -39,6 +39,37 @@ public class FamilyMemberController {
         }
     }
 
+    @PutMapping("/family-members/{memberId}")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    public ResponseEntity<?> updateFamilyMember(@PathVariable Long memberId, @RequestBody AddMemberDTO dto) {
+        try {
+            System.out.println("=== UPDATE FAMILY MEMBER REQUEST ===");
+            System.out.println("Member ID: " + memberId);
+            System.out.println("DTO Name: " + dto.getName());
+            System.out.println("DTO Relation: " + dto.getRelation());
+            System.out.println("DTO Age: " + dto.getAge());
+            System.out.println("DTO Phone: " + dto.getPhone());
+            System.out.println("DTO BloodType: " + dto.getBloodType());
+            System.out.println("====================================");
+            
+            FamilyMember updated = familyMemberService.updateMember(memberId, dto);
+            
+            System.out.println("=== UPDATE SUCCESS ===");
+            System.out.println("Updated Member: " + updated.getName());
+            System.out.println("======================");
+            
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            System.err.println("=== UPDATE FAILED ===");
+            e.printStackTrace();
+            System.err.println("=====================");
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage(),
+                    "type", e.getClass().getSimpleName()
+            ));
+        }
+    }
+
     @DeleteMapping("/family-members/{memberId}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<?> deleteFamilyMember(@PathVariable Long memberId) {
