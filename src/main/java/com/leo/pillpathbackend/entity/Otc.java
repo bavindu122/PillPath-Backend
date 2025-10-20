@@ -1,0 +1,276 @@
+package com.leo.pillpathbackend.entity;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name="otc")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class Otc {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String description;
+
+    @Column(nullable = false)
+    private Double price;
+
+    @Setter(lombok.AccessLevel.NONE)
+    @Column(nullable = false)
+    private Integer stock;
+
+    @Column(nullable = true, columnDefinition = "TEXT")
+    private String imageUrl;
+
+    @Column(name = "image_public_id")
+    private String imagePublicId;
+
+    @Column(length = 50)
+    private String status;
+
+    @Column(name = "added_to_store")
+    private Boolean addedToStore = true;
+
+    // Add these 4 new fields
+    @Column(nullable = false)
+    private String category;
+
+    @Column(nullable = false)
+    private String dosage;
+
+    @Column(nullable = false)
+    private String manufacturer;
+
+    @Column(name = "pack_size", nullable = false)
+    private String packSize;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pharmacy_id", nullable = false)
+    private Pharmacy pharmacy;
+
+    @CreationTimestamp
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    // Convenience method to get pharmacy ID
+    public Long getPharmacyId() {
+        return pharmacy != null ? pharmacy.getId() : null;
+    }
+
+    // Method to automatically calculate status based on stock
+    private String calculateStatus(Integer stock) {
+        if (stock == null || stock == 0) {
+            return "Out of Stock";
+        } else if (stock <= 10) {
+            return "Low Stock";
+        } else {
+            return "In Stock";
+        }
+    }
+
+    // Setter for stock that also updates status
+    public void setStock(Integer stock) {
+        this.stock = stock;
+        this.status = calculateStatus(stock);
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+        if (status == null && stock != null) {
+            status = calculateStatus(stock);
+        }
+        if (this.addedToStore == null) {
+            this.addedToStore = true;
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+        if (stock != null) {
+            status = calculateStatus(stock);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// package com.leo.pillpathbackend.entity;
+
+// import jakarta.persistence.*;
+// import lombok.AllArgsConstructor;
+// import lombok.Getter;
+// import lombok.NoArgsConstructor;
+// import lombok.Setter;
+// import org.hibernate.annotations.CreationTimestamp;
+// import org.hibernate.annotations.UpdateTimestamp;
+
+// import java.time.LocalDateTime;
+
+// @Entity
+// @Table(name="otc")
+// @Getter
+// @Setter
+// @NoArgsConstructor
+// @AllArgsConstructor
+// public class Otc {
+//     @Id
+//     @GeneratedValue(strategy = GenerationType.IDENTITY)
+//     private Long id;
+
+//     @Column(nullable = false)
+//     private String name;
+
+//     @Column(nullable = false, columnDefinition = "TEXT")
+//     private String description;
+
+//     @Column(nullable = false)
+//     private Double price;
+
+//     @Setter(lombok.AccessLevel.NONE)
+//     @Column(nullable = false)
+//     private Integer stock;
+
+//     @Column(nullable = true, columnDefinition = "TEXT")
+//     private String imageUrl;
+
+//     @Column(name = "image_public_id")
+//     private String imagePublicId;
+
+//     @Column(length = 50)
+//     private String status;
+
+//     @Column(name = "added_to_store")
+//     private Boolean addedToStore = true;
+
+//     // Remove the separate pharmacyId field - use the relationship instead
+//     @ManyToOne(fetch = FetchType.LAZY)
+//     @JoinColumn(name = "pharmacy_id", nullable = false)
+//     private Pharmacy pharmacy;
+
+//     @CreationTimestamp
+//     @Column(name = "created_at")
+//     private LocalDateTime createdAt;
+
+//     @UpdateTimestamp
+//     @Column(name = "updated_at")
+//     private LocalDateTime updatedAt;
+
+//     // Constructor with parameters
+//     public Otc(String name, String description, Double price, Integer stock, String imageUrl, Pharmacy pharmacy) {
+//         this.name = name;
+//         this.description = description;
+//         this.price = price;
+//         this.stock = stock;
+//         this.imageUrl = imageUrl;
+//         this.pharmacy = pharmacy;
+//         this.addedToStore = true;
+//         this.status = calculateStatus(stock);
+//     }
+
+//     // Convenience method to get pharmacy ID
+//     public Long getPharmacyId() {
+//         return pharmacy != null ? pharmacy.getId() : null;
+//     }
+
+//     // Convenience method to set pharmacy ID
+//     public void setPharmacyId(Long pharmacyId) {
+//         // This will be handled through the pharmacy relationship
+//         // You can implement this if needed for backward compatibility
+//     }
+
+//     // Method to automatically calculate status based on stock
+//     private String calculateStatus(Integer stock) {
+//         if (stock == null || stock == 0) {
+//             return "Out of Stock";
+//         } else if (stock <= 10) {
+//             return "Low Stock";
+//         } else {
+//             return "In Stock";
+//         }
+//     }
+
+//     // Helper method to add product to store
+//     public void addToStore() {
+//         this.addedToStore = true;
+//     }
+
+//     // Helper method to remove product from store
+//     public void removeFromStore() {
+//         this.addedToStore = false;
+//     }
+
+//     // Setter for stock that also updates status
+//     public void setStock(Integer stock) {
+//         this.stock = stock;
+//         this.status = calculateStatus(stock);
+//     }
+
+//     @PrePersist
+//     protected void onCreate() {
+//         createdAt = LocalDateTime.now();
+//         updatedAt = LocalDateTime.now();
+//         if (status == null && stock != null) {
+//             status = calculateStatus(stock);
+//         }
+//         if (this.addedToStore == null) {
+//             this.addedToStore = true;
+//         }
+//     }
+
+//     @PreUpdate
+//     protected void onUpdate() {
+//         updatedAt = LocalDateTime.now();
+//         if (stock != null) {
+//             status = calculateStatus(stock);
+//         }
+//     }
+// }
+
+
+
+

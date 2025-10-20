@@ -57,6 +57,9 @@ import org.springframework.http.HttpMethod;
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
+    public SecurityConfig() {
+        System.out.println("🟢🟢🟢 SecurityConfig LOADED! 🟢🟢🟢");
+    }
     @Autowired
     private CustomTokenAuthenticationFilter customTokenFilter;
 
@@ -67,6 +70,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        System.out.println("🔧 Building SecurityFilterChain...");
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
@@ -102,6 +106,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/pharmacies/register").permitAll()
                         .requestMatchers("/api/v1/pharmacy-admins/register").permitAll()
                         .requestMatchers("/api/v1/admin/**").permitAll()
+                        .requestMatchers("/api/otc/**").permitAll()
                         .requestMatchers("/api/v1/pharmacies/**").permitAll()
                         .requestMatchers("/api/v1/pharmacy-admin/**").permitAll()
                         .requestMatchers("/api/pharmacy-admin/**").permitAll()
@@ -110,6 +115,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/prescriptions/**").permitAll()
                         .requestMatchers("/api/v1/medicines/**").permitAll()
                         .requestMatchers("/api/v1/orders/**").permitAll()
+                        .requestMatchers("/api/otc/pharmacy/**").permitAll() // Test only!
                         .requestMatchers("/api/v1/wallets/**").permitAll()
                         .requestMatchers("/api/chats/**").permitAll()  // Chat endpoints
                         .requestMatchers("/api/v1/chats/**").permitAll()  // Chat endpoints with v1
@@ -120,9 +126,16 @@ public class SecurityConfig {
             // For local development: allow anonymous GET to unread-count
             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/chats/unread-count").permitAll()
                         .requestMatchers("/api/v1/notifications/**").permitAll()
+                        .requestMatchers("/api/otc-orders/**").permitAll()
+                         .requestMatchers("/api/pharmacy-orders/**").permitAll()
+                         
+                        .requestMatchers("/api/v1/pharmacy/dashboard/**").permitAll()
 
                         .anyRequest().authenticated()
                 );
+
+        System.out.println("✅ SecurityFilterChain built successfully!");
+        System.out.println("✅ /api/otc-orders/** is set to .permitAll()");
         return http.build();
     }
 
@@ -151,6 +164,11 @@ public class SecurityConfig {
         cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(true);
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT","PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
