@@ -16,6 +16,10 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     Optional<CustomerOrder> findByPrescriptionId(Long prescriptionId);
 
     List<CustomerOrder> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
+
+        // ✅ ADD THESE TWO NEW METHODS
+    Optional<CustomerOrder> findByOrderCode(String orderCode);
+    // List<CustomerOrder> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
     long countByCustomerId(Long customerId);
 
     long countByStatus(CustomerOrderStatus status);

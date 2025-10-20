@@ -67,6 +67,14 @@ public class CustomerOrder {
     @Column(length = 128)
     private String paymentReference;
 
+    // ✅ For OTC orders - delivery address
+    @Column(length = 500)
+    private String deliveryAddress;
+
+    // ✅ For OTC orders - customer notes
+    @Column(length = 1000)
+    private String notes;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 

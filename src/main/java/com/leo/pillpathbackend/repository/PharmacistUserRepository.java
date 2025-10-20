@@ -33,5 +33,33 @@ public interface PharmacistUserRepository extends JpaRepository<PharmacistUser, 
 
     @Query("SELECT p FROM PharmacistUser p WHERE p.pharmacy.id = :pharmacyId AND p.isActive = true AND p.licenseExpiryDate < :date")
     List<PharmacistUser> findByPharmacyIdAndLicenseExpiringSoon(@Param("pharmacyId") Long pharmacyId, @Param("date") LocalDate date);
+
+    // ✅ FIXED: Use 'isActive' instead of 'active'
+    @Query("SELECT COUNT(p) FROM PharmacistUser p WHERE p.pharmacy.id = :pharmacyId AND p.isActive = true")
+    Long countActivePharmacistsByPharmacyId(@Param("pharmacyId") Long pharmacyId);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

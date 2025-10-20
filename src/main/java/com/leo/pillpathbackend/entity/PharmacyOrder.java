@@ -72,6 +72,19 @@ public class PharmacyOrder {
     @Column(precision = 12, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
+    // --- Immutable finance snapshots captured at completion (HANDED_OVER) ---
+    @Column(name = "commission_percent_snapshot", precision = 8, scale = 2)
+    private BigDecimal commissionPercentSnapshot; // e.g., 10.00 for 10%
+
+    @Column(name = "commission_amount_snapshot", precision = 12, scale = 2)
+    private BigDecimal commissionAmountSnapshot; // gross * percent at completion
+
+    @Column(name = "convenience_fee_snapshot", precision = 12, scale = 2)
+    private BigDecimal convenienceFeeSnapshot; // platform convenience fee at completion
+
+    @Column(name = "net_after_commission_snapshot", precision = 12, scale = 2)
+    private BigDecimal netAfterCommissionSnapshot; // gross - commission at completion
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 
@@ -82,4 +95,3 @@ public class PharmacyOrder {
     @Builder.Default
     private List<PharmacyOrderItem> items = new ArrayList<>();
 }
-

@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -42,7 +43,16 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
                 path.startsWith("/api/pharmacy-admin/") ||
                 path.startsWith("/api/v1/prescriptions/") ||
                 path.startsWith("/api/v1/medicines/") ||
-                path.startsWith("/api/v1/orders/");
+                path.startsWith("/api/v1/orders/") ||
+                // OTC catalog endpoints are public; orders are handled by security rules
+                path.equals("/api/otc") ||
+                path.startsWith("/api/otc/") ||
+                // Websocket/STOMP endpoints
+                path.startsWith("/ws/") ||
+                path.startsWith("/app/") ||
+                path.startsWith("/topic/") ||
+                "/ws/health".equals(path) ||
+                "/error".equals(path);
     }
 
     @Override
@@ -52,7 +62,14 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
         try {
             String path = request.getRequestURI();
             System.out.println("CustomTokenAuthenticationFilter processing: " + request.getMethod() + " " + path);
-            
+
+            // If another filter already authenticated, don't override
+            Authentication existingAuth = SecurityContextHolder.getContext().getAuthentication();
+            if (existingAuth != null && existingAuth.isAuthenticated()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             String token = authHelper.extractAndValidateToken(request);
             if (token != null) {
                 System.out.println("Valid token found");
@@ -64,15 +81,16 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
 
                 List<SimpleGrantedAuthority> authorities = new ArrayList<>();
 
-                // Map JWT roles to Spring Security roles
-                if ("CUSTOMER".equalsIgnoreCase(role)) {
-                    authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
-                } else if ("PHARMACY_ADMIN".equalsIgnoreCase(role)) {
-                    authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
-                } else if ("PHARMACIST".equalsIgnoreCase(role)) {
-                    authorities.add(new SimpleGrantedAuthority("ROLE_PHARMACIST"));
-                } else if ("ADMIN".equalsIgnoreCase(role)) {
-                    authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                if (role != null) {
+                    String roleUpper = role.toUpperCase();
+                    // Use authorities consistent with SecurityConfig.hasAuthority checks
+                    switch (roleUpper) {
+                        case "CUSTOMER" -> authorities.add(new SimpleGrantedAuthority("CUSTOMER"));
+                        case "PHARMACY_ADMIN" -> authorities.add(new SimpleGrantedAuthority("PHARMACY_ADMIN"));
+                        case "PHARMACIST" -> authorities.add(new SimpleGrantedAuthority("PHARMACIST"));
+                        case "ADMIN" -> authorities.add(new SimpleGrantedAuthority("ADMIN"));
+                        default -> { /* ignore unknown roles */ }
+                    }
                 }
 
                 if (userId != null && !authorities.isEmpty()) {
