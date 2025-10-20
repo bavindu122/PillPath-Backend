@@ -8,6 +8,8 @@ import com.leo.pillpathbackend.service.NotificationService;
 import com.leo.pillpathbackend.service.OrderService;
 import com.leo.pillpathbackend.service.WalletService;
 import com.leo.pillpathbackend.service.WalletSettingsService;
+import com.leo.pillpathbackend.dto.PharmacyReviewRequest;
+import com.leo.pillpathbackend.dto.PharmacyReviewResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -36,6 +38,8 @@ public class OrderServiceImpl implements OrderService {
     private final CommissionRecordRepository commissionRecordRepository;
     private final PayoutRecordRepository payoutRecordRepository;
     private final WalletSettingsService walletSettingsService;
+    private final PharmacyReviewRepository pharmacyReviewRepository;
+    private final PharmacyRepository pharmacyRepository;
 
     @Override
     public CustomerOrderDTO placeOrder(Long customerId, PlaceOrderRequestDTO request) {
@@ -519,6 +523,78 @@ public class OrderServiceImpl implements OrderService {
                 .findByOrderCodeAndCustomerOrder_Customer_Id(pharmacyOrderCode, customerId)
                 .orElseThrow(() -> new IllegalArgumentException("Pharmacy order not found"));
         return toPharmacyDTO(po, true);
+    }
+
+    @Override
+    public PharmacyReviewResponse submitPharmacyReview(Long customerId, String orderCode, Long pharmacyId, PharmacyReviewRequest request) {
+        if (customerId == null) throw new IllegalArgumentException("customerId required");
+        if (orderCode == null || orderCode.isBlank()) throw new IllegalArgumentException("orderCode required");
+        if (pharmacyId == null) throw new IllegalArgumentException("pharmacyId required");
+        if (request == null) throw new IllegalArgumentException("request required");
+        int rating = request.getRating();
+        if (rating < 1 || rating > 5) throw new IllegalArgumentException("rating must be between 1 and 5");
+        String comment = request.getComment();
+        if (comment != null && comment.length() > 1000) {
+            throw new IllegalArgumentException("comment must be 0-1000 characters");
+        }
+
+        // Validate that the order belongs to this customer and includes the given pharmacy
+        boolean matched = false;
+        String effectiveOrderCode = orderCode;
+        Optional<CustomerOrder> coOpt = customerOrderRepository.findByOrderCodeAndCustomerId(orderCode, customerId);
+        if (coOpt.isPresent()) {
+            CustomerOrder co = coOpt.get();
+            matched = co.getPharmacyOrders() != null && co.getPharmacyOrders().stream()
+                    .anyMatch(po -> po.getPharmacy() != null && Objects.equals(po.getPharmacy().getId(), pharmacyId));
+        } else {
+            Optional<PharmacyOrder> poOpt = pharmacyOrderRepository.findByOrderCodeAndCustomerOrder_Customer_Id(orderCode, customerId);
+            if (poOpt.isPresent()) {
+                PharmacyOrder po = poOpt.get();
+                matched = po.getPharmacy() != null && Objects.equals(po.getPharmacy().getId(), pharmacyId);
+                // normalize to the pharmacy slice code for uniqueness if provided
+                effectiveOrderCode = po.getOrderCode();
+            }
+        }
+        if (!matched) {
+            throw new IllegalArgumentException("Order does not include the specified pharmacy");
+        }
+
+        // Enforce single review per (customer, pharmacy, orderCode)
+        if (pharmacyReviewRepository.findByCustomerIdAndPharmacyIdAndOrderCode(customerId, pharmacyId, effectiveOrderCode).isPresent()) {
+            throw new IllegalStateException("Review already submitted for this pharmacy and order");
+        }
+
+        PharmacyReview review = PharmacyReview.builder()
+                .reviewId(java.util.UUID.randomUUID().toString())
+                .customerId(customerId)
+                .pharmacyId(pharmacyId)
+                .rating(rating)
+                .review(comment)
+                .orderCode(effectiveOrderCode)
+                .build();
+        PharmacyReview saved = pharmacyReviewRepository.save(review);
+
+        // Update pharmacy aggregates
+        pharmacyRepository.findById(pharmacyId).ifPresent(ph -> {
+            try {
+                Double avg = pharmacyReviewRepository.averageRatingByPharmacy(pharmacyId);
+                long count = pharmacyReviewRepository.countByPharmacyId(pharmacyId);
+                ph.setAverageRating(avg != null ? avg : 0.0);
+                ph.setTotalReviews((int) count);
+                pharmacyRepository.save(ph);
+            } catch (Exception ex) {
+                log.warn("Failed to update pharmacy rating aggregates for pharmacy {}: {}", pharmacyId, ex.getMessage());
+            }
+        });
+
+        return PharmacyReviewResponse.builder()
+                .id(saved.getReviewId())
+                .customerId(saved.getCustomerId())
+                .pharmacyId(saved.getPharmacyId())
+                .rating(saved.getRating())
+                .review(saved.getReview())
+                .createdAt(saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : null)
+                .build();
     }
 
     private boolean isValidTransition(PharmacyOrderStatus from, PharmacyOrderStatus to) {

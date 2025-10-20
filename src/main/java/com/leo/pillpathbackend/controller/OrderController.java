@@ -4,6 +4,8 @@ import com.leo.pillpathbackend.dto.order.CustomerOrderDTO;
 import com.leo.pillpathbackend.dto.order.PlaceOrderRequestDTO;
 import com.leo.pillpathbackend.dto.order.PayOrderRequestDTO;
 import com.leo.pillpathbackend.dto.order.PharmacyOrderDTO;
+import com.leo.pillpathbackend.dto.PharmacyReviewRequest;
+import com.leo.pillpathbackend.dto.PharmacyReviewResponse;
 import com.leo.pillpathbackend.service.OrderService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
 import lombok.RequiredArgsConstructor;
@@ -125,6 +127,29 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Unexpected error paying order {}", orderCode, e);
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Internal server error" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
+        }
+    }
+
+    // Customer submits a review for a pharmacy in an order
+    @PostMapping("/{orderCode}/pharmacies/{pharmacyId}/reviews")
+    public ResponseEntity<?> submitPharmacyReview(@PathVariable String orderCode,
+                                                  @PathVariable Long pharmacyId,
+                                                  @Valid @RequestBody PharmacyReviewRequest request,
+                                                  HttpServletRequest httpRequest) {
+        try {
+            Long customerId = auth.extractCustomerIdFromRequest(httpRequest);
+            PharmacyReviewResponse resp = orderService.submitPharmacyReview(customerId, orderCode, pharmacyId, request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(resp);
+        } catch (IllegalArgumentException e) {
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Bad request" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", msg));
+        } catch (IllegalStateException e) {
+            String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Conflict" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", msg));
+        } catch (Exception e) {
+            log.error("Unexpected error submitting review for order {} pharmacy {}", orderCode, pharmacyId, e);
             String msg = (e.getMessage() == null || e.getMessage().isBlank()) ? "Internal server error" : e.getMessage();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
         }
