@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.persistence.criteria.*;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.*;
 import java.util.*;
 
@@ -131,16 +132,13 @@ public class AdminFinanceController {
             Long pid = ph != null ? ph.getId() : null;
             BigDecimal gross = Optional.ofNullable(po.getTotal()).orElse(BigDecimal.ZERO);
 
-            // Prefer snapshot values if available; avoid lambda captures with mutable locals
-            BigDecimal rate = Optional.ofNullable(po.getCommissionPercentSnapshot())
-                    .orElseGet(() -> walletSettingsService.resolveCommissionPercent(pid));
-            if (rate == null) rate = BigDecimal.ZERO;
-            BigDecimal commission = (po.getCommissionAmountSnapshot() != null)
-                    ? po.getCommissionAmountSnapshot()
-                    : gross.multiply(rate).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
-            BigDecimal net = (sc == SettlementChannel.ONLINE)
-                    ? Optional.ofNullable(po.getNetAfterCommissionSnapshot()).orElse(gross.subtract(commission))
-                    : BigDecimal.ZERO;
+            // Default to current settings-based computation
+            BigDecimal fallbackRate = walletSettingsService.resolveCommissionPercent(pid);
+            BigDecimal commission = gross.multiply(fallbackRate).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+            BigDecimal net = sc == SettlementChannel.ONLINE ? gross.subtract(commission) : BigDecimal.ZERO;
+            BigDecimal effectiveRate = gross.compareTo(BigDecimal.ZERO) > 0
+                    ? commission.multiply(new BigDecimal("100")).divide(gross, 2, RoundingMode.HALF_UP)
+                    : null;
 
             String commissionId = null; Boolean received = null; String payoutId = null;
             if (sc == SettlementChannel.ON_HAND) {
@@ -149,12 +147,35 @@ public class AdminFinanceController {
                     CommissionRecord cr = crOpt.get();
                     commissionId = String.valueOf(cr.getId());
                     received = mapOnHandReceived(cr.getStatus());
+                    // Use snapshot commission amount
+                    if (cr.getAmount() != null) {
+                        commission = cr.getAmount();
+                        // recompute effective rate from snapshot if possible
+                        effectiveRate = gross.compareTo(BigDecimal.ZERO) > 0
+                                ? commission.multiply(new BigDecimal("100")).divide(gross, 2, RoundingMode.HALF_UP)
+                                : null;
+                    }
+                    // net remains zero for ON_HAND in order-payments view
+                    net = BigDecimal.ZERO;
                 } else {
                     received = Boolean.FALSE; // default
                 }
             } else {
                 Optional<PayoutRecord> prOpt = payoutRecordRepository.findByOrderId(po.getId());
-                payoutId = prOpt.map(pr -> String.valueOf(pr.getId())).orElse(null);
+                if (prOpt.isPresent()) {
+                    PayoutRecord pr = prOpt.get();
+                    payoutId = String.valueOf(pr.getId());
+                    // Use snapshot net payout amount
+                    if (pr.getAmount() != null) {
+                        net = pr.getAmount();
+                        // Derive commission from snapshot
+                        commission = gross.subtract(net);
+                        if (commission.compareTo(BigDecimal.ZERO) < 0) commission = BigDecimal.ZERO;
+                        effectiveRate = gross.compareTo(BigDecimal.ZERO) > 0
+                                ? commission.multiply(new BigDecimal("100")).divide(gross, 2, RoundingMode.HALF_UP)
+                                : null;
+                    }
+                }
             }
 
             items.add(OrderPaymentDTO.builder()
@@ -167,7 +188,7 @@ public class AdminFinanceController {
                     .settlementChannel(sc)
                     .paymentMethod(pm)
                     .grossAmount(gross)
-                    .commissionRate(rate)
+                    .commissionRate(effectiveRate)
                     .commissionAmount(commission)
                     .netPayoutAmount(net)
                     .onHandCommissionReceived(sc == SettlementChannel.ON_HAND ? received : null)
