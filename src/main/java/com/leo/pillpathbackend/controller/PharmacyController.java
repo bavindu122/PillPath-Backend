@@ -326,12 +326,13 @@ public class PharmacyController {
             List<Map<String, Object>> items = reviews.stream().map(r -> {
                 String displayName = "Anonymous";
                 if (r.getCustomerId() != null) {
-                    userRepository.findById(r.getCustomerId()).ifPresent(u -> {
-                        // Use username to avoid PII like full name or email
-                        // If username is null, fall back to "User" + masked id
-                    });
                     displayName = userRepository.findById(r.getCustomerId())
-                            .map(u -> u.getUsername() != null ? u.getUsername() : ("User"))
+                            .map(u -> {
+                                String fn = u.getFullName();
+                                if (fn != null && !fn.isBlank()) return fn; // prefer full_name
+                                String un = u.getUsername();
+                                return (un != null && !un.isBlank()) ? un : "User";
+                            })
                             .orElse("Anonymous");
                 }
                 String iso = r.getCreatedAt() != null
