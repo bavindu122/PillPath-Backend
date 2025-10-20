@@ -93,17 +93,6 @@ public class FamilyMemberServiceImpl implements FamilyMemberService {
         FamilyMember saved = familyMemberRepository.save(member);
         System.out.println("Member saved successfully! ID: " + saved.getId());
         
-        // Verify by reading back from database
-        FamilyMember verified = familyMemberRepository.findById(saved.getId()).orElse(null);
-        if (verified != null) {
-            System.out.println("=== VERIFICATION FROM DATABASE ===");
-            System.out.println("Verified Name: " + verified.getName());
-            System.out.println("Verified Age: " + verified.getAge());
-            System.out.println("Verified Phone: " + verified.getPhone());
-            System.out.println("Verified BloodType: " + verified.getBloodType());
-            System.out.println("Verified Allergies: " + verified.getAllergies());
-            System.out.println("==================================");
-        }
         System.out.println("====================================");
         
         return saved;
