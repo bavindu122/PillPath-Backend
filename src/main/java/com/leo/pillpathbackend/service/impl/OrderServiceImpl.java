@@ -8,6 +8,7 @@ import com.leo.pillpathbackend.service.NotificationService;
 import com.leo.pillpathbackend.service.OrderService;
 import com.leo.pillpathbackend.service.WalletService;
 import com.leo.pillpathbackend.service.WalletSettingsService;
+import com.leo.pillpathbackend.service.LoyaltyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -16,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -33,6 +33,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final WalletService walletService;
+    private final LoyaltyService loyaltyService;
     // Added for finance tracking
     private final CommissionRecordRepository commissionRecordRepository;
     private final PayoutRecordRepository payoutRecordRepository;
@@ -492,6 +493,17 @@ public class OrderServiceImpl implements OrderService {
         // Mark paid and advance pharmacy slices from RECEIVED -> PREPARING
         order.setPaymentStatus(PaymentStatus.PAID);
         order.setStatus(CustomerOrderStatus.PAID);
+
+        // Award loyalty points for card payments
+        try {
+            Integer pointsAwarded = loyaltyService.calculateAndAwardPoints(order);
+            if (pointsAwarded > 0) {
+                log.info("Awarded {} loyalty points for order {}", pointsAwarded, orderCode);
+            }
+        } catch (Exception e) {
+            log.error("Error awarding loyalty points for order {}: {}", orderCode, e.getMessage());
+            // Don't fail the payment if loyalty points fail
+        }
 
         if (order.getPharmacyOrders() != null) {
             for (PharmacyOrder po : order.getPharmacyOrders()) {
