@@ -173,6 +173,11 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getSuspendedAccounts());
     }
 
+    @GetMapping("/reviews")
+    public ResponseEntity<List<AdminPharmacyReviewDTO>> getAllPharmacyReviews() {
+        return ResponseEntity.ok(adminService.getAllPharmacyReviews());
+    }
+
     // Future admin endpoints:
     // @GetMapping("/users")
     // @PostMapping("/users/{id}/deactivate")

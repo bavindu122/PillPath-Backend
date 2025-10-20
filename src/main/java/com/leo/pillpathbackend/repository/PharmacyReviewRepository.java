@@ -18,4 +18,5 @@ public interface PharmacyReviewRepository extends JpaRepository<PharmacyReview, 
 
     // List reviews for a pharmacy newest first
     List<PharmacyReview> findByPharmacyIdOrderByCreatedAtDesc(Long pharmacyId);
+    List<PharmacyReview> findAllByOrderByCreatedAtDesc();
 }

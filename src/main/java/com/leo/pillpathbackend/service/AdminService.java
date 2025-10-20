@@ -15,6 +15,7 @@ import com.leo.pillpathbackend.dto.SuspendedAccountDTO;
 import com.leo.pillpathbackend.dto.ModeratorCreateRequest;
 import com.leo.pillpathbackend.dto.ModeratorCreateResponse;
 import com.leo.pillpathbackend.dto.ModeratorListItemDTO;
+import com.leo.pillpathbackend.dto.AdminPharmacyReviewDTO;
 
 import java.util.List;
 
@@ -50,6 +51,9 @@ public interface AdminService {
     ModeratorCreateResponse addModerator(ModeratorCreateRequest request);
     List<ModeratorListItemDTO> getModerators();
     void deleteModerator(String idOrCode);
+
+    // Pharmacy Reviews
+    List<AdminPharmacyReviewDTO> getAllPharmacyReviews();
 
     // Future admin methods can go here:
     // List<UserDTO> getAllUsers();

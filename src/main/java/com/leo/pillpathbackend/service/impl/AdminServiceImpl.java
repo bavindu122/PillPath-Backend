@@ -30,6 +30,7 @@ import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 import com.leo.pillpathbackend.repository.PrescriptionSubmissionRepository;
 import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
+import com.leo.pillpathbackend.repository.PharmacyReviewRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +44,7 @@ public class AdminServiceImpl implements AdminService {
     private final com.leo.pillpathbackend.repository.PharmacyOrderRepository pharmacyOrderRepository; // New repository for pharmacy orders
     private final PasswordEncoder passwordEncoder;
     private final PrescriptionSubmissionRepository prescriptionSubmissionRepository;
+    private final PharmacyReviewRepository pharmacyReviewRepository;
 
     private static final DateTimeFormatter CUSTOMER_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -619,5 +621,39 @@ public class AdminServiceImpl implements AdminService {
             throw new RuntimeException("Cannot delete non-moderator admin");
         }
         userRepository.deleteById(admin.getId());
+    }
+
+    @Override
+    public List<AdminPharmacyReviewDTO> getAllPharmacyReviews() {
+        List<PharmacyReview> reviews = pharmacyReviewRepository.findAllByOrderByCreatedAtDesc();
+        java.util.Map<Long, String> customerNames = new java.util.HashMap<>();
+        java.util.Map<Long, String> pharmacyNames = new java.util.HashMap<>();
+        java.time.ZoneId sys = java.time.ZoneId.systemDefault();
+        java.time.ZoneId utc = java.time.ZoneId.of("UTC");
+        List<AdminPharmacyReviewDTO> result = new java.util.ArrayList<>();
+        for (PharmacyReview r : reviews) {
+            Long cid = r.getCustomerId();
+            Long pid = r.getPharmacyId();
+            String customerName = customerNames.computeIfAbsent(cid != null ? cid : -1L, k -> {
+                if (cid == null) return "";
+                return userRepository.findById(cid)
+                        .map(u -> u.getFullName() != null && !u.getFullName().isBlank() ? u.getFullName() : u.getUsername())
+                        .orElse("");
+            });
+            String pharmacyName = pharmacyNames.computeIfAbsent(pid != null ? pid : -1L, k -> {
+                if (pid == null) return "";
+                return pharmacyRepository.findById(pid).map(Pharmacy::getName).orElse("");
+            });
+            String createdAtIso = r.getCreatedAt() != null ? r.getCreatedAt().atZone(sys).withZoneSameInstant(utc).toInstant().toString() : null;
+            result.add(AdminPharmacyReviewDTO.builder()
+                    .id(r.getReviewId())
+                    .customerName(customerName)
+                    .pharmacyName(pharmacyName)
+                    .review(r.getReview())
+                    .rating(r.getRating())
+                    .createdAt(createdAtIso)
+                    .build());
+        }
+        return result;
     }
 }
