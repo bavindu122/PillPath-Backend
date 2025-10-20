@@ -52,8 +52,9 @@ public class PharmacyAdminController {
         BigDecimal commissionPercent = Optional.ofNullable(po.getCommissionPercentSnapshot())
                 .orElseGet(() -> walletSettingsService.resolveCommissionPercent(po.getPharmacy().getId()));
         if (commissionPercent == null) commissionPercent = BigDecimal.ZERO;
+        final BigDecimal cpFinal = commissionPercent;
         BigDecimal commissionAmount = Optional.ofNullable(po.getCommissionAmountSnapshot())
-                .orElseGet(() -> total.multiply(commissionPercent).divide(new BigDecimal("100"), 2, RM));
+                .orElseGet(() -> total.multiply(cpFinal).divide(new BigDecimal("100"), 2, RM));
         BigDecimal convenienceFee = Optional.ofNullable(po.getConvenienceFeeSnapshot())
                 .orElseGet(() -> Optional.ofNullable(walletSettingsService.getSettings().getConvenienceFee()).orElse(BigDecimal.ZERO).setScale(2, RM));
         BigDecimal netAfterCommission = Optional.ofNullable(po.getNetAfterCommissionSnapshot())
