@@ -18,8 +18,11 @@ import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHe
 import org.springframework.http.HttpMethod;
 
 import com.leo.pillpathbackend.security.filter.CustomTokenAuthenticationFilter;
+import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 
 import java.util.List;
+
+import com.leo.pillpathbackend.security.JwtAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -39,15 +42,21 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         System.out.println("🔧 Building SecurityFilterChain...");
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(customTokenFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(customTokenFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+    
+      
                 .headers(headers -> headers
                         .crossOriginOpenerPolicy(coop -> coop.policy(CrossOriginOpenerPolicy.SAME_ORIGIN_ALLOW_POPUPS))
+                        .crossOriginResourcePolicy(corp -> corp.policy(CrossOriginResourcePolicy.CROSS_ORIGIN))
                 )
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -64,27 +73,24 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/users/change-password").permitAll()
                         .requestMatchers("/api/v1/customers/register").permitAll()
                         .requestMatchers("/api/v1/customers/login").permitAll()
-                        .requestMatchers("/api/v1/customers/oauth").permitAll() // allow Google sign‑in
+                        .requestMatchers("/api/v1/customers/oauth").permitAll()
                         .requestMatchers("/api/v1/customers/check-email/**").permitAll()
                         .requestMatchers("/api/v1/customers/profile/**").permitAll()
-
-                        // Pharmacy public endpoints
+                        // Public registration endpoints
                         .requestMatchers("/api/v1/pharmacies/register").permitAll()
                         .requestMatchers("/api/v1/pharmacy-admins/register").permitAll()
 
-                        // NOTE: Leave admin/pharmacy protected; do not permitAll so JWT is required
-                        // .requestMatchers("/api/v1/admin/**").permitAll() // removed to enforce auth
+                        // Protect admin and pharmacy-admin APIs
+                        .requestMatchers("/api/v1/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/v1/pharmacy-admin/**").hasAuthority("PHARMACY_ADMIN")
+                        .requestMatchers("/api/pharmacy-admin/**").hasAuthority("PHARMACY_ADMIN")
 
-                        .requestMatchers("/api/otc/**").permitAll()
+                        // Leave existing public APIs as-is for now
                         .requestMatchers("/api/v1/pharmacies/**").permitAll()
-                        // .requestMatchers("/api/v1/pharmacy-admin/**").permitAll() // removed to enforce auth
-                        // .requestMatchers("/api/pharmacy-admin/**").permitAll() // removed to enforce auth
-
-                        // Other public endpoints
                         .requestMatchers("/api/v1/prescriptions/**").permitAll()
                         .requestMatchers("/api/v1/medicines/**").permitAll()
                         .requestMatchers("/api/v1/orders/**").permitAll()
-                        .requestMatchers("/api/otc/pharmacy/**").permitAll() // Test only!
+                        .requestMatchers("/api/v1/notifications/**").permitAll()
                         .requestMatchers("/api/v1/wallets/**").permitAll()
                         .requestMatchers("/api/chats/**").permitAll()  // Chat endpoints
                         .requestMatchers("/api/v1/chats/**").permitAll()  // Chat endpoints with v1
