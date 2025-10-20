@@ -1,0 +1,39 @@
+### List reroute candidates (replace <token> and {prescriptionId})
+GET http://localhost:8080/api/v1/prescriptions/customer/{{prescriptionId}}/reroute/candidates?excludePharmacyId={{originalPharmacyId}}&lat={{lat}}&lng={{lng}}&radiusKm=10&limit=20&offset=0
+Authorization: Bearer {{customer_token}}
+
+### Reroute unavailable items to a single pharmacy
+POST http://localhost:8080/api/v1/prescriptions/customer/{{prescriptionId}}/reroute
+Authorization: Bearer {{customer_token}}
+Content-Type: application/json
+Idempotency-Key: {{uuid}}
+
+{
+  "originalPharmacyId": {{originalPharmacyId}},
+  "parentPreviewId": "PP-2025-001239",
+  "targetPharmacyId": {{targetPharmacyId}},
+  "note": "Please try to fulfill these if available.",
+  "items": [
+    { "name": "Amoxicillin 500mg", "quantity": 1 },
+    { "name": "Cetirizine 10mg", "quantity": 1 }
+  ],
+  "strategy": "SINGLE"
+}
+
+### Reroute to multiple pharmacies (broadcast)
+POST http://localhost:8080/api/v1/prescriptions/customer/{{prescriptionId}}/reroute
+Authorization: Bearer {{customer_token}}
+Content-Type: application/json
+Idempotency-Key: {{uuid}}
+
+{
+  "originalPharmacyId": {{originalPharmacyId}},
+  "parentPreviewId": "PP-2025-001239",
+  "targetPharmacyIds": [{{id1}}, {{id2}}],
+  "note": "Broadcasting unavailable items",
+  "items": [
+    { "name": "Amoxicillin 500mg", "quantity": 1 }
+  ],
+  "strategy": "BROADCAST"
+}
+
