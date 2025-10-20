@@ -36,6 +36,10 @@ public class CustomerOrder {
     @JoinColumn(name = "prescription_id")
     private Prescription prescription;
 
+    // Optional: which family member this order is for
+    @Column(name = "family_member_id")
+    private Long familyMemberId;
+
     @Enumerated(EnumType.STRING)
     private CustomerOrderStatus status = CustomerOrderStatus.PENDING;
 

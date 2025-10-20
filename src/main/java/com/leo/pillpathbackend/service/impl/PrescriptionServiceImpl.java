@@ -47,6 +47,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final UserRepository userRepository;
     private final PrescriptionSubmissionItemRepository prescriptionSubmissionItemRepository;
     private final PharmacyOrderRepository pharmacyOrderRepository;
+    private final CustomerOrderRepository customerOrderRepository;
     private final NotificationService notificationService;
 
     private static final DateTimeFormatter ISO_SECOND_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
@@ -137,6 +138,19 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<PrescriptionListItemDTO> getFamilyMemberPrescriptions(Long customerId, Long familyMemberId) {
+        return prescriptionRepository.findByCustomerIdAndFamilyMemberIdOrderByCreatedAtDesc(customerId, familyMemberId)
+                .stream().map(prescription -> {
+                    PrescriptionListItemDTO dto = mapper.toPrescriptionListItemDTO(prescription);
+                    // Try to find the associated order for navigation
+                    customerOrderRepository.findByPrescriptionId(prescription.getId())
+                            .ifPresent(order -> dto.setOrderCode(order.getOrderCode()));
+                    return dto;
+                }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<PrescriptionListItemDTO> getPharmacyPrescriptions(Long pharmacyId) {
         return prescriptionRepository.findByPharmacyIdOrderByCreatedAtDesc(pharmacyId)
                 .stream().map(mapper::toPrescriptionListItemDTO).toList();
@@ -147,7 +161,26 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     public PrescriptionDTO getCustomerPrescription(Long id, Long customerId) {
         Prescription p = prescriptionRepository.findByIdAndCustomerId(id, customerId)
                 .orElseThrow(() -> new NoSuchElementException("Prescription not found"));
-        return mapper.toPrescriptionDTO(p);
+        PrescriptionDTO dto = mapper.toPrescriptionDTO(p);
+        
+        // Include order information if prescription has been ordered
+        customerOrderRepository.findByPrescriptionId(id).ifPresent(order -> {
+            dto.setOrderCode(order.getOrderCode());
+            
+            // Set order totals
+            dto.setOrderTotals(mapper.toOrderTotalsDTO(order));
+            
+            // Set pharmacy orders (the actual fulfilled items from pharmacies)
+            if (order.getPharmacyOrders() != null && !order.getPharmacyOrders().isEmpty()) {
+                dto.setPharmacyOrders(
+                    order.getPharmacyOrders().stream()
+                        .map(po -> mapper.toPharmacyOrderDTO(po, true))
+                        .toList()
+                );
+            }
+        });
+        
+        return dto;
     }
 
     @Override
@@ -663,5 +696,24 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             throw new IllegalStateException("Cannot delete a submission that is part of an active order");
         }
         prescriptionSubmissionRepository.delete(submission);
+    }
+
+    @Override
+    public void assignPrescriptionToFamilyMember(Long prescriptionId, Long customerId, Long familyMemberId) {
+        // Load the prescription
+        Prescription prescription = prescriptionRepository.findById(prescriptionId)
+                .orElseThrow(() -> new IllegalArgumentException("Prescription not found"));
+        
+        // Verify that the prescription belongs to this customer
+        if (!prescription.getCustomer().getId().equals(customerId)) {
+            throw new IllegalArgumentException("You don't have permission to assign this prescription");
+        }
+        
+        // Update the prescription's family member reference
+        prescription.setFamilyMemberId(familyMemberId);
+        prescriptionRepository.save(prescription);
+        
+        log.info("Prescription {} assigned to family member {} by customer {}", 
+                prescriptionId, familyMemberId, customerId);
     }
 }
