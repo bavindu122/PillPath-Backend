@@ -162,28 +162,4 @@ public class PharmacyDashboardServiceImpl implements PharmacyDashboardService {
 //         Long pendingOrders = pharmacyOrderRepository.countOrdersByPharmacyIdAndStatus(
 //                 pharmacyId, PharmacyOrderStatus.PENDING);
 
-//         // Get completed orders
-//         Long completedOrders = pharmacyOrderRepository.countOrdersByPharmacyIdAndStatus(
-//                 pharmacyId, PharmacyOrderStatus.COMPLETED);
-
-//         // Get low stock items
-//         Long lowStockItems = otcRepository.countLowStockByPharmacyId(pharmacyId);
-
-//         // Get out of stock items
-//         Long outOfStockItems = otcRepository.countOutOfStockByPharmacyId(pharmacyId);
-
-//         log.info("Dashboard stats for pharmacy {}: Revenue={}, Orders={}, Inventory={}, Staff={}",
-//                 pharmacyId, totalRevenue, totalOrders, totalInventoryItems, activeStaffMembers);
-
-//         return PharmacyDashboardStatsDTO.builder()
-//                 .totalRevenue(totalRevenue != null ? totalRevenue : BigDecimal.ZERO)
-//                 .totalOrders(totalOrders != null ? totalOrders : 0L)
-//                 .totalInventoryItems(totalInventoryItems != null ? totalInventoryItems : 0L)
-//                 .activeStaffMembers(activeStaffMembers != null ? activeStaffMembers : 0L)
-//                 .pendingOrders(pendingOrders != null ? pendingOrders : 0L)
-//                 .completedOrders(completedOrders != null ? completedOrders : 0L)
-//                 .lowStockItems(lowStockItems != null ? lowStockItems : 0L)
-//                 .outOfStockItems(outOfStockItems != null ? outOfStockItems : 0L)
-//                 .build();
-//     }
 // }
