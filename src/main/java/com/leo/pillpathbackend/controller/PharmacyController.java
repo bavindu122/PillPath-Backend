@@ -25,6 +25,9 @@ public class PharmacyController {
     private final PharmacyService pharmacyService;
     private final AuthenticationHelper authenticationHelper;
     private final CloudinaryService cloudinaryService;
+    // New: repositories for reviews listing
+    private final com.leo.pillpathbackend.repository.PharmacyReviewRepository pharmacyReviewRepository;
+    private final com.leo.pillpathbackend.repository.UserRepository userRepository;
 
 
     @PostMapping("/register")
@@ -313,6 +316,40 @@ public class PharmacyController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("error", "Failed to get pharmacy products: " + e.getMessage(), "status", 500));
+        }
+    }
+
+    @GetMapping("/{pharmacyId}/reviews")
+    public ResponseEntity<?> listPharmacyReviews(@PathVariable("pharmacyId") Long pharmacyId) {
+        try {
+            List<com.leo.pillpathbackend.entity.PharmacyReview> reviews = pharmacyReviewRepository.findByPharmacyIdOrderByCreatedAtDesc(pharmacyId);
+            List<Map<String, Object>> items = reviews.stream().map(r -> {
+                String displayName = "Anonymous";
+                if (r.getCustomerId() != null) {
+                    userRepository.findById(r.getCustomerId()).ifPresent(u -> {
+                        // Use username to avoid PII like full name or email
+                        // If username is null, fall back to "User" + masked id
+                    });
+                    displayName = userRepository.findById(r.getCustomerId())
+                            .map(u -> u.getUsername() != null ? u.getUsername() : ("User"))
+                            .orElse("Anonymous");
+                }
+                String iso = r.getCreatedAt() != null
+                        ? r.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).withZoneSameInstant(java.time.ZoneId.of("UTC")).toInstant().toString()
+                        : null;
+                return java.util.Map.<String, Object>of(
+                        "id", r.getReviewId(),
+                        "userName", displayName,
+                        "date", iso,
+                        "rating", r.getRating(),
+                        "comment", r.getReview(),
+                        "helpfulCount", 0
+                );
+            }).toList();
+            return ResponseEntity.ok(Map.of("items", items));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
         }
     }
 }

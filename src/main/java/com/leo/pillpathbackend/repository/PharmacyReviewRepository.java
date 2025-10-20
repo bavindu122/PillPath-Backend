@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface PharmacyReviewRepository extends JpaRepository<PharmacyReview, String> {
@@ -14,5 +15,7 @@ public interface PharmacyReviewRepository extends JpaRepository<PharmacyReview, 
     Double averageRatingByPharmacy(@Param("pid") Long pharmacyId);
 
     Optional<PharmacyReview> findByCustomerIdAndPharmacyIdAndOrderCode(Long customerId, Long pharmacyId, String orderCode);
-}
 
+    // List reviews for a pharmacy newest first
+    List<PharmacyReview> findByPharmacyIdOrderByCreatedAtDesc(Long pharmacyId);
+}
