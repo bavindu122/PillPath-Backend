@@ -14,8 +14,11 @@ import java.util.List;
 @Builder
 public class PharmacyOrderDTO {
     private Long pharmacyOrderId;
+    private String orderCode;           // ✅ ADDED
     private Long pharmacyId;
     private String pharmacyName;
+    private String pharmacyAddress;     // ✅ ADDED
+    private String pharmacyPhone;       // ✅ ADDED
     private BigDecimal subtotal;
     private String status;
     private List<OrderItemDetailDTO> items;

@@ -82,6 +82,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/otc/pharmacy/**").permitAll() // Test only!
                         .requestMatchers("/api/v1/notifications/**").permitAll()
                         .requestMatchers("/api/otc-orders/**").permitAll()
+                         .requestMatchers("/api/pharmacy-orders/**").permitAll()
+                         
+                        .requestMatchers("/api/v1/pharmacy/dashboard/**").permitAll()
 
                         .anyRequest().authenticated()
                 );

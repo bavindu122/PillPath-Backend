@@ -28,6 +28,7 @@ public class OrderServiceImpl implements OrderService {
     private final PharmacyOrderRepository pharmacyOrderRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final PharmacyAdminRepository pharmacyAdminRepository; // ✅ ADDED
 
     @Override
     public CustomerOrderDTO placeOrder(Long customerId, PlaceOrderRequestDTO request) {
@@ -96,7 +97,6 @@ public class OrderServiceImpl implements OrderService {
                     .pharmacy(submission.getPharmacy())
                     .submission(submission)
                     .status(PharmacyOrderStatus.RECEIVED)
-                    // set unique pharmacy-specific order code
                     .orderCode(generatePharmacyOrderCode(submission.getPharmacy().getId()))
                     .pickupCode(generatePickupCode(submission.getPharmacy().getId()))
                     .pickupLocation(submission.getPharmacy().getAddress())
@@ -145,7 +145,6 @@ public class OrderServiceImpl implements OrderService {
             overallSubtotal = overallSubtotal.add(subSubtotal);
             order.getPharmacyOrders().add(pOrder);
 
-            // Mark selected submission as PREPARING_ORDER only if it's still in an initial state
             PrescriptionStatus current = submission.getStatus();
             if (current == PrescriptionStatus.PENDING_REVIEW || current == PrescriptionStatus.PENDING) {
                 submission.setStatus(PrescriptionStatus.PREPARING_ORDER);
@@ -153,7 +152,6 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Optionally delete unselected submissions that never sent any items (no preview)
         Set<Long> selectedPharmacyIds = request.getPharmacies().stream()
                 .map(PharmacyOrderSelectionDTO::getPharmacyId)
                 .filter(Objects::nonNull)
@@ -166,7 +164,6 @@ public class OrderServiceImpl implements OrderService {
                 if (sub.getItems() == null || sub.getItems().isEmpty()) {
                     toDelete.add(sub);
                 } else {
-                    // Pharmacy sent a preview but customer didn't select it (declined)
                     toNotifyDecline.add(sub);
                 }
             }
@@ -175,7 +172,6 @@ public class OrderServiceImpl implements OrderService {
             submissionRepository.deleteAll(toDelete);
         }
         
-        // NOTIFICATION: Notify pharmacists when customer declines their order preview (Scenario 3 - decline)
         for (PrescriptionSubmission declinedSub : toNotifyDecline) {
             Long pharmacyId = declinedSub.getPharmacy().getId();
             try {
@@ -194,7 +190,6 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // After attaching all PharmacyOrders, mark their submissions as ORDER_PLACED
         if (order.getPharmacyOrders() != null) {
             for (PharmacyOrder po : order.getPharmacyOrders()) {
                 PrescriptionSubmission sub = po.getSubmission();
@@ -205,8 +200,6 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Update parent prescription status
-        // depending on your desired flow. Example: only set if still pending.
         PrescriptionStatus ps = prescription.getStatus();
         if (ps == PrescriptionStatus.PENDING_REVIEW || ps == PrescriptionStatus.PENDING) {
             prescription.setStatus(PrescriptionStatus.ORDER_PLACED);
@@ -218,7 +211,6 @@ public class OrderServiceImpl implements OrderService {
 
         CustomerOrder saved = customerOrderRepository.save(order);
         
-        // NOTIFICATION: Notify pharmacists when customer confirms order (Scenario 3)
         Customer customer = cust;
         for (PharmacyOrder pOrder : saved.getPharmacyOrders()) {
             Long pharmacyId = pOrder.getPharmacy().getId();
@@ -248,6 +240,8 @@ public class OrderServiceImpl implements OrderService {
         return toCustomerDTO(order, true);
     }
 
+    // ========== PHARMACIST METHODS ==========
+    
     @Override
     @Transactional(readOnly = true)
     public PharmacyOrderDTO getPharmacyOrder(Long pharmacistId, Long pharmacyOrderId) {
@@ -290,10 +284,8 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalStateException("Invalid status transition");
         }
 
-        // 1) Update slice and persist (ensures updatedAt for completedDate)
         po.setStatus(status);
         
-        // NOTIFICATION: Notify customer when order is ready for pickup (Scenario 4)
         if (status == PharmacyOrderStatus.READY_FOR_PICKUP) {
             CustomerOrder customerOrder = po.getCustomerOrder();
             if (customerOrder != null && customerOrder.getCustomer() != null) {
@@ -311,19 +303,17 @@ public class OrderServiceImpl implements OrderService {
         
         po = pharmacyOrderRepository.save(po);
 
-        // 2) Update linked submission status (resolve if missing) - restrict to statuses allowed by DB constraint
         PrescriptionSubmission sub = po.getSubmission();
         if (sub != null) {
             switch (status) {
                 case RECEIVED, PREPARING -> sub.setStatus(PrescriptionStatus.PREPARING_ORDER);
                 case READY_FOR_PICKUP -> sub.setStatus(PrescriptionStatus.READY_FOR_PICKUP);
-                case HANDED_OVER      -> sub.setStatus(PrescriptionStatus.COMPLETED);
-                case CANCELLED        -> sub.setStatus(PrescriptionStatus.CANCELLED);
+                case HANDED_OVER -> sub.setStatus(PrescriptionStatus.COMPLETED);
+                case CANCELLED -> sub.setStatus(PrescriptionStatus.CANCELLED);
             }
             submissionRepository.save(sub);
         }
 
-        // 3) Roll up to parent order + prescription from fresh DB slices
         CustomerOrder parent = po.getCustomerOrder();
         if (parent != null) {
             List<PharmacyOrder> slices = pharmacyOrderRepository.findByCustomerOrderId(parent.getId());
@@ -358,6 +348,135 @@ public class OrderServiceImpl implements OrderService {
         return toPharmacyDTO(po, true);
     }
 
+    // ========== ✅ PHARMACY ADMIN METHODS ==========
+    
+    @Override
+    @Transactional(readOnly = true)
+    public PharmacyOrderDTO getPharmacyOrderByAdmin(Long pharmacyAdminId, Long pharmacyOrderId) {
+        log.info("Pharmacy admin {} fetching pharmacy order {}", pharmacyAdminId, pharmacyOrderId);
+        
+        PharmacyAdmin admin = pharmacyAdminRepository.findById(pharmacyAdminId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacy admin not found: " + pharmacyAdminId));
+        
+        if (admin.getPharmacy() == null) {
+            throw new IllegalArgumentException("Pharmacy admin not assigned to pharmacy");
+        }
+        
+        PharmacyOrder po = pharmacyOrderRepository.findByIdAndPharmacyId(pharmacyOrderId, admin.getPharmacy().getId())
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacy order not found"));
+        
+        return toPharmacyDTO(po, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PharmacyOrderDTO> listPharmacyOrdersByAdmin(Long pharmacyAdminId, PharmacyOrderStatus status) {
+        log.info("Pharmacy admin {} listing orders with status {}", pharmacyAdminId, status);
+        
+        PharmacyAdmin admin = pharmacyAdminRepository.findById(pharmacyAdminId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacy admin not found: " + pharmacyAdminId));
+        
+        if (admin.getPharmacy() == null) {
+            throw new IllegalArgumentException("Pharmacy admin not assigned to pharmacy");
+        }
+        
+        Long pharmacyId = admin.getPharmacy().getId();
+        
+        List<PharmacyOrder> list = (status == null)
+                ? pharmacyOrderRepository.findByPharmacyIdOrderByCreatedAtDesc(pharmacyId)
+                : pharmacyOrderRepository.findByPharmacyIdAndStatusOrderByCreatedAtDesc(pharmacyId, status);
+        
+        return list.stream().map(o -> toPharmacyDTO(o, false)).toList();
+    }
+
+    @Override
+    public PharmacyOrderDTO updatePharmacyOrderStatusByAdmin(Long pharmacyAdminId, Long pharmacyOrderId, PharmacyOrderStatus status) {
+        log.info("Pharmacy admin {} updating order {} to status {}", pharmacyAdminId, pharmacyOrderId, status);
+        
+        if (status == null) throw new IllegalArgumentException("status required");
+        
+        PharmacyAdmin admin = pharmacyAdminRepository.findById(pharmacyAdminId)
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacy admin not found: " + pharmacyAdminId));
+        
+        if (admin.getPharmacy() == null) {
+            throw new IllegalArgumentException("Pharmacy admin not assigned to pharmacy");
+        }
+        
+        PharmacyOrder po = pharmacyOrderRepository.findByIdAndPharmacyId(pharmacyOrderId, admin.getPharmacy().getId())
+                .orElseThrow(() -> new IllegalArgumentException("Pharmacy order not found"));
+        
+        if (!isValidTransition(po.getStatus(), status)) {
+            throw new IllegalStateException("Invalid status transition from " + po.getStatus() + " to " + status);
+        }
+
+        po.setStatus(status);
+        
+        if (status == PharmacyOrderStatus.READY_FOR_PICKUP) {
+            CustomerOrder customerOrder = po.getCustomerOrder();
+            if (customerOrder != null && customerOrder.getCustomer() != null) {
+                try {
+                    notificationService.createOrderReadyNotification(
+                        po.getId(),
+                        customerOrder.getCustomer().getId(),
+                        po.getPharmacy().getName()
+                    );
+                } catch (Exception e) {
+                    log.error("Failed to send order ready notification: {}", e.getMessage());
+                }
+            }
+        }
+        
+        po = pharmacyOrderRepository.save(po);
+
+        PrescriptionSubmission sub = po.getSubmission();
+        if (sub != null) {
+            switch (status) {
+                case RECEIVED, PREPARING -> sub.setStatus(PrescriptionStatus.PREPARING_ORDER);
+                case READY_FOR_PICKUP -> sub.setStatus(PrescriptionStatus.READY_FOR_PICKUP);
+                case HANDED_OVER -> sub.setStatus(PrescriptionStatus.COMPLETED);
+                case CANCELLED -> sub.setStatus(PrescriptionStatus.CANCELLED);
+            }
+            submissionRepository.save(sub);
+        }
+
+        CustomerOrder parent = po.getCustomerOrder();
+        if (parent != null) {
+            List<PharmacyOrder> slices = pharmacyOrderRepository.findByCustomerOrderId(parent.getId());
+            boolean hasSlices = !slices.isEmpty();
+            boolean allHandedOver = hasSlices && slices.stream().allMatch(s -> s.getStatus() == PharmacyOrderStatus.HANDED_OVER);
+            boolean allCancelled = hasSlices && slices.stream().allMatch(s -> s.getStatus() == PharmacyOrderStatus.CANCELLED);
+            boolean anyReady = slices.stream().anyMatch(s -> s.getStatus() == PharmacyOrderStatus.READY_FOR_PICKUP);
+            boolean anyPreparing = slices.stream().anyMatch(s -> s.getStatus() == PharmacyOrderStatus.PREPARING);
+
+            if (allHandedOver) {
+                parent.setStatus(CustomerOrderStatus.COMPLETED);
+            } else if (allCancelled) {
+                parent.setStatus(CustomerOrderStatus.CANCELLED);
+            }
+            customerOrderRepository.save(parent);
+
+            Prescription pres = parent.getPrescription();
+            if (pres != null) {
+                if (allHandedOver) {
+                    pres.setStatus(PrescriptionStatus.COMPLETED);
+                } else if (allCancelled) {
+                    pres.setStatus(PrescriptionStatus.CANCELLED);
+                } else if (anyReady) {
+                    pres.setStatus(PrescriptionStatus.READY_FOR_PICKUP);
+                } else if (anyPreparing) {
+                    pres.setStatus(PrescriptionStatus.IN_PROGRESS);
+                }
+                prescriptionRepository.save(pres);
+            }
+        }
+
+        log.info("Order {} status updated to {} by pharmacy admin {}", pharmacyOrderId, status, pharmacyAdminId);
+        
+        return toPharmacyDTO(po, true);
+    }
+
+    // ========== OTHER METHODS ==========
+
     @Override
     public CustomerOrderDTO payOrder(Long customerId, String orderCode, PayOrderRequestDTO request) {
         CustomerOrder order = customerOrderRepository.findByOrderCodeAndCustomerId(orderCode, customerId)
@@ -378,7 +497,6 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Mark paid and advance pharmacy slices from RECEIVED -> PREPARING
         order.setPaymentStatus(PaymentStatus.PAID);
         order.setStatus(CustomerOrderStatus.PAID);
 
@@ -390,7 +508,6 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Nudge prescription to IN_PROGRESS if still pending/review
         Prescription prescription = order.getPrescription();
         if (prescription != null) {
             PrescriptionStatus pstatus = prescription.getStatus();
@@ -410,6 +527,8 @@ public class OrderServiceImpl implements OrderService {
         List<CustomerOrder> orders = customerOrderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId);
         return orders.stream().map(o -> toCustomerDTO(o, includeItems)).toList();
     }
+
+    // ========== HELPER METHODS ==========
 
     private boolean isValidTransition(PharmacyOrderStatus from, PharmacyOrderStatus to) {
         return switch (from) {
@@ -528,7 +647,6 @@ public class OrderServiceImpl implements OrderService {
         return "PU-" + pharmacyId + "-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase();
     }
 
-    // generate a unique pharmacy-specific order code
     private String generatePharmacyOrderCode(Long pharmacyId) {
         return "PORD-" + pharmacyId + "-" + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
                 + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
@@ -552,3 +670,5 @@ public class OrderServiceImpl implements OrderService {
         return dt == null ? null : dt.toString();
     }
 }
+
+

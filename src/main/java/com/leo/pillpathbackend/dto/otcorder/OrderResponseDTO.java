@@ -20,6 +20,7 @@ public class OrderResponseDTO {
     private BigDecimal total;
     private String paymentMethod;
     private String paymentStatus;
+    private String deliveryAddress;     // ✅ ADDED
     private LocalDateTime createdAt;
     private List<PharmacyOrderDTO> pharmacyOrders;
 }

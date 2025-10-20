@@ -1,6 +1,7 @@
 package com.leo.pillpathbackend.controller;
 
 import com.leo.pillpathbackend.dto.OtcDTO;
+import com.leo.pillpathbackend.dto.OtcStockAlertDTO;
 import com.leo.pillpathbackend.dto.PharmacyWithProductDTO;
 import com.leo.pillpathbackend.service.CloudinaryService;
 import com.leo.pillpathbackend.service.OtcService;
@@ -137,6 +138,20 @@ public class OtcController {
         List<PharmacyWithProductDTO> pharmacies = otcService.getPharmaciesByProductName(productName);
         return ResponseEntity.ok(pharmacies);
     }
+
+    // Get stock alerts for a pharmacy
+@GetMapping("/pharmacy/{pharmacyId}/stock-alerts")
+public ResponseEntity<List<OtcStockAlertDTO>> getStockAlerts(@PathVariable Long pharmacyId) {
+    List<OtcStockAlertDTO> alerts = otcService.getStockAlerts(pharmacyId);
+    return ResponseEntity.ok(alerts);
+}
+
+// Get stock statistics for a pharmacy
+@GetMapping("/pharmacy/{pharmacyId}/stock-statistics")
+public ResponseEntity<Map<String, Object>> getStockStatistics(@PathVariable Long pharmacyId) {
+    Map<String, Object> stats = otcService.getStockStatistics(pharmacyId);
+    return ResponseEntity.ok(stats);
+}
 }
 
 
