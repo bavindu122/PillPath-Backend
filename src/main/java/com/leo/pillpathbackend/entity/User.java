@@ -57,6 +57,10 @@ public abstract class User {
     @Column(name = "phone_verified")
     private Boolean phoneVerified = false;
 
+    @Column(name = "suspend_reason")
+    private String suspendReason;
+
+
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -67,5 +71,6 @@ public abstract class User {
 
     // Abstract method to get user type
     public abstract UserType getUserType();
-}
 
+
+}

@@ -286,7 +286,8 @@ public class PharmacyServiceImpl implements PharmacyService {
         dto.setPhoneNumber(pharmacy.getPhoneNumber());
         dto.setDeliveryAvailable(pharmacy.getDeliveryAvailable());
         dto.setLogoUrl(pharmacy.getLogoUrl());
-        dto.setOperatingHours(pharmacy.getOperatingHours());
+        // Ensure operatingHours is never null
+        dto.setOperatingHours(pharmacy.getOperatingHours() != null ? pharmacy.getOperatingHours() : new java.util.HashMap<>());
         dto.setIsActive(pharmacy.getIsActive());
         dto.setIsVerified(pharmacy.getIsVerified());
         return dto;
@@ -371,8 +372,10 @@ public class PharmacyServiceImpl implements PharmacyService {
         profileDTO.setLogoPublicId(pharmacy.getLogoPublicId());
         profileDTO.setBannerUrl(pharmacy.getBannerUrl());
         profileDTO.setBannerPublicId(pharmacy.getBannerPublicId());
-        profileDTO.setOperatingHours(pharmacy.getOperatingHours());
-        profileDTO.setServices(pharmacy.getServices());
+        // Ensure operatingHours is never null - provide empty map if null
+        profileDTO.setOperatingHours(pharmacy.getOperatingHours() != null ? pharmacy.getOperatingHours() : new java.util.HashMap<>());
+        // Ensure services is never null - provide empty list if null
+        profileDTO.setServices(pharmacy.getServices() != null ? pharmacy.getServices() : new java.util.ArrayList<>());
         profileDTO.setIsVerified(pharmacy.getIsVerified());
         profileDTO.setIsActive(pharmacy.getIsActive());
         profileDTO.setDeliveryAvailable(pharmacy.getDeliveryAvailable());
