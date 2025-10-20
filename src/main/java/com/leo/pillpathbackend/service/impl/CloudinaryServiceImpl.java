@@ -136,4 +136,38 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     // 5MB limit for OTC product images
     return uploadImageWithValidation(file, publicId, transformation, 5 * 1024 * 1024);
 }
+    @Override
+    public Map<String, Object> uploadPayoutReceipt(MultipartFile file) throws IOException {
+        if (file.isEmpty()) throw new IllegalArgumentException("File is empty");
+        String contentType = file.getContentType();
+        if (contentType == null) throw new IllegalArgumentException("Unknown file type");
+        long maxBytes = 5L * 1024 * 1024; // 5 MB
+        if (file.getSize() > maxBytes) throw new IllegalArgumentException("File size exceeds 5MB");
+
+        String publicId = "pillpath/payouts/receipts/" + UUID.randomUUID();
+        if (contentType.startsWith("image/")) {
+            Transformation transformation = new Transformation()
+                    .width(1600).height(1600).crop("limit")
+                    .quality("auto").fetchFormat("auto");
+            return cloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap(
+                            "public_id", publicId,
+                            "resource_type", "image",
+                            "transformation", transformation
+                    )
+            );
+        } else if (contentType.equals("application/pdf")) {
+            return cloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap(
+                            "public_id", publicId,
+                            "resource_type", "raw",
+                            "format", "pdf"
+                    )
+            );
+        } else {
+            throw new IllegalArgumentException("Unsupported file type: only image/* or application/pdf allowed");
+        }
+    }
 }

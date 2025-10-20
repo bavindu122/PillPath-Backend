@@ -7,6 +7,7 @@ import java.util.List;
 public interface OrderService {
     CustomerOrderDTO placeOrder(Long customerId, PlaceOrderRequestDTO request);
     CustomerOrderDTO getCustomerOrder(Long customerId, String orderCode);
+    PharmacyOrderDTO getCustomerPharmacyOrderByCode(Long customerId, String pharmacyOrderCode);
     List<CustomerOrderDTO> listCustomerOrders(Long customerId, boolean includeItems);
     
     // Existing pharmacist methods

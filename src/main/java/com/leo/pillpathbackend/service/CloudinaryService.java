@@ -19,4 +19,6 @@ public interface CloudinaryService {
 
     // OTC product images
     Map<String, Object> uploadOtcProductImage(MultipartFile file, Long pharmacyId) throws IOException;
+    // payouts receipts (images or PDFs)
+    Map<String, Object> uploadPayoutReceipt(MultipartFile file) throws IOException;
 }

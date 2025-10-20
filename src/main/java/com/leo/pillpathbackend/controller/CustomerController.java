@@ -3,6 +3,7 @@ package com.leo.pillpathbackend.controller;
 import com.leo.pillpathbackend.entity.Customer;
 import com.leo.pillpathbackend.repository.CustomerRepository;
 import com.leo.pillpathbackend.dto.*;
+import com.leo.pillpathbackend.dto.request.SocialLoginRequest;
 import com.leo.pillpathbackend.service.CustomerService;
 import com.leo.pillpathbackend.service.CloudinaryService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
@@ -13,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +42,8 @@ public class CustomerController {
             }
         }
 
+
+
     @GetMapping(value = "/check-email/{email}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Boolean> checkEmailAvailability(@PathVariable String email) {
         boolean exists = customerService.existsByEmail(email);
@@ -50,6 +54,16 @@ public class CustomerController {
     public ResponseEntity<CustomerLoginResponse> loginCustomer(@RequestBody CustomerLoginRequest request) {
         CustomerLoginResponse response = customerService.loginCustomer(request);
 
+        if (response.isSuccess()) {
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+    }
+
+    @PostMapping(value = "/oauth", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<CustomerLoginResponse> loginWithGoogle(@RequestBody SocialLoginRequest request) {
+        CustomerLoginResponse response = customerService.loginWithGoogle(request);
         if (response.isSuccess()) {
             return ResponseEntity.ok(response);
         } else {
