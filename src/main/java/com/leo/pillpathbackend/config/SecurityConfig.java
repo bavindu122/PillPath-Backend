@@ -85,10 +85,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/users/**").permitAll()  // Unified login
                         .requestMatchers("/api/v1/users/admin/login").permitAll()  // Admin login
                         .requestMatchers("/api/v1/users/change-password").permitAll()
-                        
+
                         // Customer endpoints
-                        .requestMatchers("/api/v1/customers/register").permitAll()
                         .requestMatchers("/api/v1/customers/login").permitAll()
+                        .requestMatchers("/api/v1/customers/register").permitAll()
                         .requestMatchers("/api/v1/customers/oauth").permitAll() // allow Google sign‑in
                         .requestMatchers("/api/v1/customers/check-email/**").permitAll()
                         .requestMatchers("/api/members/**").authenticated()
@@ -107,7 +107,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/medicines/**").permitAll()
                         .requestMatchers("/api/v1/orders/**").permitAll()
                         .requestMatchers("/api/v1/wallets/**").permitAll()
-                        
+                        .requestMatchers("/api/chats/**").permitAll()  // Chat endpoints
+                        .requestMatchers("/api/v1/chats/**").permitAll()  // Chat endpoints with v1
+                        .requestMatchers("/api/v1/v1/chats/**").permitAll()  // Temporary alias path used by frontend
+                        .requestMatchers("/api/v1/v1/chats/threads").permitAll()  // Explicit path
+                        // For local development: explicitly allow anonymous GET to messages path
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/chats/*/messages").permitAll()
+            // For local development: allow anonymous GET to unread-count
+            .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/chats/unread-count").permitAll()
+
                         .anyRequest().authenticated()
                 );
         return http.build();
