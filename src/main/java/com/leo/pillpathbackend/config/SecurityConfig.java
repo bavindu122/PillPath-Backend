@@ -78,6 +78,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/pharmacies/**").permitAll()
                         .requestMatchers("/api/v1/pharmacy-admin/**").permitAll()
                         .requestMatchers("/api/pharmacy-admin/**").permitAll()
+                        .requestMatchers("/api/v1/pharmacist/**").permitAll()
                         .requestMatchers("/api/v1/prescriptions/**").permitAll()
                         .requestMatchers("/api/v1/medicines/**").permitAll()
                         .requestMatchers("/api/v1/orders/**").permitAll()
