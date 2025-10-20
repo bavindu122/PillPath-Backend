@@ -44,10 +44,9 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
                 path.startsWith("/api/v1/prescriptions/") ||
                 path.startsWith("/api/v1/medicines/") ||
                 path.startsWith("/api/v1/orders/") ||
-                // OTC endpoints are public
+                // OTC catalog endpoints are public; orders are handled by security rules
                 path.equals("/api/otc") ||
                 path.startsWith("/api/otc/") ||
-                path.startsWith("/api/otc-orders/") ||
                 // Websocket/STOMP endpoints
                 path.startsWith("/ws/") ||
                 path.startsWith("/app/") ||

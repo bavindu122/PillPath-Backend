@@ -72,9 +72,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/pharmacies/register").permitAll()
                 .requestMatchers("/api/v1/pharmacy-admins/register").permitAll()
 
-                // Public OTC endpoints
+                // Public OTC catalog endpoints (browse only)
                 .requestMatchers("/api/otc/**").permitAll()
-                .requestMatchers("/api/otc-orders/**").permitAll()
+
+                // OTC order endpoints: only GET is public; other methods require auth
+                .requestMatchers(HttpMethod.GET, "/api/otc-orders/**").permitAll()
 
                 // Protect admin and pharmacy-admin APIs
                 .requestMatchers("/api/v1/admin/**").hasAuthority("ADMIN")
@@ -85,7 +87,6 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/pharmacies/**").permitAll()
                 .requestMatchers("/api/v1/prescriptions/**").permitAll()
                 .requestMatchers("/api/v1/medicines/**").permitAll()
-                .requestMatchers("/api/v1/orders/**").permitAll()
                 .requestMatchers("/api/v1/wallets/**").permitAll()
                 .requestMatchers("/api/chats/**").permitAll()
                 .requestMatchers("/api/v1/chats/**").permitAll()
@@ -104,7 +105,7 @@ public class SecurityConfig {
             .addFilterBefore(customTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         System.out.println("✅ SecurityFilterChain built successfully!");
-        System.out.println("✅ /api/otc-orders/** is set to .permitAll()");
+        System.out.println("✅ /api/otc-orders/** GET is set to .permitAll(); write ops require auth");
         return http.build();
     }
 
