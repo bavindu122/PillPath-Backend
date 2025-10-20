@@ -11,8 +11,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/otc-orders")
-// @CrossOrigin("*")
-@CrossOrigin(origins = "*", allowedHeaders = "*")  // ✅ ADD THIS
 public class OtcOrderController {
 
     public OtcOrderController(OtcOrderService otcOrderService) {
