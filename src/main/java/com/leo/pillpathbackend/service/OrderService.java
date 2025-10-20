@@ -14,4 +14,5 @@ public interface OrderService {
     List<PharmacyOrderDTO> listPharmacyOrders(Long pharmacistId, PharmacyOrderStatus status);
     PharmacyOrderDTO updatePharmacyOrderStatus(Long pharmacistId, Long pharmacyOrderId, PharmacyOrderStatus status);
     CustomerOrderDTO payOrder(Long customerId, String orderCode, PayOrderRequestDTO request);
+    void assignOrderToFamilyMember(String orderCode, Long customerId, Long familyMemberId);
 }

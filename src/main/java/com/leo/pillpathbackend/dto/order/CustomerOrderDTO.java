@@ -15,6 +15,7 @@ public class CustomerOrderDTO {
     private String updatedAt;
     private Long prescriptionId;
     private String prescriptionCode;
+    private Long familyMemberId;
     private CustomerOrderStatus status;
     private PaymentDTO payment;
     private OrderTotalsDTO totals;

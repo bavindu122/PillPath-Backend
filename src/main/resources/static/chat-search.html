@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Chat Search (Test)</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .row { margin: 10px 0; }
+    .result { border: 1px solid #ddd; padding: 10px; margin: 6px 0; display:flex; justify-content:space-between; align-items:center; }
+    .no-result { color: #888; }
+  </style>
+</head>
+<body>
+  <h2>Search Pharmacy to Start Chat</h2>
+  <div class="row">
+    <input id="pharmacySearchInput" placeholder="Search pharmacy by name" style="width:300px;padding:8px;" />
+    <button id="searchBtn">Search</button>
+  </div>
+  <div id="pharmacySearchMessage" class="row"></div>
+  <div id="pharmacySearchResults"></div>
+
+  <script src="/js/chat-search.js"></script>
+  <script>
+    // For testing, set a fake current user id if not using auth
+    window.CURRENT_USER_ID = 1;
+  </script>
+</body>
+</html>

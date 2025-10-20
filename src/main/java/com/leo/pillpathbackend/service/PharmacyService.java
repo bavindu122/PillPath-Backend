@@ -29,4 +29,7 @@ public interface PharmacyService {
     // New method for pharmacy profile
     PharmacyDTO getPharmacyProfile(Long pharmacyId);
     List<OTCProductDTO> getPharmacyProducts(Long pharmacyId);
+    
+    // Chat-related method
+    List<PharmacySearchDTO> searchPharmaciesByName(String name);
 }

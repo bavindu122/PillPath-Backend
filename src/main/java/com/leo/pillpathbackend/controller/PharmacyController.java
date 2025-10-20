@@ -6,6 +6,7 @@ import com.leo.pillpathbackend.service.PharmacyService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/pharmacies")
 @CrossOrigin(origins = "*")
+@Slf4j
 public class PharmacyController {
 
     private final PharmacyService pharmacyService;
@@ -314,5 +316,55 @@ public class PharmacyController {
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("error", "Failed to get pharmacy products: " + e.getMessage(), "status", 500));
         }
+    }
+
+    /**
+     * Search pharmacies by name for chat initiation.
+     * Endpoint: GET /api/v1/pharmacies/search?name=...
+     *
+     * @param name Pharmacy name to search for
+     * @return List of PharmacySearchDTO
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<PharmacySearchDTO>> searchPharmacies(
+            @RequestParam(name = "name", required = false) String name,
+            @RequestParam(name = "q", required = false) String q) {
+        String query = (name != null ? name : q);
+        if (query == null) query = "";
+        query = query.trim();
+        log.info("Pharmacy search requested, query='{}' (nameParam='{}', qParam='{}')", query, name, q);
+        List<PharmacySearchDTO> pharmacies = pharmacyService.searchPharmaciesByName(query);
+        log.info("Search returned {} pharmacies for query='{}'", pharmacies.size(), query);
+        return ResponseEntity.ok(pharmacies);
+    }
+
+    /**
+     * Search pharmacies for the chat page with an explicit message when no results.
+     * Endpoint: GET /api/v1/pharmacies/search-for-chat?q=...
+     * Returns: { results: [...], message?: 'No search result' }
+     */
+    @GetMapping("/search-for-chat")
+    public ResponseEntity<Map<String, Object>> searchPharmaciesForChat(
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "name", required = false) String name) {
+        String query = (q != null ? q : (name != null ? name : "")).trim();
+        log.info("Pharmacy chat-search requested, query='{}'", query);
+
+        if (query.isEmpty()) {
+            return ResponseEntity.ok(Map.of(
+                    "results", List.of(),
+                    "message", "No search result"
+            ));
+        }
+
+        List<PharmacySearchDTO> pharmacies = pharmacyService.searchPharmaciesByName(query);
+        if (pharmacies == null || pharmacies.isEmpty()) {
+            return ResponseEntity.ok(Map.of(
+                    "results", List.of(),
+                    "message", "No search result"
+            ));
+        }
+
+        return ResponseEntity.ok(Map.of("results", pharmacies));
     }
 }

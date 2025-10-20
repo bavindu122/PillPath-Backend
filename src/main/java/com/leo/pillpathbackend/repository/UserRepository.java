@@ -34,7 +34,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT COUNT(u) FROM User u WHERE TYPE(u) = Admin")
     Long countSystemAdmins();
 
-    @Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
     List<User> findTop5ByOrderByCreatedAtDesc();
 
     @Query("SELECT u FROM User u WHERE TYPE(u) = Customer")

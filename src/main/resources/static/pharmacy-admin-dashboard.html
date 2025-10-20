@@ -1,0 +1,626 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Pharmacy Admin Dashboard - Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>
+    // SET YOUR PHARMACY ADMIN INFO HERE
+    window.CURRENT_USER_ID = 100;  // Your pharmacy admin ID from database
+    window.CURRENT_USER_ROLE = 'pharmacy_admin';
+    window.AUTH_TOKEN = null; // Set this if you have authentication
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f5f5f5;
+    }
+    
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+    
+    /* Chat List Sidebar */
+    .chat-list {
+      width: 320px;
+      background: white;
+      border-right: 1px solid #e0e0e0;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .chat-list-header {
+      padding: 20px;
+      background: #1976d2;
+      color: white;
+    }
+    
+    .chat-list-header h2 {
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+    
+    .chat-list-items {
+      flex: 1;
+      overflow-y: auto;
+    }
+    
+    .chat-item {
+      padding: 15px 20px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .chat-item:hover {
+      background: #f5f5f5;
+    }
+    
+    .chat-item.active {
+      background: #e3f2fd;
+    }
+    
+    .chat-item-name {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    
+    .chat-item-preview {
+      font-size: 13px;
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .chat-item-time {
+      font-size: 11px;
+      color: #999;
+      margin-top: 3px;
+    }
+    
+    .unread-badge {
+      display: inline-block;
+      background: #f44336;
+      color: white;
+      border-radius: 10px;
+      padding: 2px 8px;
+      font-size: 11px;
+      margin-left: 8px;
+    }
+    
+    /* Chat Area */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: white;
+    }
+    
+    .chat-header {
+      padding: 15px 20px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .chat-header-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      color: #666;
+    }
+    
+    .chat-header-info h3 {
+      font-size: 16px;
+      margin-bottom: 2px;
+    }
+    
+    .chat-header-info p {
+      font-size: 12px;
+      color: #999;
+    }
+    
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .message {
+      max-width: 65%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      line-height: 1.4;
+    }
+    
+    .message.customer {
+      align-self: flex-start;
+      background: #f0f0f0;
+      border-bottom-left-radius: 4px;
+    }
+    
+    .message.pharmacy {
+      align-self: flex-end;
+      background: #1976d2;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+    
+    .message-content {
+      margin-bottom: 4px;
+    }
+    
+    .message-time {
+      font-size: 11px;
+      opacity: 0.7;
+    }
+    
+    .chat-input-area {
+      padding: 15px 20px;
+      background: white;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      gap: 10px;
+    }
+    
+    .chat-input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+    }
+    
+    .chat-input:focus {
+      border-color: #1976d2;
+    }
+    
+    .send-btn {
+      padding: 10px 20px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    
+    .send-btn:hover {
+      background: #1565c0;
+    }
+    
+    .empty-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #999;
+      font-size: 14px;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Chat List Sidebar -->
+    <div class="chat-list">
+      <div class="chat-list-header">
+        <h2>Customer Chats</h2>
+        <p id="pharmacyAdminName" style="opacity: 0.9; font-size: 13px;">Pharmacy Admin</p>
+      </div>
+      <div class="chat-list-items" id="chatList">
+        <div class="loading">Loading chats...</div>
+      </div>
+    </div>
+    
+    <!-- Chat Area -->
+    <div class="chat-area" id="chatArea">
+      <div class="empty-state">
+        Select a chat to start messaging
+      </div>
+    </div>
+  </div>
+  
+  <!-- WebSocket Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+  
+  <script>
+    const currentUserId = window.CURRENT_USER_ID;
+    const currentUserRole = window.CURRENT_USER_ROLE;
+    const authToken = window.AUTH_TOKEN;
+    
+    let chatRooms = [];
+    let activeChat = null;
+    let messages = [];
+    let stompClient = null;
+    let isConnected = false;
+    const displayedMessageIds = new Set();
+    
+    // Load chat list
+    async function loadChatList() {
+      try {
+        const headers = {};
+        if (authToken) {
+          headers['Authorization'] = 'Bearer ' + authToken;
+        }
+        
+        const response = await fetch('/api/v1/chats/pharmacy-admin/dashboard/chats', { headers });
+        
+        if (!response.ok) {
+          console.error('Failed to load chats:', response.status);
+          document.getElementById('chatList').innerHTML = '<div class="loading">Error loading chats. Check console.</div>';
+          return;
+        }
+        
+        chatRooms = await response.json();
+        console.log('Loaded', chatRooms.length, 'chat rooms:', chatRooms);
+        
+        renderChatList();
+      } catch (error) {
+        console.error('Error loading chats:', error);
+        document.getElementById('chatList').innerHTML = '<div class="loading">Error: ' + error.message + '</div>';
+      }
+    }
+    
+    // Render chat list
+    function renderChatList() {
+      const container = document.getElementById('chatList');
+      
+      if (chatRooms.length === 0) {
+        container.innerHTML = '<div class="loading">No chats yet</div>';
+        return;
+      }
+      
+      container.innerHTML = '';
+      
+      chatRooms.forEach(chat => {
+        const div = document.createElement('div');
+        div.className = 'chat-item';
+        if (activeChat && activeChat.id === chat.id) {
+          div.classList.add('active');
+        }
+        
+        div.innerHTML = `
+          <div class="chat-item-name">
+            ${chat.customerName || 'Customer #' + chat.customerId}
+            ${chat.unreadCount > 0 ? '<span class="unread-badge">' + chat.unreadCount + '</span>' : ''}
+          </div>
+          <div class="chat-item-preview">${chat.lastMessage || 'No messages yet'}</div>
+          <div class="chat-item-time">${formatTime(chat.lastMessageAt)}</div>
+        `;
+        
+        div.onclick = () => openChat(chat);
+        container.appendChild(div);
+      });
+    }
+    
+    // Open a chat
+    async function openChat(chat) {
+      activeChat = chat;
+      console.log('Opening chat:', chat);
+      
+      // Update UI
+      renderChatList();
+      
+      // Show chat area
+      document.getElementById('chatArea').innerHTML = `
+        <div class="chat-header">
+          <div class="chat-header-avatar">${(chat.customerName || 'C').charAt(0).toUpperCase()}</div>
+          <div class="chat-header-info">
+            <h3>${chat.customerName || 'Customer #' + chat.customerId}</h3>
+            <p>Customer</p>
+          </div>
+        </div>
+        <div class="chat-messages" id="messages">
+          <div class="loading">Loading messages...</div>
+        </div>
+        <div class="chat-input-area">
+          <input type="text" class="chat-input" id="messageInput" placeholder="Type a message..." />
+          <button class="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+      `;
+      
+      // Add enter key handler
+      document.getElementById('messageInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          sendMessage();
+        }
+      });
+      
+      // Load messages
+      await loadMessages(chat.id);
+      
+      // Subscribe to WebSocket for this chat
+      if (stompClient && isConnected) {
+        subscribeToActiveChat();
+      }
+    }
+    
+    // Load messages for a chat
+    async function loadMessages(chatId) {
+      try {
+        console.log('Loading messages for chat:', chatId);
+        
+        const headers = {};
+        if (authToken) {
+          headers['Authorization'] = 'Bearer ' + authToken;
+        }
+        
+        const response = await fetch(`/api/v1/chats/pharmacy-admin/dashboard/chats/${chatId}/messages?page=0&limit=50`, { headers });
+        
+        if (!response.ok) {
+          console.error('Failed to load messages:', response.status);
+          document.getElementById('messages').innerHTML = '<div class="loading">Error loading messages. Status: ' + response.status + '</div>';
+          return;
+        }
+        
+        const data = await response.json();
+        console.log('Loaded messages:', data);
+        
+        messages = data.messages || [];
+        renderMessages();
+      } catch (error) {
+        console.error('Error loading messages:', error);
+        document.getElementById('messages').innerHTML = '<div class="loading">Error: ' + error.message + '</div>';
+      }
+    }
+    
+    // Render messages
+    function renderMessages() {
+      const container = document.getElementById('messages');
+      
+      if (messages.length === 0) {
+        container.innerHTML = '<div class="loading">No messages yet. Start the conversation!</div>';
+        return;
+      }
+      
+      container.innerHTML = '';
+      displayedMessageIds.clear();
+      
+      // Reverse messages to show oldest first
+      const sortedMessages = [...messages].reverse();
+      
+      sortedMessages.forEach(msg => {
+        addMessageToUI(msg);
+      });
+      
+      // Scroll to bottom
+      container.scrollTop = container.scrollHeight;
+    }
+    
+    // Add a single message to the UI
+    function addMessageToUI(msg) {
+      // Avoid duplicates
+      if (msg.id && displayedMessageIds.has(msg.id)) {
+        return;
+      }
+      
+      const container = document.getElementById('messages');
+      const div = document.createElement('div');
+      const isCustomer = msg.senderType === 'CUSTOMER';
+      div.className = 'message ' + (isCustomer ? 'customer' : 'pharmacy');
+      
+      div.innerHTML = `
+        <div class="message-content">${msg.content || msg.text || ''}</div>
+        <div class="message-time">${formatTime(msg.timestamp || msg.createdAt)}</div>
+      `;
+      
+      container.appendChild(div);
+      
+      if (msg.id) {
+        displayedMessageIds.add(msg.id);
+      }
+      
+      // Scroll to bottom
+      container.scrollTop = container.scrollHeight;
+    }
+    
+    // Send a message
+    async function sendMessage() {
+      if (!activeChat) return;
+      
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      
+      if (!text) return;
+      
+      try {
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        if (authToken) {
+          headers['Authorization'] = 'Bearer ' + authToken;
+        }
+        
+        const response = await fetch(`/api/v1/chats/pharmacy-admin/dashboard/chats/${activeChat.id}/messages`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ text })
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          console.error('Failed to send message:', error);
+          alert('Failed to send message: ' + (error.error || response.statusText));
+          return;
+        }
+        
+        console.log('Message sent successfully');
+        
+        // Clear input
+        input.value = '';
+        
+        // The message will arrive via WebSocket, no need to add optimistically
+        
+      } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Error sending message: ' + error.message);
+      }
+    }
+    
+    // Connect to WebSocket for real-time updates
+    function connectWebSocket() {
+      if (!currentUserId) {
+        console.warn('Cannot connect WebSocket: missing currentUserId');
+        return;
+      }
+
+      try {
+        // Check if libraries are loaded
+        if (typeof SockJS === 'undefined' || typeof Stomp === 'undefined') {
+          console.warn('SockJS or Stomp.js not loaded. Real-time updates disabled.');
+          return;
+        }
+
+        // Connect with role and userId as query parameters
+        const wsUrl = `/ws/chat?role=${currentUserRole}&userId=${currentUserId}`;
+        const socket = new SockJS(wsUrl);
+        stompClient = Stomp.over(socket);
+
+        const headers = {};
+        if (authToken) {
+          headers['Authorization'] = 'Bearer ' + authToken;
+        }
+
+        stompClient.connect(headers, function(frame) {
+          console.log('✅ WebSocket connected for pharmacy admin:', currentUserId);
+          isConnected = true;
+
+          // Subscribe to all chat rooms for this pharmacy
+          // When a message arrives, check if it's for the active chat
+          subscribeToActiveChat();
+
+        }, function(error) {
+          console.error('WebSocket connection error:', error);
+          isConnected = false;
+          
+          // Attempt to reconnect after 3 seconds
+          setTimeout(connectWebSocket, 3000);
+        });
+
+      } catch (e) {
+        console.error('Failed to initialize WebSocket:', e);
+      }
+    }
+    
+    // Subscribe to the active chat room
+    function subscribeToActiveChat() {
+      if (!stompClient || !isConnected || !activeChat) return;
+      
+      const chatId = activeChat.id;
+      
+      // Subscribe to room-specific messages from topic
+      stompClient.subscribe('/topic/chat/room/' + chatId, function(message) {
+        try {
+          const data = JSON.parse(message.body);
+          console.log('📨 Received message from topic:', data);
+
+          // Add to UI if we're viewing this chat
+          if (activeChat && activeChat.id === chatId) {
+            addMessageToUI({
+              id: data.id,
+              content: data.content || data.text,
+              senderId: data.senderId,
+              senderType: data.senderType,
+              timestamp: data.timestamp || data.createdAt || Date.now()
+            });
+          }
+          
+          // Update chat list
+          loadChatList();
+        } catch (e) {
+          console.error('Error processing WebSocket message:', e);
+        }
+      });
+
+      // Also subscribe to user-specific queue for guaranteed delivery
+      const userDestination = '/user/queue/chat/' + chatId;
+      stompClient.subscribe(userDestination, function(message) {
+        try {
+          const data = JSON.parse(message.body);
+          console.log('📬 Received message from user queue:', data);
+
+          // Add to UI if we're viewing this chat
+          if (activeChat && activeChat.id === chatId) {
+            addMessageToUI({
+              id: data.id,
+              content: data.content || data.text,
+              senderId: data.senderId,
+              senderType: data.senderType,
+              timestamp: data.timestamp || data.createdAt || Date.now()
+            });
+          }
+          
+          // Update chat list
+          loadChatList();
+        } catch (e) {
+          console.error('Error processing user queue message:', e);
+        }
+      });
+      
+      // Notify server that we joined this room
+      try {
+        stompClient.send('/app/chat.join.' + chatId, {}, JSON.stringify({}));
+      } catch (e) {
+        console.error('Error joining room:', e);
+      }
+    }
+    
+    // Format time
+    function formatTime(timestamp) {
+      if (!timestamp) return '';
+      
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+      
+      // Less than 1 minute
+      if (diff < 60000) return 'Just now';
+      
+      // Less than 1 hour
+      if (diff < 3600000) {
+        const mins = Math.floor(diff / 60000);
+        return mins + 'm ago';
+      }
+      
+      // Less than 24 hours
+      if (diff < 86400000) {
+        const hours = Math.floor(diff / 3600000);
+        return hours + 'h ago';
+      }
+      
+      // Otherwise show date
+      return date.toLocaleDateString();
+    }
+    
+    // Initialize
+    loadChatList();
+    
+    // Connect to WebSocket
+    connectWebSocket();
+    
+    // Refresh chat list every 5 seconds
+    setInterval(loadChatList, 5000);
+  </script>
+</body>
+</html>
