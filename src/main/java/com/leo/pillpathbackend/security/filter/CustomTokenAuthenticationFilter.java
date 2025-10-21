@@ -73,7 +73,6 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
             String token = authHelper.extractAndValidateToken(request);
             if (token != null) {
                 System.out.println("Valid token found");
-                // Extract user information from JWT token
                 Long userId = jwtService.getUserId(token);
                 String role = jwtService.getRole(token);
                 
@@ -83,13 +82,24 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
 
                 if (role != null) {
                     String roleUpper = role.toUpperCase();
-                    // Use authorities consistent with SecurityConfig.hasAuthority checks
                     switch (roleUpper) {
-                        case "CUSTOMER" -> authorities.add(new SimpleGrantedAuthority("CUSTOMER"));
-                        case "PHARMACY_ADMIN" -> authorities.add(new SimpleGrantedAuthority("PHARMACY_ADMIN"));
-                        case "PHARMACIST" -> authorities.add(new SimpleGrantedAuthority("PHARMACIST"));
-                        case "ADMIN" -> authorities.add(new SimpleGrantedAuthority("ADMIN"));
-                        default -> { /* ignore unknown roles */ }
+                        case "CUSTOMER" -> {
+                            authorities.add(new SimpleGrantedAuthority("CUSTOMER"));
+                            authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+                        }
+                        case "PHARMACY_ADMIN" -> {
+                            authorities.add(new SimpleGrantedAuthority("PHARMACY_ADMIN"));
+                            authorities.add(new SimpleGrantedAuthority("ROLE_PHARMACY_ADMIN"));
+                        }
+                        case "PHARMACIST" -> {
+                            authorities.add(new SimpleGrantedAuthority("PHARMACIST"));
+                            authorities.add(new SimpleGrantedAuthority("ROLE_PHARMACIST"));
+                        }
+                        case "ADMIN" -> {
+                            authorities.add(new SimpleGrantedAuthority("ADMIN"));
+                            authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                        }
+                        default -> authorities.add(new SimpleGrantedAuthority(roleUpper));
                     }
                 }
 
@@ -105,7 +115,6 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
                 System.out.println("No valid token found");
             }
         } catch (Exception e) {
-            // Log and continue without authentication
             System.err.println("Token authentication failed: " + e.getMessage());
             e.printStackTrace();
         }
