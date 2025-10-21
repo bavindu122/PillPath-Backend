@@ -9,6 +9,13 @@ import com.leo.pillpathbackend.dto.CustomerDTO;
 import com.leo.pillpathbackend.dto.OverviewChartsResponseDTO;
 import com.leo.pillpathbackend.dto.OverviewSummaryDTO;
 import com.leo.pillpathbackend.entity.Announcement;
+import com.leo.pillpathbackend.dto.PharmacyPerformanceResponseDTO;
+import com.leo.pillpathbackend.dto.CustomerActivityResponseDTO;
+import com.leo.pillpathbackend.dto.SuspendedAccountDTO;
+import com.leo.pillpathbackend.dto.ModeratorCreateRequest;
+import com.leo.pillpathbackend.dto.ModeratorCreateResponse;
+import com.leo.pillpathbackend.dto.ModeratorListItemDTO;
+import com.leo.pillpathbackend.dto.AdminPharmacyReviewDTO;
 
 import java.util.List;
 
@@ -35,6 +42,19 @@ public interface AdminService {
 
     AdminAnalyticsChartsDTO getAnalyticsCharts(Integer year);
 
+    // Analytics
+    List<PharmacyPerformanceResponseDTO> getPharmacyPerformance();
+    List<CustomerActivityResponseDTO> getCustomerActivity();
+    List<SuspendedAccountDTO> getSuspendedAccounts();
+
+    // Moderators
+    ModeratorCreateResponse addModerator(ModeratorCreateRequest request);
+    List<ModeratorListItemDTO> getModerators();
+    void deleteModerator(String idOrCode);
+
+    // Pharmacy Reviews
+    List<AdminPharmacyReviewDTO> getAllPharmacyReviews();
+    void deletePharmacyReview(String reviewId);
 
     // Future admin methods can go here:
     // List<UserDTO> getAllUsers();
