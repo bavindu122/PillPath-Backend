@@ -36,6 +36,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             case "CUSTOMER" -> {
                 list.add(new SimpleGrantedAuthority("CUSTOMER"));
                 list.add(new SimpleGrantedAuthority("ROLE_USER"));
+                list.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
             }
             case "ADMIN" -> {
                 list.add(new SimpleGrantedAuthority("ADMIN"));

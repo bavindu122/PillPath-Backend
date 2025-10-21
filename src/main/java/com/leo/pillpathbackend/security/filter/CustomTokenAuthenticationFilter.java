@@ -86,6 +86,7 @@ public class CustomTokenAuthenticationFilter extends OncePerRequestFilter {
                         case "CUSTOMER" -> {
                             authorities.add(new SimpleGrantedAuthority("CUSTOMER"));
                             authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+                            authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
                         }
                         case "PHARMACY_ADMIN" -> {
                             authorities.add(new SimpleGrantedAuthority("PHARMACY_ADMIN"));

@@ -8,6 +8,7 @@ import com.leo.pillpathbackend.service.NotificationService;
 import com.leo.pillpathbackend.service.OrderService;
 import com.leo.pillpathbackend.service.WalletService;
 import com.leo.pillpathbackend.service.WalletSettingsService;
+import com.leo.pillpathbackend.service.LoyaltyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import static java.math.RoundingMode.HALF_UP;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -33,6 +35,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final WalletService walletService;
+    private final LoyaltyService loyaltyService;
     // Added for finance tracking
     private final CommissionRecordRepository commissionRecordRepository;
     private final PayoutRecordRepository payoutRecordRepository;
@@ -295,6 +298,59 @@ public class OrderServiceImpl implements OrderService {
 
         po.setStatus(status);
         
+        // Get customer and pharmacy info for notifications
+        CustomerOrder customerOrder = po.getCustomerOrder();
+        Long customerId = (customerOrder != null && customerOrder.getCustomer() != null) 
+                ? customerOrder.getCustomer().getId() : null;
+        String pharmacyName = po.getPharmacy() != null ? po.getPharmacy().getName() : "Pharmacy";
+        
+        // NOTIFICATION: Notify customer when order status changes
+        if (customerId != null) {
+            try {
+                // Scenario: Order status changed to PREPARING
+                if (status == PharmacyOrderStatus.PREPARING) {
+                    notificationService.createOrderPreparingNotification(
+                        po.getId(),
+                        po.getOrderCode(),
+                        customerId,
+                        pharmacyName
+                    );
+                }
+                
+                // Scenario 4: Order ready for pickup
+                else if (status == PharmacyOrderStatus.READY_FOR_PICKUP) {
+                    notificationService.createOrderReadyNotification(
+                        po.getId(),
+                        po.getOrderCode(),
+                        customerId,
+                        pharmacyName
+                    );
+                }
+                
+                // Scenario: Order handed over to customer
+                else if (status == PharmacyOrderStatus.HANDED_OVER) {
+                    notificationService.createOrderHandedOverNotification(
+                        po.getId(),
+                        po.getOrderCode(),
+                        customerId,
+                        pharmacyName,
+                        LocalDateTime.now()
+                    );
+                }
+                
+                // Scenario: Order cancelled by pharmacist
+                else if (status == PharmacyOrderStatus.CANCELLED) {
+                    notificationService.createOrderCancelledByPharmacistNotification(
+                        po.getId(),
+                        customerId,
+                        pharmacyName,
+                        "The pharmacy was unable to fulfill this order"  // Default reason
+                    );
+                }
+            } catch (Exception e) {
+                log.error("Failed to send order status notification: {}", e.getMessage());
+            }
+        }
         // Snapshot finance values when finalizing the slice
         if (status == PharmacyOrderStatus.HANDED_OVER) {
             try {
@@ -599,6 +655,17 @@ public class OrderServiceImpl implements OrderService {
         order.setPaymentStatus(PaymentStatus.PAID);
         order.setStatus(CustomerOrderStatus.PAID);
 
+        // Award loyalty points for card payments
+        try {
+            Integer pointsAwarded = loyaltyService.calculateAndAwardPoints(order);
+            if (pointsAwarded > 0) {
+                log.info("Awarded {} loyalty points for order {}", pointsAwarded, orderCode);
+            }
+        } catch (Exception e) {
+            log.error("Error awarding loyalty points for order {}: {}", orderCode, e.getMessage());
+            // Don't fail the payment if loyalty points fail
+        }
+
         if (order.getPharmacyOrders() != null) {
             for (PharmacyOrder po : order.getPharmacyOrders()) {
                 if (po.getStatus() == PharmacyOrderStatus.RECEIVED) {
@@ -711,6 +778,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private PharmacyOrderDTO toPharmacyDTO(PharmacyOrder po, boolean includeItems) {
+        // Always count items, even if not including full details
+        int itemCount = Optional.ofNullable(po.getItems()).map(List::size).orElse(0);
+        
         List<PharmacyOrderItemDTO> items = includeItems ?
                 (Optional.ofNullable(po.getItems()).orElse(Collections.emptyList())).stream().map(it -> PharmacyOrderItemDTO.builder()
                         .itemId(it.getId())
@@ -757,6 +827,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderCode(po.getOrderCode() != null ? po.getOrderCode() : (parent != null ? parent.getOrderCode() : null))
                 .payment(payment)
                 .items(items)
+                .itemCount(itemCount)
                 .totals(OrderTotalsDTO.builder()
                         .subtotal(po.getSubtotal())
                         .discount(po.getDiscount())
@@ -786,8 +857,18 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private String generatePharmacyOrderCode(Long pharmacyId) {
-        return "PORD-" + pharmacyId + "-" + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-                + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        LocalDateTime now = LocalDateTime.now();
+        String dateStr = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        
+        // Get start and end of today
+        LocalDateTime startOfDay = now.toLocalDate().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1);
+        
+        // Count existing orders for today and increment by 1
+        long todayCount = pharmacyOrderRepository.countByCreatedAtBetween(startOfDay, endOfDay);
+        long sequenceNumber = todayCount + 1;
+        
+        return String.format("ORD-%s-%d", dateStr, sequenceNumber);
     }
 
     private Customer resolveCustomer(User user) {

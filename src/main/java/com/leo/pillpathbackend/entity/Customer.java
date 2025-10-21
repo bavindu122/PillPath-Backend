@@ -44,6 +44,9 @@ public class Customer extends User {
     @Column(name = "profile_picture_public_id")
     private String profilePicturePublicId;
 
+    @Column(name = "loyalty_points", columnDefinition = "integer default 0")
+    private Integer loyaltyPoints = 0;
+
 
 
     // Relationships - Temporarily commented out until related entities are created

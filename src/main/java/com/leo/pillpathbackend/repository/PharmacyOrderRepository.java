@@ -6,6 +6,10 @@ import com.leo.pillpathbackend.entity.enums.CustomerOrderStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
+import java.time.LocalDateTime;
+import java.util.Collection; // added
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -26,6 +30,10 @@ public interface PharmacyOrderRepository extends JpaRepository<PharmacyOrder, Lo
     boolean existsBySubmissionIdAndCustomerOrder_StatusIn(Long submissionId, Collection<CustomerOrderStatus> statuses);
 
     List<PharmacyOrder> findByCustomerOrderId(Long customerOrderId);
+    
+    // Count orders created on a specific date (between start and end of day)
+    @Query("SELECT COUNT(po) FROM PharmacyOrder po WHERE po.createdAt >= :startOfDay AND po.createdAt < :endOfDay")
+    long countByCreatedAtBetween(@Param("startOfDay") LocalDateTime startOfDay, @Param("endOfDay") LocalDateTime endOfDay);
 
     // Dashboard Statistics Queries
     
