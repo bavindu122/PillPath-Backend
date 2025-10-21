@@ -12,6 +12,7 @@ import com.leo.pillpathbackend.entity.enums.PaymentStatus;
 import com.leo.pillpathbackend.service.OrderService;
 import com.leo.pillpathbackend.service.OtcOrderService;
 import com.leo.pillpathbackend.util.AuthenticationHelper;
+import com.leo.pillpathbackend.repository.OtcRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -39,6 +40,7 @@ public class OrderController {
     private final OrderService orderService;
     private final AuthenticationHelper auth;
     private final OtcOrderService otcOrderService;
+    private final OtcRepository otcRepository;
 
     // Customer places multi-pharmacy order
     @PostMapping
@@ -80,43 +82,44 @@ public class OrderController {
 
             if (wantPresc) {
                 List<CustomerOrderDTO> presc = orderService.listCustomerOrders(customerId, includeItems);
-                for (CustomerOrderDTO co : presc) {
-                    UnifiedOrderSummaryDTO.UnifiedOrderSummaryDTOBuilder b = UnifiedOrderSummaryDTO.builder()
-                            .orderType("PRESCRIPTION")
-                            .orderCode(co.getOrderCode())
-                            .createdAt(co.getCreatedAt())
-                            .status(co.getStatus() != null ? co.getStatus().name() : null)
-                            .payment(co.getPayment())
-                            .totals(co.getTotals());
+                // Only keep orders that are true prescriptions (avoid OTC duplicates)
+                presc.stream()
+                        .filter(co -> co.getPrescriptionId() != null)
+                        .forEach(co -> {
+                            UnifiedOrderSummaryDTO.UnifiedOrderSummaryDTOBuilder b = UnifiedOrderSummaryDTO.builder()
+                                    .orderType("PRESCRIPTION")
+                                    .orderCode(co.getOrderCode())
+                                    .createdAt(co.getCreatedAt())
+                                    .status(co.getStatus() != null ? co.getStatus().name() : null)
+                                    .payment(co.getPayment())
+                                    .totals(co.getTotals());
 
-                    // Map pharmacy orders summary (code, id, name, status, prescriptionImageUrl)
-                    if (co.getPharmacyOrders() != null) {
-                        List<UnifiedOrderSummaryDTO.UnifiedPharmacyOrderSummaryDTO> pos = co.getPharmacyOrders().stream().map(po ->
-                                UnifiedOrderSummaryDTO.UnifiedPharmacyOrderSummaryDTO.builder()
-                                        .orderCode(po.getOrderCode())
-                                        .pharmacyId(po.getPharmacyId())
-                                        .pharmacyName(po.getPharmacyName())
-                                        .status(po.getStatus() != null ? po.getStatus().name() : null)
-                                        .prescriptionImageUrl(po.getPrescriptionImageUrl())
-                                        .build()
-                        ).toList();
-                        b.pharmacyOrders(pos);
-                    }
+                            if (co.getPharmacyOrders() != null) {
+                                List<UnifiedOrderSummaryDTO.UnifiedPharmacyOrderSummaryDTO> pos = co.getPharmacyOrders().stream().map(po ->
+                                        UnifiedOrderSummaryDTO.UnifiedPharmacyOrderSummaryDTO.builder()
+                                                .orderCode(po.getOrderCode())
+                                                .pharmacyId(po.getPharmacyId())
+                                                .pharmacyName(po.getPharmacyName())
+                                                .status(po.getStatus() != null ? po.getStatus().name() : null)
+                                                .prescriptionImageUrl(po.getPrescriptionImageUrl())
+                                                .build()
+                                ).toList();
+                                b.pharmacyOrders(pos);
+                            }
 
-                    result.add(b.build());
-                }
+                            result.add(b.build());
+                        });
             }
 
             if (wantOtc) {
                 var otcOrders = otcOrderService.getCustomerOrders(customerId);
                 for (var oo : otcOrders) {
-                    // Build totals and payment
                     OrderTotalsDTO totals = OrderTotalsDTO.builder()
                             .total(oo.getTotal())
                             .currency("LKR")
                             .build();
 
-                    PaymentDTO payment = null;
+                    PaymentDTO payment;
                     try {
                         PaymentMethod pm = oo.getPaymentMethod() != null ? PaymentMethod.valueOf(oo.getPaymentMethod()) : null;
                         PaymentStatus ps = oo.getPaymentStatus() != null ? PaymentStatus.valueOf(oo.getPaymentStatus()) : null;
@@ -128,7 +131,6 @@ public class OrderController {
                                 .reference(null)
                                 .build();
                     } catch (Exception ignore) {
-                        // Fallback: partial payment info
                         payment = PaymentDTO.builder()
                                 .method(null)
                                 .status(null)
@@ -146,22 +148,27 @@ public class OrderController {
                             .payment(payment)
                             .totals(totals);
 
-                    // Convenience: set primary pharmacy info from first slice
                     if (oo.getPharmacyOrders() != null && !oo.getPharmacyOrders().isEmpty()) {
                         var first = oo.getPharmacyOrders().get(0);
                         b.pharmacyId(first.getPharmacyId());
                         b.pharmacyName(first.getPharmacyName());
 
                         if (includeItems && first.getItems() != null) {
-                            var items = first.getItems().stream().map(it ->
-                                    UnifiedOrderSummaryDTO.UnifiedOtcItemDTO.builder()
-                                            .otcProductId(null) // not stored in current schema
-                                            .name(it.getMedicineName())
-                                            .quantity(it.getQuantity())
-                                            .unitPrice(it.getUnitPrice())
-                                            .productImageUrl(null) // not stored; UI may resolve via /api/otc/{id}
-                                            .build()
-                            ).toList();
+                            // Enrich items with productId and imageUrl by matching OTC products in the same pharmacy by name
+                            var otcProducts = otcRepository.findByPharmacyId(first.getPharmacyId());
+                            var items = first.getItems().stream().map(it -> {
+                                var productMatch = otcProducts.stream()
+                                        .filter(p -> p.getName() != null && p.getName().equalsIgnoreCase(it.getMedicineName()))
+                                        .findFirst()
+                                        .orElse(null);
+                                return UnifiedOrderSummaryDTO.UnifiedOtcItemDTO.builder()
+                                        .otcProductId(productMatch != null ? productMatch.getId() : null)
+                                        .name(it.getMedicineName())
+                                        .quantity(it.getQuantity())
+                                        .unitPrice(it.getUnitPrice())
+                                        .productImageUrl(productMatch != null ? productMatch.getImageUrl() : null)
+                                        .build();
+                            }).toList();
                             b.items(items);
                         }
                     }
@@ -276,4 +283,3 @@ public class OrderController {
         }
     }
 }
-

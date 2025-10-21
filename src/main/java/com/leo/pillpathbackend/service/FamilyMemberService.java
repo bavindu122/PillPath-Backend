@@ -6,6 +6,7 @@ import java.util.List;
 
 public interface FamilyMemberService {
     FamilyMember addMember(AddMemberDTO dto);
+    FamilyMember updateMember(Long memberId, AddMemberDTO dto);
     void deleteMember(Long memberId);
     List<FamilyMember> getFamilyMembersByUserId(Long userId);
     List<FamilyMember> getCurrentUserFamilyMembers();
