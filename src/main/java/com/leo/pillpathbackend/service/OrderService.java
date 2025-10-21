@@ -2,6 +2,9 @@ package com.leo.pillpathbackend.service;
 
 import com.leo.pillpathbackend.dto.order.*;
 import com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus;
+import com.leo.pillpathbackend.dto.PharmacyReviewRequest;
+import com.leo.pillpathbackend.dto.PharmacyReviewResponse;
+
 import java.util.List;
 
 public interface OrderService {
@@ -22,6 +25,7 @@ public interface OrderService {
     
     CustomerOrderDTO payOrder(Long customerId, String orderCode, PayOrderRequestDTO request);
     void assignOrderToFamilyMember(String orderCode, Long customerId, Long familyMemberId);
+    PharmacyReviewResponse submitPharmacyReview(Long customerId, String orderCode, Long pharmacyId, PharmacyReviewRequest request);
 }
 
 

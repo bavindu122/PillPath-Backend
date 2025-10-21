@@ -34,6 +34,26 @@ public class AdminController {
         }
     }
 
+    // List moderators
+    @GetMapping("/moderators")
+    public ResponseEntity<List<ModeratorListItemDTO>> getModerators() {
+        return ResponseEntity.ok(adminService.getModerators());
+    }
+
+    // Delete moderator
+    @DeleteMapping("/moderators/{id}")
+    public ResponseEntity<Void> deleteModerator(@PathVariable("id") String id) {
+        adminService.deleteModerator(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // Create a moderator (admin-only action)
+    @PostMapping("/moderators")
+    public ResponseEntity<ModeratorCreateResponse> addModerator(@Valid @RequestBody ModeratorCreateRequest request) {
+        ModeratorCreateResponse response = adminService.addModerator(request);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/announcements")
     public ResponseEntity<AddAnnouncementResponse> addAnnouncement(@RequestBody @Valid AddAnnouncementRequest request) {
         Announcement announcement = adminService.addAnnouncement(request);
@@ -133,6 +153,41 @@ public class AdminController {
     @GetMapping("/analytics/charts")
     public ResponseEntity<AdminAnalyticsChartsDTO> getAnalyticsCharts(@RequestParam(value = "year", required = false) Integer year) {
         return ResponseEntity.ok(adminService.getAnalyticsCharts(year));
+    }
+
+    // Pharmacy performance (no pagination/sorting)
+    @GetMapping("/analytics/pharmacy-performance")
+    public ResponseEntity<List<PharmacyPerformanceResponseDTO>> getPharmacyPerformance() {
+        return ResponseEntity.ok(adminService.getPharmacyPerformance());
+    }
+
+    // Customer activity (no pagination/sorting)
+    @GetMapping("/analytics/customer-activity")
+    public ResponseEntity<List<CustomerActivityResponseDTO>> getCustomerActivity() {
+        return ResponseEntity.ok(adminService.getCustomerActivity());
+    }
+
+    // Suspended accounts (no pagination/sorting)
+    @GetMapping("/analytics/suspended-accounts")
+    public ResponseEntity<List<SuspendedAccountDTO>> getSuspendedAccounts() {
+        return ResponseEntity.ok(adminService.getSuspendedAccounts());
+    }
+
+    @GetMapping("/reviews")
+    public ResponseEntity<List<AdminPharmacyReviewDTO>> getAllPharmacyReviews() {
+        return ResponseEntity.ok(adminService.getAllPharmacyReviews());
+    }
+
+    @DeleteMapping("/reviews/{reviewId}")
+    public ResponseEntity<Void> deletePharmacyReview(@PathVariable("reviewId") String reviewId) {
+        try {
+            adminService.deletePharmacyReview(reviewId);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     // Future admin endpoints:

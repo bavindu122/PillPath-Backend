@@ -1,21 +1,8 @@
 package com.leo.pillpathbackend.service.impl;
 
 import com.leo.pillpathbackend.dto.*;
-import com.leo.pillpathbackend.entity.Prescription;
-import com.leo.pillpathbackend.entity.User;
+import com.leo.pillpathbackend.entity.*;
 import com.leo.pillpathbackend.repository.UserRepository;
-import com.leo.pillpathbackend.service.AdminService;
-import org.springframework.stereotype.Service;
-import com.leo.pillpathbackend.entity.Prescription;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
-import com.leo.pillpathbackend.dto.AddAnnouncementRequest;
-import com.leo.pillpathbackend.entity.Announcement;
-import com.leo.pillpathbackend.repository.AnnouncementRepository;
 import com.leo.pillpathbackend.service.AdminService;
 import org.springframework.stereotype.Service;
 import com.leo.pillpathbackend.repository.PrescriptionRepository;
@@ -30,6 +17,20 @@ import java.time.format.TextStyle;
 import java.util.Locale;
 import com.leo.pillpathbackend.dto.AdminAnalyticsChartsDTO;
 import java.time.Year;
+import java.time.format.DateTimeFormatter;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import com.leo.pillpathbackend.repository.AnnouncementRepository;
+import com.leo.pillpathbackend.dto.ModeratorListItemDTO;
+import com.leo.pillpathbackend.entity.enums.AdminLevel;
+
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.time.LocalDateTime;
+import java.util.stream.Collectors;
+import com.leo.pillpathbackend.repository.PrescriptionSubmissionRepository;
+import com.leo.pillpathbackend.entity.enums.PrescriptionStatus;
+import com.leo.pillpathbackend.repository.PharmacyReviewRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -40,10 +41,16 @@ public class AdminServiceImpl implements AdminService {
     private final PrescriptionRepository prescriptionRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final PharmacyRepository pharmacyRepository;
+    private final com.leo.pillpathbackend.repository.PharmacyOrderRepository pharmacyOrderRepository; // New repository for pharmacy orders
+    private final PasswordEncoder passwordEncoder;
+    private final PrescriptionSubmissionRepository prescriptionSubmissionRepository;
+    private final PharmacyReviewRepository pharmacyReviewRepository;
+
+    private static final DateTimeFormatter CUSTOMER_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     // You can inject other repositories here as needed:
     // private final PharmacyRepository pharmacyRepository;
-    // private final OrderRepository orderRepository;
+    // private final OrderRepository orderRepository
 
     @Override
     public AdminDashboardResponseDTO getDashboardData() {
@@ -263,9 +270,16 @@ public class AdminServiceImpl implements AdminService {
             dto.setId(p.getCode()); // or p.getId().toString()
             dto.setPatient(p.getCustomer().getFullName());
             dto.setPharmacy(p.getPharmacy().getName());
-            dto.setStatus(p.getStatus().name());
+            // Fetch submission for this prescription-pharmacy pair
+            var subOpt = prescriptionSubmissionRepository.findByPrescriptionIdAndPharmacyId(p.getId(), p.getPharmacy().getId());
+            String status = subOpt.map(s -> s.getStatus().name()).orElse(PrescriptionStatus.REJECTED.name());
+            dto.setStatus(status);
+            // total_price from prescription_submission
+            String total = subOpt.map(s -> s.getTotalPrice())
+                    .map(java.math.BigDecimal::toPlainString)
+                    .orElse("0");
+            dto.setTotalPrice(total);
             dto.setSubmitted(p.getCreatedAt().toLocalDate().toString());
-            dto.setTotalPrice(String.valueOf(p.getTotalPrice()));
             dto.setPatientImage(p.getCustomer().getProfilePictureUrl());
             dto.setPharmacyImage(p.getPharmacy().getImageUrl());
             dtos.add(dto);
@@ -426,5 +440,232 @@ public class AdminServiceImpl implements AdminService {
                 .growthRegistrations(growthRegistrations)
                 .orderFulfillment(orderFulfillment)
                 .build();
+    }
+
+    @Override
+    public List<PharmacyPerformanceResponseDTO> getPharmacyPerformance() {
+        List<com.leo.pillpathbackend.entity.Pharmacy> pharmacies = pharmacyRepository.findAll();
+        List<PharmacyPerformanceResponseDTO> result = new ArrayList<>();
+        for (com.leo.pillpathbackend.entity.Pharmacy p : pharmacies) {
+            long fulfilled = pharmacyOrderRepository.countByPharmacyIdAndStatus(p.getId(), com.leo.pillpathbackend.entity.enums.PharmacyOrderStatus.HANDED_OVER);
+            String status = mapStatus(p.getIsActive(), p.getIsVerified());
+            String regDate = null;
+            if (p.getCreatedAt() != null) {
+                regDate = p.getCreatedAt()
+                        .atZone(ZoneId.systemDefault())
+                        .withZoneSameInstant(ZoneId.of("UTC"))
+                        .toInstant()
+                        .toString();
+            }
+            double rating = p.getAverageRating() != null ? p.getAverageRating() : 0.0;
+            result.add(PharmacyPerformanceResponseDTO.builder()
+                    .pharmacyId(formatPharmacyId(p.getId()))
+                    .name(p.getName())
+                    .ordersFulfilled(fulfilled)
+                    .rating(rating)
+                    .status(status)
+                    .registrationDate(regDate)
+                    .build());
+        }
+        return result;
+    }
+
+    @Override
+    public List<CustomerActivityResponseDTO> getCustomerActivity() {
+        List<User> customers = userRepository.findAllCustomers();
+        List<CustomerActivityResponseDTO> result = new ArrayList<>();
+        for (User u : customers) {
+            long uploads = prescriptionRepository.countByCustomerId(u.getId());
+            String status = Boolean.TRUE.equals(u.getIsActive()) ? "Active" : "Suspended";
+            String regDate = u.getCreatedAt() != null ? u.getCreatedAt().format(CUSTOMER_DATE_FORMAT) : null;
+            result.add(CustomerActivityResponseDTO.builder()
+                    .customerId(formatCustomerId(u.getId()))
+                    .name(u.getFullName() != null ? u.getFullName() : u.getUsername())
+                    .prescriptionsUploaded(uploads)
+                    .status(status)
+                    .registrationDate(regDate)
+                    .build());
+        }
+        return result;
+    }
+
+    @Override
+    public List<SuspendedAccountDTO> getSuspendedAccounts() {
+        List<SuspendedAccountDTO> result = new ArrayList<>();
+
+        // Pharmacies: suspended = isActive=false AND isVerified=true
+        List<com.leo.pillpathbackend.entity.Pharmacy> suspendedPharmacies = pharmacyRepository.findSuspendedPharmacies();
+        for (com.leo.pillpathbackend.entity.Pharmacy p : suspendedPharmacies) {
+            result.add(SuspendedAccountDTO.builder()
+                    .type("Pharmacy")
+                    .id(formatPharmacyId(p.getId()))
+                    .name(p.getName())
+                    .reason("") // no field available in entity
+                    .suspendedAt("") // not tracked
+                    .build());
+        }
+
+        // Customers: suspended if isActive=false
+        List<User> customers = userRepository.findAllCustomers();
+        for (User u : customers) {
+            if (Boolean.FALSE.equals(u.getIsActive())) {
+                result.add(SuspendedAccountDTO.builder()
+                        .type("Customer")
+                        .id(formatUserId(u.getId()))
+                        .name(u.getFullName() != null ? u.getFullName() : u.getUsername())
+                        .reason(u.getSuspendReason() != null ? u.getSuspendReason() : "")
+                        .suspendedAt("") // not tracked
+                        .build());
+            }
+        }
+
+        return result;
+    }
+
+    private String formatUserId(Long id) {
+        if (id == null) return null;
+        String s = String.valueOf(id);
+        if (s.length() < 3) s = String.format("%03d", id);
+        return "usr_" + s;
+    }
+
+    private String formatCustomerId(Long id) {
+        if (id == null) return null;
+        String s = String.valueOf(id);
+        if (s.length() < 3) s = String.format("%03d", id);
+        return "cus_" + s;
+    }
+
+    private String formatPharmacyId(Long id) {
+        if (id == null) return null;
+        String s = String.valueOf(id);
+        if (s.length() < 3) {
+            s = String.format("%03d", id);
+        }
+        return "ph_" + s;
+    }
+
+    private String formatModeratorId(Long id) {
+        if (id == null) return null;
+        String s = String.valueOf(id);
+        if (s.length() < 3) s = String.format("%03d", id);
+        return "mod_" + s;
+    }
+
+    private String mapStatus(Boolean isActive, Boolean isVerified) {
+        boolean active = Boolean.TRUE.equals(isActive);
+        boolean verified = Boolean.TRUE.equals(isVerified);
+        if (active && verified) return "Active";
+        if (!active && verified) return "Suspended";
+        // When not verified, treat as Pending (includes inactive+unverified which may be Rejected elsewhere)
+        return "Pending";
+    }
+
+    @Override
+    public ModeratorCreateResponse addModerator(ModeratorCreateRequest request) {
+        if (request == null || request.getUsername() == null || request.getUsername().trim().isEmpty() ||
+                request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+            throw new IllegalArgumentException("Username and password are required");
+        }
+
+        String username = request.getUsername().trim();
+        if (userRepository.existsByUsername(username)) {
+            throw new IllegalArgumentException("Username already exists");
+        }
+
+        // Generate a synthetic email to satisfy not-null+unique constraint
+        String email = ("mod_" + username + "@pillpath.local").toLowerCase();
+        if (userRepository.existsByEmail(email)) {
+            email = ("mod_" + username + "+1@pillpath.local").toLowerCase();
+        }
+
+        Admin moderator = new Admin();
+        moderator.setUsername(username);
+        moderator.setPassword(passwordEncoder.encode(request.getPassword()));
+        moderator.setEmail(email);
+        moderator.setFullName("Moderator");
+        moderator.setIsActive(true);
+        moderator.setEmailVerified(true);
+        // Admin-specific
+        moderator.setAdminLevel(com.leo.pillpathbackend.entity.enums.AdminLevel.STANDARD);
+        moderator.setDepartment("Administration");
+        moderator.setEmployeeId("MOD" + System.currentTimeMillis());
+
+        Admin saved = (Admin) userRepository.save(moderator);
+        return ModeratorCreateResponse.builder()
+                .id(saved.getId())
+                .username(saved.getUsername())
+                .message("Moderator created successfully")
+                .build();
+    }
+
+    @Override
+    public List<ModeratorListItemDTO> getModerators() {
+        List<Admin> admins = userRepository.findAdminsByLevel(AdminLevel.STANDARD);
+        return admins.stream().map(a -> ModeratorListItemDTO.builder()
+                .id(a.getEmployeeId()) // use emp_id as id
+                .username(a.getUsername())
+                .createdAt(a.getCreatedAt() != null ? a.getCreatedAt().format(CUSTOMER_DATE_FORMAT) : null)
+                .build()).collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteModerator(String idOrCode) {
+        String empId = (idOrCode == null) ? null : idOrCode.trim();
+        if (empId == null || empId.isEmpty()) {
+            throw new IllegalArgumentException("Moderator id (emp_id) is required");
+        }
+        Admin admin = userRepository.findAdminByEmployeeId(empId)
+                .orElseThrow(() -> new RuntimeException("Moderator not found"));
+        if (admin.getAdminLevel() != AdminLevel.STANDARD) {
+            throw new RuntimeException("Cannot delete non-moderator admin");
+        }
+        userRepository.deleteById(admin.getId());
+    }
+
+    @Override
+    public List<AdminPharmacyReviewDTO> getAllPharmacyReviews() {
+        List<PharmacyReview> reviews = pharmacyReviewRepository.findAllByOrderByCreatedAtDesc();
+        java.util.Map<Long, String> customerNames = new java.util.HashMap<>();
+        java.util.Map<Long, String> pharmacyNames = new java.util.HashMap<>();
+        java.time.ZoneId sys = java.time.ZoneId.systemDefault();
+        java.time.ZoneId utc = java.time.ZoneId.of("UTC");
+        List<AdminPharmacyReviewDTO> result = new java.util.ArrayList<>();
+        for (PharmacyReview r : reviews) {
+            Long cid = r.getCustomerId();
+            Long pid = r.getPharmacyId();
+            String customerName = customerNames.computeIfAbsent(cid != null ? cid : -1L, k -> {
+                if (cid == null) return "";
+                return userRepository.findById(cid)
+                        .map(u -> u.getFullName() != null && !u.getFullName().isBlank() ? u.getFullName() : u.getUsername())
+                        .orElse("");
+            });
+            String pharmacyName = pharmacyNames.computeIfAbsent(pid != null ? pid : -1L, k -> {
+                if (pid == null) return "";
+                return pharmacyRepository.findById(pid).map(Pharmacy::getName).orElse("");
+            });
+            String createdAtIso = r.getCreatedAt() != null ? r.getCreatedAt().atZone(sys).withZoneSameInstant(utc).toInstant().toString() : null;
+            result.add(AdminPharmacyReviewDTO.builder()
+                    .id(r.getReviewId())
+                    .customerName(customerName)
+                    .pharmacyName(pharmacyName)
+                    .review(r.getReview())
+                    .rating(r.getRating())
+                    .createdAt(createdAtIso)
+                    .build());
+        }
+        return result;
+    }
+
+    @Override
+    public void deletePharmacyReview(String reviewId) {
+        if (reviewId == null || reviewId.isBlank()) {
+            throw new IllegalArgumentException("reviewId is required");
+        }
+        boolean exists = pharmacyReviewRepository.existsById(reviewId);
+        if (!exists) {
+            throw new RuntimeException("Review not found");
+        }
+        pharmacyReviewRepository.deleteById(reviewId);
     }
 }

@@ -54,7 +54,7 @@ public interface PharmacyOrderRepository extends JpaRepository<PharmacyOrder, Lo
 
     // New: resolve by code scoped to a customer
     Optional<PharmacyOrder> findByOrderCodeAndCustomerOrder_Customer_Id(String orderCode, Long customerId);
+
+    // Count fulfilled (delivered) orders all-time for a pharmacy
+    long countByPharmacyIdAndStatus(Long pharmacyId, PharmacyOrderStatus status);
 }
-
-
-
