@@ -15,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.ArrayList;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -25,6 +26,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     public JwtAuthenticationFilter(JwtService jwtService, TokenBlacklistService tokenBlacklistService) {
         this.jwtService = jwtService;
         this.tokenBlacklistService = tokenBlacklistService;
+    }
+
+    private List<SimpleGrantedAuthority> mapAuthorities(String role) {
+        if (role == null) return List.of();
+        String r = role.toUpperCase();
+        List<SimpleGrantedAuthority> list = new ArrayList<>();
+        switch (r) {
+            case "CUSTOMER" -> {
+                list.add(new SimpleGrantedAuthority("CUSTOMER"));
+                list.add(new SimpleGrantedAuthority("ROLE_USER"));
+            }
+            case "ADMIN" -> {
+                list.add(new SimpleGrantedAuthority("ADMIN"));
+                list.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+            }
+            case "PHARMACY_ADMIN" -> {
+                list.add(new SimpleGrantedAuthority("PHARMACY_ADMIN"));
+                list.add(new SimpleGrantedAuthority("ROLE_PHARMACY_ADMIN"));
+            }
+            case "PHARMACIST" -> {
+                list.add(new SimpleGrantedAuthority("PHARMACIST"));
+                list.add(new SimpleGrantedAuthority("ROLE_PHARMACIST"));
+            }
+            default -> list.add(new SimpleGrantedAuthority(r));
+        }
+        return list;
     }
 
     @Override
@@ -38,12 +65,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     Long userId = jwtService.getUserId(token);
                     String role = jwtService.getRole(token);
                     if (role != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                        // ✅ FIX: Add ROLE_ prefix for Spring Security's @PreAuthorize
-                        String roleWithPrefix = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+                        List<SimpleGrantedAuthority> authorities = mapAuthorities(role);
                         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                                 userId,
                                 null,
-                                List.of(new SimpleGrantedAuthority(roleWithPrefix))
+                                authorities
                         );
                         SecurityContextHolder.getContext().setAuthentication(authentication);
                     }
@@ -55,4 +81,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 }
-

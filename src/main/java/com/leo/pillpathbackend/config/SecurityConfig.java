@@ -103,8 +103,9 @@ public class SecurityConfig {
                 // Public OTC catalog endpoints (browse only)
                 .requestMatchers("/api/otc/**").permitAll()
 
-                // OTC order endpoints: only GET is public; other methods require auth
+                // OTC order endpoints: allow GET (read) and POST (create) public; other methods require auth
                 .requestMatchers(HttpMethod.GET, "/api/otc-orders/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/otc-orders").permitAll()
 
                 // Protect admin and pharmacy-admin APIs
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
@@ -133,7 +134,7 @@ public class SecurityConfig {
             .addFilterBefore(customTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         System.out.println("✅ SecurityFilterChain built successfully!");
-        System.out.println("✅ /api/otc-orders/** GET is set to .permitAll(); write ops require auth");
+        System.out.println("✅ /api/otc-orders/** GET and POST are set to .permitAll(); other ops require auth");
         return http.build();
     }
 
