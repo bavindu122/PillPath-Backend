@@ -50,7 +50,7 @@ public class AdminServiceImpl implements AdminService {
 
     // You can inject other repositories here as needed:
     // private final PharmacyRepository pharmacyRepository;
-    // private final OrderRepository orderRepository
+    // private final OrderRepository orderRepository;
 
     @Override
     public AdminDashboardResponseDTO getDashboardData() {
