@@ -7,6 +7,8 @@ class PharmacyAdminChatClient {
     constructor(config) {
         this.baseUrl = config.baseUrl || 'http://localhost:8080';
         this.authToken = config.authToken;
+        this.userId = config.userId || config.adminId; // pharmacy admin userId required for WS targeting
+        this.userRole = (config.userRole || 'pharmacy_admin').toLowerCase();
         this.onMessageReceived = config.onMessageReceived || (() => {});
         this.onChatListUpdated = config.onChatListUpdated || (() => {});
         this.onError = config.onError || console.error;
@@ -93,21 +95,26 @@ class PharmacyAdminChatClient {
      */
     async sendMessage(chatId, text) {
         try {
+            const body = { text };
+            // If no auth token is set, include senderId for backend fallback
+            if (!this.authToken && this.userId) {
+                body.senderId = this.userId;
+            }
             const response = await fetch(
                 `${this.baseUrl}/api/v1/chats/pharmacy-admin/dashboard/chats/${chatId}/messages`,
                 {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${this.authToken}`,
+                        'Authorization': this.authToken ? `Bearer ${this.authToken}` : undefined,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ text })
+                    body: JSON.stringify(body)
                 }
             );
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to send message');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Failed to send message (HTTP ${response.status})`);
             }
 
             const result = await response.json();
@@ -129,11 +136,17 @@ class PharmacyAdminChatClient {
             return;
         }
 
+        if (!this.userId) {
+            console.warn('PharmacyAdminChatClient: userId is required to receive user-targeted messages. Pass { userId } in config.');
+        }
+
         try {
-            const socket = new SockJS(`${this.baseUrl}/ws`);
+            // IMPORTANT: connect to the correct endpoint and include role/userId so server can route /user destinations
+            const wsUrl = `${this.baseUrl.replace(/\/$/, '')}/ws/chat?role=${encodeURIComponent(this.userRole)}&userId=${encodeURIComponent(this.userId || '')}`;
+            const socket = new SockJS(wsUrl);
             this.stompClient = Stomp.over(socket);
             
-            // Add auth headers
+            // Add auth headers (for app-level authorization; handshake uses query params for WS principal)
             const headers = {};
             if (this.authToken) {
                 headers['Authorization'] = `Bearer ${this.authToken}`;
@@ -144,7 +157,7 @@ class PharmacyAdminChatClient {
                     console.log('Connected to WebSocket:', frame);
                     this.isConnected = true;
 
-                    // Subscribe to pharmacy admin notifications
+                    // Subscribe to pharmacy admin generic per-user queue (backend sends this alongside room-specific messages)
                     this.stompClient.subscribe('/user/queue/chat', (message) => {
                         const messageData = JSON.parse(message.body);
                         console.log('Received real-time message:', messageData);

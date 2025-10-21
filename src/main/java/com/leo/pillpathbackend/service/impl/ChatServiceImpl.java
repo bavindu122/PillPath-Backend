@@ -291,14 +291,25 @@ public class ChatServiceImpl implements ChatService {
         String customerDestination = "customer:" + customerId;
         System.out.println("📤 Sending to customer: " + customerDestination + " -> /queue/chat/" + chatRoomId);
         messagingTemplate.convertAndSendToUser(customerDestination, "/queue/chat/" + chatRoomId, payload);
-        
+        // Also send to generic per-user queue for backward-compatible clients
+        System.out.println("📤 Sending to customer generic queue: " + customerDestination + " -> /queue/chat");
+        messagingTemplate.convertAndSendToUser(customerDestination, "/queue/chat", payload);
+
         // Deliver to all pharmacy admins for this pharmacy
         List<PharmacyAdmin> pharmacyAdmins = pharmacyAdminRepository.findByPharmacyId(chatRoom.getPharmacy().getId());
         System.out.println("📤 Found " + pharmacyAdmins.size() + " pharmacy admins for pharmacy " + chatRoom.getPharmacy().getId());
         for (PharmacyAdmin admin : pharmacyAdmins) {
-            String adminDestination = "pharmacy_admin:" + admin.getId();
-            System.out.println("   📤 Sending to pharmacy admin: " + adminDestination + " -> /queue/chat/" + chatRoomId);
-            messagingTemplate.convertAndSendToUser(adminDestination, "/queue/chat/" + chatRoomId, payload);
+            String adminDestination1 = "pharmacy_admin:" + admin.getId();
+            String adminDestination2 = "admin:" + admin.getId(); // alias to support clients using 'admin' role
+            System.out.println("   📤 Sending to pharmacy admin: " + adminDestination1 + " -> /queue/chat/" + chatRoomId);
+            messagingTemplate.convertAndSendToUser(adminDestination1, "/queue/chat/" + chatRoomId, payload);
+            System.out.println("   📤 Sending to pharmacy admin alias: " + adminDestination2 + " -> /queue/chat/" + chatRoomId);
+            messagingTemplate.convertAndSendToUser(adminDestination2, "/queue/chat/" + chatRoomId, payload);
+            // Generic per-user queue for backward-compatible clients
+            System.out.println("   📤 Sending to pharmacy admin generic: " + adminDestination1 + " -> /queue/chat");
+            messagingTemplate.convertAndSendToUser(adminDestination1, "/queue/chat", payload);
+            System.out.println("   📤 Sending to pharmacy admin alias generic: " + adminDestination2 + " -> /queue/chat");
+            messagingTemplate.convertAndSendToUser(adminDestination2, "/queue/chat", payload);
         }
         
         // Also send to room-based topic for anyone subscribed to this specific chat room
